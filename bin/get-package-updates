@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# check for packages that need to be built, and build a list in the proper build order
+# Details:
+#  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
+
+set -e
+
+lock_file="/tmp/get-package-updates.lock"
+
+# Create a lock file for build list.
+
+exec 9>"${lock_file}"
+flock -n 9 || exit
+
+# Update git repositories (official packages, community packages and the repository of package customizations).
+# TODO:
+#  include repository of package customizations
+
+for repo in packages community; do
+  git -C /usr/src/archlinux/${repo} pull
+done
+
+# TODO:
+#  Read previous git revision numbers from files.
+
+# TODO:
+#  Check modified packages from the last update, and put them to the build list.
+#  If a package is updated, but already on the rebuild list, then just update the git revision number.
+#  If a package is deleted, remove from the rebuild list, and add it to the deletion list.
+#  If a new package is added, then ensure that it's not on the deletion list.
+
+# TODO:
+#  Put the list in the proper build order.
+
+# TODO:
+#  Write the current git revision numbers to files.
+
+rm -f "${lock_file}"
