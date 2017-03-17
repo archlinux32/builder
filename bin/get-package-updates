@@ -8,21 +8,33 @@ set -e
 
 lock_file="/tmp/get-package-updates.lock"
 
+# TODO:
+#  include repository of package customizations
+
+declare -A repo_paths
+repo_paths["packages"]="/usr/src/archlinux/packages"
+repo_paths["community"]="/usr/src/archlinux/community"
+
+base_dir="$(dirname "$(readlink -f "$0")")/.."
+
 # Create a lock file for build list.
 
 exec 9>"${lock_file}"
 flock -n 9 || exit
 
 # Update git repositories (official packages, community packages and the repository of package customizations).
-# TODO:
-#  include repository of package customizations
 
-for repo in packages community; do
-  git -C /usr/src/archlinux/${repo} pull
+for repo in "${repo_paths[@]}"; do
+  git -C "${repo}" pull
 done
 
-# TODO:
-#  Read previous git revision numbers from files.
+# Read previous git revision numbers from files.
+
+declare -A old_repo_revisions
+
+for repo in "${!repo_paths[@]}"; do
+  old_repo_revisions["${repo}"]="$(cat ${base_dir}/work/${repo}.revision)"
+done
 
 # TODO:
 #  Check modified packages from the last update, and put them to the build list.
@@ -33,7 +45,11 @@ done
 # TODO:
 #  Put the list in the proper build order.
 
-# TODO:
-#  Write the current git revision numbers to files.
+# Write the current git revision numbers to files.
+
+for repo in "${!repo_paths[@]}"; do
+  git -C "${repo_paths["${repo}"]}" rev-parse HEAD > \
+    "${base_dir}/work/${repo}.revision"
+done
 
 rm -f "${lock_file}"
