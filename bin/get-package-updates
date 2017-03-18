@@ -42,6 +42,17 @@ done
 #  If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 #  If a new package is added, then ensure that it's not on the deletion list.
 
+for repo in "${!repo_paths[@]}"; do
+  current_HEAD="$(
+    git -C "${repo_paths["${repo}"]}" rev-parse HEAD
+  )"
+  git -C "${repo_paths["${repo}"]}" diff --name-only "${old_repo_revisions["${repo}"]}" HEAD | \
+    grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+    sed 's|^\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 '"${current_HEAD}"' \2|' | \
+    grep -v '\(staging\|testing\)$'
+done | \
+  sort -u
+
 # TODO:
 #  Put the list in the proper build order.
 
@@ -51,5 +62,7 @@ for repo in "${!repo_paths[@]}"; do
   git -C "${repo_paths["${repo}"]}" rev-parse HEAD > \
     "${base_dir}/work/${repo}.revision"
 done
+
+# Remove the lock file
 
 rm -f "${lock_file}"
