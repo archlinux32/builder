@@ -36,22 +36,44 @@ for repo in "${!repo_paths[@]}"; do
   old_repo_revisions["${repo}"]="$(cat ${base_dir}/work/${repo}.revision)"
 done
 
-# TODO:
-#  Check modified packages from the last update, and put them to the build list.
-#  If a package is updated, but already on the rebuild list, then just update the git revision number.
-#  If a package is deleted, remove from the rebuild list, and add it to the deletion list.
-#  If a new package is added, then ensure that it's not on the deletion list.
+# Check modified packages from the last update, and put them to the build list.
+# If a package is updated, but already on the rebuild list, then just update the git revision number.
+# If a package is deleted, remove from the rebuild list, and add it to the deletion list.
+# If a new package is added, then ensure that it's not on the deletion list.
 
 for repo in "${!repo_paths[@]}"; do
   current_HEAD="$(
     git -C "${repo_paths["${repo}"]}" rev-parse HEAD
   )"
-  git -C "${repo_paths["${repo}"]}" diff --name-only "${old_repo_revisions["${repo}"]}" HEAD | \
-    grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
-    sed 's|^\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 '"${current_HEAD}"' \2|' | \
+  git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD | \
+    grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+    sed 's|^\(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2 '"${current_HEAD}"' \3|' | \
     grep -v '\(staging\|testing\)$'
 done | \
-  sort -u
+  sort -u | \
+  while read -r mode package git_revision repository; do
+    case "${mode}" in
+
+      "A"|"M")
+        sed -i "/^${package} /d" "${base_dir}/work/build-list"
+        echo "${package} ${git_revision} ${repository}" >> \
+          "${base_dir}/work/build-list"
+        sed -i "/^${package}/d" "${base_dir}/work/deletion-list"
+      ;;
+
+      "D")
+        echo "${package}" >> \
+          "${base_dir}/work/deletion-list"
+        sed -i "/^${package} /d" "${base_dir}/work/build-list"
+      ;;
+
+      *)
+        >&2 echo "unknown git diff mode '${mode}'"
+        exit 1
+      ;;
+
+    esac
+  done
 
 # TODO:
 #  Put the list in the proper build order.
