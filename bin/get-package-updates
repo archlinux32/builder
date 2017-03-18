@@ -17,6 +17,22 @@ repo_paths["community"]="/usr/src/archlinux/community"
 
 base_dir="$(dirname "$(readlink -f "$0")")/.."
 
+# find the PKGBUILD of a given package in a given repository
+# TODO:
+#  include repository of package customizations
+
+find_pkgbuild() {
+
+  for prefix in "${repo_paths["packages"]}" "${repo_paths["community"]}"; do
+    [ -d "${prefix}/$1" ] || continue
+    ls "${prefix}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null && break
+  done | \
+    tr ' ' '\n' | \
+    grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+    sort | \
+    tail -n1
+}
+
 # Create a lock file for build list.
 
 exec 9>"${lock_file}"
@@ -77,6 +93,94 @@ done | \
 
 # TODO:
 #  Put the list in the proper build order.
+
+declare -A packages_built
+declare -A packages_needed
+
+while read -r package dummy repository; do
+  PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
+
+  if [ ! -r "${PKGBUILD}" ]; then
+    echo "'${package}'" "'${repository}'" "'${PKGBUILD}'"
+    exit 1
+  fi
+
+  content="$(
+    sed 's|#.*$||;s|^\s\+||;s|\s\+$||;/^$/d' "${PKGBUILD}" | \
+      sed '
+        :begin;
+          $!N;
+          s@^\([^=]\+=([^)]*\)\n\(.*\)$@\1 \2@;
+          tbegin;
+        P;
+        D
+      '
+  )"
+
+  packages_built["${package}"]="$(
+    echo "${content}" | \
+      grep '^provides=\|^pkgname=' | \
+      sed 's|^[^=]\+=||; s|=.*$||' | \
+      tr "' ()\"" '\n' | \
+      sort -u | \
+      sed '/^$/d'
+  )"
+
+  packages_needed["${package}"]="$(
+    (
+      echo "${content}" | \
+        grep '^depends=\|^makedepends=' | \
+        sed 's|^[^=]\+=||; s|>\?=.*$||' | \
+        tr "' ()\"" '\n' | \
+        sort -u | \
+        sed '/^$/d'
+      echo "${packages_built["${package}"]}" | \
+        sed 'p'
+    ) | \
+      sort | \
+      uniq -u
+  )"
+
+done < "${base_dir}/work/build-list"
+
+rm -f "${base_dir}/work/build-list.new"
+
+while [ ${#packages_built[@]} -gt 0 ]; do
+
+  found_something=false
+
+  for package in "${!packages_built[@]}"; do
+
+    if [ -z "$(
+      (
+        echo "${packages_needed["${package}"]}"
+        echo "${!packages_built[@]}" | \
+          tr ' ' '\n'
+      ) | \
+        sort | \
+        uniq -d
+    )" ]; then
+      grep "^${package} " "${base_dir}/work/build-list" >> \
+        "${base_dir}/work/build-list.new"
+      unset packages_built["${package}"]
+      unset packages_needed["${package}"]
+      found_something=true
+    fi
+  done
+
+  if ${found_something}; then
+    continue
+  fi
+
+  >&2 echo 'uaagh: there seem to be cyclic dependencies - I give up.'
+  >&2 echo "packages left: ${!packages_built[@]}"
+
+# TODO: Break circular dependencies
+
+  exit 1
+done
+
+mv "${base_dir}/work/build-list.new" "${base_dir}/work/build-list"
 
 # Write the current git revision numbers to files.
 
