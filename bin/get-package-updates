@@ -91,8 +91,7 @@ done | \
     esac
   done
 
-# TODO:
-#  Put the list in the proper build order.
+# Put the list in the proper build order.
 
 declare -A packages_built
 declare -A packages_needed
