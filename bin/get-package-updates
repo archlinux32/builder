@@ -57,6 +57,9 @@ done
 # If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 # If a new package is added, then ensure that it's not on the deletion list.
 
+# TODO:
+#  ignore packages from the blacklist
+
 for repo in "${!repo_paths[@]}"; do
   current_HEAD="$(
     git -C "${repo_paths["${repo}"]}" rev-parse HEAD
