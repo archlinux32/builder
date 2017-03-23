@@ -98,6 +98,7 @@ done | \
 
 declare -A packages_built
 declare -A packages_needed
+declare -A packages_needed_for_make
 
 while read -r package dummy repository; do
   PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
@@ -131,7 +132,22 @@ while read -r package dummy repository; do
   packages_needed["${package}"]="$(
     (
       echo "${content}" | \
-        grep '^depends=\|^makedepends=' | \
+        grep '^depends=' | \
+        sed 's|^[^=]\+=||; s|>\?=.*$||' | \
+        tr "' ()\"" '\n' | \
+        sort -u | \
+        sed '/^$/d'
+      echo "${packages_built["${package}"]}" | \
+        sed 'p'
+    ) | \
+      sort | \
+      uniq -u
+  )"
+
+  packages_needed_for_make["${package}"]="$(
+    (
+      echo "${content}" | \
+        grep '^makedepends=' | \
         sed 's|^[^=]\+=||; s|>\?=.*$||' | \
         tr "' ()\"" '\n' | \
         sort -u | \
@@ -156,6 +172,7 @@ while [ ${#packages_built[@]} -gt 0 ]; do
     if [ -z "$(
       (
         echo "${packages_needed["${package}"]}"
+        echo "${packages_needed_for_make["${package}"]}"
         echo "${!packages_built[@]}" | \
           tr ' ' '\n'
       ) | \
@@ -166,6 +183,55 @@ while [ ${#packages_built[@]} -gt 0 ]; do
         "${base_dir}/work/build-list.new"
       unset packages_built["${package}"]
       unset packages_needed["${package}"]
+      unset packages_needed_for_make["${package}"]
+      found_something=true
+    fi
+  done
+
+  if ${found_something}; then
+    continue
+  fi
+
+  for package in "${!packages_built[@]}"; do
+
+    if [ -z "$(
+      (
+        echo "${packages_needed["${package}"]}"
+        echo "${!packages_built[@]}" | \
+          tr ' ' '\n'
+      ) | \
+        sort | \
+        uniq -d
+    )" ]; then
+      grep "^${package} " "${base_dir}/work/build-list" >> \
+        "${base_dir}/work/build-list.new"
+      unset packages_built["${package}"]
+      unset packages_needed["${package}"]
+      unset packages_needed_for_make["${package}"]
+      found_something=true
+    fi
+  done
+
+  if ${found_something}; then
+    continue
+  fi
+
+  for package in "${!packages_built[@]}"; do
+
+    if [ -z "$(
+      (
+        echo "${packages_needed_for_make["${package}"]}"
+        echo "${!packages_built[@]}" | \
+          tr ' ' '\n'
+      ) | \
+        sort | \
+        uniq -d
+    )" ]; then
+      grep "^${package} " "${base_dir}/work/build-list" >> \
+        "${base_dir}/work/build-list.new"
+      unset packages_built["${package}"]
+      unset packages_needed["${package}"]
+      unset packages_needed_for_make["${package}"]
       found_something=true
     fi
   done
@@ -176,6 +242,11 @@ while [ ${#packages_built[@]} -gt 0 ]; do
 
   >&2 echo 'uaagh: there seem to be cyclic dependencies - I give up.'
   >&2 echo "packages left: ${!packages_built[@]}"
+
+  for pkg in "${!packages_built[@]}"; do
+    echo "${pkg}:"
+    echo ${packages_needed["${pkg}"]}
+  done
 
 # TODO: Break circular dependencies
 
