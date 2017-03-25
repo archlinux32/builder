@@ -209,6 +209,7 @@ while [ ${#packages_built[@]} -gt 0 ]; do
       unset packages_needed["${package}"]
       unset packages_needed_for_make["${package}"]
       found_something=true
+      break
     fi
   done
 
@@ -233,6 +234,7 @@ while [ ${#packages_built[@]} -gt 0 ]; do
       unset packages_needed["${package}"]
       unset packages_needed_for_make["${package}"]
       found_something=true
+      break
     fi
   done
 
