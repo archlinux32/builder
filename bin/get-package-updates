@@ -77,7 +77,7 @@ done | \
         sed -i "/^${package} /d" "${base_dir}/work/build-list"
         echo "${package} ${git_revision} ${repository}" >> \
           "${base_dir}/work/build-list"
-        sed -i "/^${package}/d" "${base_dir}/work/deletion-list"
+        sed -i "/^${package}\$/d" "${base_dir}/work/deletion-list"
       ;;
 
       "D")
