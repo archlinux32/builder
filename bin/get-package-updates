@@ -49,7 +49,7 @@ done
 declare -A old_repo_revisions
 
 for repo in "${!repo_paths[@]}"; do
-  old_repo_revisions["${repo}"]="$(cat ${base_dir}/work/${repo}.revision)"
+  old_repo_revisions["${repo}"]="$(cat ${base_dir}/work/${repo}.revision || echo NONE)"
 done
 
 # Check modified packages from the last update, and put them to the build list.
@@ -64,7 +64,15 @@ for repo in "${!repo_paths[@]}"; do
   current_HEAD="$(
     git -C "${repo_paths["${repo}"]}" rev-parse HEAD
   )"
-  git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD | \
+  (
+    if [ "${old_repo_revisions["${repo}"]}" == "NONE" ]; then
+      git -C "${repo_paths["${repo}"]}" archive --format=tar HEAD | \
+        tar -t | \
+        sed 's|^|A\t|'
+    else
+      git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD
+    fi
+  ) | \
     grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
     sed 's|^\(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2 '"${current_HEAD}"' \3|' | \
     grep -v '\(staging\|testing\)$'
