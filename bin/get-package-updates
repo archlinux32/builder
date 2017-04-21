@@ -204,7 +204,7 @@ while [ ${#packages_built[@]} -gt 0 ]; do
 
     if [ -z "$(
       (
-        echo "${packages_needed["${package}"]}"
+        echo "${packages_needed_for_make["${package}"]}"
         echo "${!packages_built[@]}" | \
           tr ' ' '\n'
       ) | \
@@ -229,7 +229,7 @@ while [ ${#packages_built[@]} -gt 0 ]; do
 
     if [ -z "$(
       (
-        echo "${packages_needed_for_make["${package}"]}"
+        echo "${packages_needed["${package}"]}"
         echo "${!packages_built[@]}" | \
           tr ' ' '\n'
       ) | \
