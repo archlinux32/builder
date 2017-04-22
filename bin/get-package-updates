@@ -4,6 +4,9 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
+# TODO:
+#  use tsort and mksrcinfo
+
 set -e
 
 lock_file="/tmp/get-package-updates.lock"
