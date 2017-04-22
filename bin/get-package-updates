@@ -5,24 +5,13 @@
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
 # TODO:
-#  use tsort and mksrcinfo
-
-set -e
-
-lock_file="/tmp/get-package-updates.lock"
-
-# TODO:
 #  include repository of package customizations
 
-declare -A repo_paths
-repo_paths["packages"]="/usr/src/archlinux/packages"
-repo_paths["community"]="/usr/src/archlinux/community"
-
-base_dir="$(dirname "$(readlink -f "$0")")/.."
+. "${0%/*}/../conf/default.conf"
 
 # find the PKGBUILD of a given package in a given repository
 # TODO:
-#  include repository of package customizations
+#  _properly_ include repository of package customizations
 
 find_pkgbuild() {
 
@@ -31,6 +20,7 @@ find_pkgbuild() {
     ls "${prefix}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null && break
   done | \
     tr ' ' '\n' | \
+    grep -v -- '-i686/PKGBUILD$' | \
     grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
     sort | \
     tail -n1
@@ -52,8 +42,15 @@ done
 declare -A old_repo_revisions
 
 for repo in "${!repo_paths[@]}"; do
-  old_repo_revisions["${repo}"]="$(cat ${base_dir}/work/${repo}.revision || echo NONE)"
+  old_repo_revisions["${repo}"]="$(
+    cat "${work_dir}/${repo}.revision" 2> /dev/null || \
+      echo NONE
+  )"
+  git -C "${repo_paths["${repo}"]}" rev-parse HEAD > \
+    "${work_dir}/${repo}.revision.new"
 done
+
+echo 'Check modified packages from the last update, and put them to the build list.'
 
 # Check modified packages from the last update, and put them to the build list.
 # If a package is updated, but already on the rebuild list, then just update the git revision number.
@@ -63,38 +60,43 @@ done
 # TODO:
 #  ignore packages from the blacklist
 
-for repo in "${!repo_paths[@]}"; do
-  current_HEAD="$(
-    git -C "${repo_paths["${repo}"]}" rev-parse HEAD
-  )"
-  (
-    if [ "${old_repo_revisions["${repo}"]}" == "NONE" ]; then
-      git -C "${repo_paths["${repo}"]}" archive --format=tar HEAD | \
-        tar -t | \
-        sed 's|^|A\t|'
-    else
-      git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD
-    fi
-  ) | \
-    grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
-    sed 's|^\(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2 '"${current_HEAD}"' \3|' | \
-    grep -v '\(staging\|testing\)$'
-done | \
-  sort -u | \
+cp "${work_dir}/build-list"{,.new}
+cp "${work_dir}/deletion-list"{,.new}
+
+(
+  for repo in "${!repo_paths[@]}"; do
+    current_HEAD="$(cat "${work_dir}/${repo}.revision.new")"
+    (
+      if [ "${old_repo_revisions["${repo}"]}" == "NONE" ]; then
+        git -C "${repo_paths["${repo}"]}" archive --format=tar HEAD | \
+          tar -t | \
+          sed 's|^|A\t|'
+      else
+        git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD
+      fi
+    ) | \
+      grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+      grep -v -- '-i686/PKGBUILD$' | \
+      sed 's|^\(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2 '"${current_HEAD}"' \3|' | \
+      grep -v '\(staging\|testing\)$'
+  done | \
+    sort -u
+  sed "s|^\(.*\)\$|D \1 $(cat "${work_dir}/archlinux32.revision.new") archlinux32|" "${repo_paths["archlinux32"]}/blacklist"
+) | \
   while read -r mode package git_revision repository; do
     case "${mode}" in
 
       "A"|"M")
-        sed -i "/^${package} /d" "${base_dir}/work/build-list"
+        sed -i "/^${package} /d" "${work_dir}/build-list"
         echo "${package} ${git_revision} ${repository}" >> \
-          "${base_dir}/work/build-list"
-        sed -i "/^${package}\$/d" "${base_dir}/work/deletion-list"
+          "${work_dir}/build-list.new"
+        sed -i "/^${package}\$/d" "${work_dir}/deletion-list.new"
       ;;
 
       "D")
         echo "${package}" >> \
-          "${base_dir}/work/deletion-list"
-        sed -i "/^${package} /d" "${base_dir}/work/build-list"
+          "${work_dir}/deletion-list.new"
+        sed -i "/^${package} /d" "${work_dir}/build-list.new"
       ;;
 
       *)
@@ -105,175 +107,105 @@ done | \
     esac
   done
 
+echo 'Extract dependencies of packages.'
+
 # Put the list in the proper build order.
+# First, we extract the dependencies of each package.
+# TODO:
+#  package modifications need to be included here
 
-declare -A packages_built
-declare -A packages_needed
-declare -A packages_needed_for_make
+mkdir -p "${work_dir}/package-infos"
 
-while read -r package dummy repository; do
+rm -f "${work_dir}/build-order"
+
+while read -r package git_rev repository; do
   PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
   if [ ! -r "${PKGBUILD}" ]; then
-    echo "'${package}'" "'${repository}'" "'${PKGBUILD}'"
+    echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
     exit 1
   fi
 
-  content="$(
-    sed 's|#.*$||;s|^\s\+||;s|\s\+$||;/^$/d' "${PKGBUILD}" | \
-      sed '
-        :begin;
-          $!N;
-          s@^\([^=]\+=([^)]*\)\n\(.*\)$@\1 \2@;
-          tbegin;
-        P;
-        D
-      '
-  )"
+  if [ ! -e "${work_dir}/package-infos/${package}.${git_rev}.builds" ] || \
+    [ ! -e "${work_dir}/package-infos/${package}.${git_rev}.needs" ]; then
 
-  packages_built["${package}"]="$(
-    echo "${content}" | \
-      grep '^provides=\|^pkgname=' | \
-      sed 's|^[^=]\+=||; s|=.*$||' | \
-      tr "' ()\"" '\n' | \
-      sort -u | \
-      sed '/^$/d'
-  )"
-
-  packages_needed["${package}"]="$(
     (
-      echo "${content}" | \
-        grep '^depends=' | \
-        sed 's|^[^=]\+=||; s|>\?=.*$||' | \
-        tr "' ()\"" '\n' | \
-        sort -u | \
-        sed '/^$/d'
-      echo "${packages_built["${package}"]}" | \
+      cd "${PKGBUILD%/*}"
+      mksrcinfo -o "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+    )
+
+    grep '^\('$'\t''provides\|pkgname\) = ' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO" | \
+      cut -d= -f2 | \
+      sed 's|^\s\+||; s|[<>]$||' | \
+      sort -u > \
+      "${work_dir}/package-infos/${package}.${git_rev}.builds"
+
+    (
+      (
+        sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+        grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+      ) | \
+        cut -d= -f2 | \
+        sed 's|^\s\+||; s|[<>]$||' | \
+        sort -u
+      cat "${work_dir}/package-infos/${package}.${git_rev}.builds" | \
         sed 'p'
     ) | \
       sort | \
-      uniq -u
-  )"
+      uniq -u > \
+      "${work_dir}/package-infos/${package}.${git_rev}.needs"
 
-  packages_needed_for_make["${package}"]="$(
-    (
-      echo "${content}" | \
-        grep '^makedepends=' | \
-        sed 's|^[^=]\+=||; s|>\?=.*$||' | \
-        tr "' ()\"" '\n' | \
-        sort -u | \
-        sed '/^$/d'
-      echo "${packages_built["${package}"]}" | \
-        sed 'p'
-    ) | \
-      sort | \
-      uniq -u
-  )"
+    rm "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
 
-done < "${base_dir}/work/build-list"
-
-rm -f "${base_dir}/work/build-list.new"
-
-while [ ${#packages_built[@]} -gt 0 ]; do
-
-  found_something=false
-
-  for package in "${!packages_built[@]}"; do
-
-    if [ -z "$(
-      (
-        echo "${packages_needed["${package}"]}"
-        echo "${packages_needed_for_make["${package}"]}"
-        echo "${!packages_built[@]}" | \
-          tr ' ' '\n'
-      ) | \
-        sort | \
-        uniq -d
-    )" ]; then
-      grep "^${package} " "${base_dir}/work/build-list" >> \
-        "${base_dir}/work/build-list.new"
-      unset packages_built["${package}"]
-      unset packages_needed["${package}"]
-      unset packages_needed_for_make["${package}"]
-      found_something=true
-    fi
-  done
-
-  if ${found_something}; then
-    continue
   fi
 
-  for package in "${!packages_built[@]}"; do
+  while read target; do
+    echo "${target} ${target}" >> \
+      "${work_dir}/build-order"
+    while read dependency; do
+      echo "${target} ${dependency}" >> \
+        "${work_dir}/build-order"
+    done < "${work_dir}/package-infos/${package}.${git_rev}.needs"
+  done < "${work_dir}/package-infos/${package}.${git_rev}.builds"
 
-    if [ -z "$(
-      (
-        echo "${packages_needed_for_make["${package}"]}"
-        echo "${!packages_built[@]}" | \
-          tr ' ' '\n'
-      ) | \
-        sort | \
-        uniq -d
-    )" ]; then
-      grep "^${package} " "${base_dir}/work/build-list" >> \
-        "${base_dir}/work/build-list.new"
-      unset packages_built["${package}"]
-      unset packages_needed["${package}"]
-      unset packages_needed_for_make["${package}"]
-      found_something=true
-      break
-    fi
+done < "${work_dir}/build-list.new"
+
+echo 'Now actually sort it.'
+
+(
+  tsort "${work_dir}/build-order" 2> "${work_dir}/tsort.error" | \
+    nl -ba | \
+    awk '{print $1 " not-git whatever " $2}'
+  awk '{print "0 " $2 " " $3 " " $1}' < \
+    "${work_dir}/build-list.new"
+) | \
+  sort -k4,4 -k1nr | \
+  uniq -f3 -D | \
+  sed 'N;s|\n| |' | \
+  sort -k1n,1 | \
+  awk '{print $4 " " $6 " " $7}' > \
+  "${work_dir}/build-list.new.new"
+
+if [ -s "${work_dir}/tsort.error" ]; then
+  >&2 echo 'WARNING: There is a dependency cycle!'
+  >&2 cat "${work_dir}/tsort.error"
+  >&2 echo
+  >&2 echo 'I will continue anyway.'
+else
+  rm "${work_dir}/tsort.error"
+fi
+
+# Move the .new-files to the actual files
+
+(
+  echo "build-list.new" "build-list" "deletion-list"
+  echo "${!repo_paths[@]}" | \
+    sed 's@\( \|$\)@.revision\1@g'
+) | \
+  tr ' ' '\n' | \
+  while read -r file; do
+    mv "${work_dir}/${file}.new" "${work_dir}/${file}"
   done
-
-  if ${found_something}; then
-    continue
-  fi
-
-  for package in "${!packages_built[@]}"; do
-
-    if [ -z "$(
-      (
-        echo "${packages_needed["${package}"]}"
-        echo "${!packages_built[@]}" | \
-          tr ' ' '\n'
-      ) | \
-        sort | \
-        uniq -d
-    )" ]; then
-      grep "^${package} " "${base_dir}/work/build-list" >> \
-        "${base_dir}/work/build-list.new"
-      unset packages_built["${package}"]
-      unset packages_needed["${package}"]
-      unset packages_needed_for_make["${package}"]
-      found_something=true
-      break
-    fi
-  done
-
-  if ${found_something}; then
-    continue
-  fi
-
-  >&2 echo 'uaagh: there seem to be cyclic dependencies - I give up.'
-  >&2 echo "packages left: ${!packages_built[@]}"
-
-  for pkg in "${!packages_built[@]}"; do
-    echo "${pkg}:"
-    echo ${packages_needed["${pkg}"]}
-  done
-
-# TODO: Break circular dependencies
-
-  exit 1
-done
-
-mv "${base_dir}/work/build-list.new" "${base_dir}/work/build-list"
-
-# Write the current git revision numbers to files.
-
-for repo in "${!repo_paths[@]}"; do
-  git -C "${repo_paths["${repo}"]}" rev-parse HEAD > \
-    "${base_dir}/work/${repo}.revision"
-done
 
 # Remove the lock file
 
