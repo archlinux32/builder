@@ -160,13 +160,14 @@ while read -r package git_rev repository; do
   fi
 
   while read target; do
-    echo "${target} ${target}" >> \
+    echo "${target} ${package}" >> \
       "${work_dir}/build-order"
-    while read dependency; do
-      echo "${target} ${dependency}" >> \
-        "${work_dir}/build-order"
-    done < "${work_dir}/package-infos/${package}.${git_rev}.needs"
   done < "${work_dir}/package-infos/${package}.${git_rev}.builds"
+
+  while read dependency; do
+    echo "${package} ${dependency}" >> \
+      "${work_dir}/build-order"
+  done < "${work_dir}/package-infos/${package}.${git_rev}.needs"
 
 done < "${work_dir}/build-list.new"
 
