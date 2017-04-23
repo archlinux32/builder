@@ -28,7 +28,7 @@ find_pkgbuild() {
 
 # Create a lock file for build list.
 
-exec 9>"${lock_file}"
+exec 9> "${lock_file}"
 flock -n 9 || exit
 
 # Update git repositories (official packages, community packages and the repository of package customizations).
@@ -116,7 +116,7 @@ mkdir -p "${work_dir}/package-infos"
 rm -f "${work_dir}/build-order"
 touch "${work_dir}/build-order"
 
-while read -r package git_rev repository; do
+while read -r package git_revision repository; do
   PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
   if [ ! -r "${PKGBUILD}" ]; then
@@ -126,53 +126,53 @@ while read -r package git_rev repository; do
 
   ls -1 "${work_dir}/package-infos" | \
     grep "^${package}"'\.[0-9a-f]\{40\}\.\(builds\|needs\)$' | \
-    grep -v "^${package}\.${git_rev}"'\.\(builds\|needs\)$' | \
+    grep -v "^${package}\.${git_revision}"'\.\(builds\|needs\)$' | \
     while read file; do
       echo rm "${work_dir}/package-infos/${file}"
     done
 
-  if [ ! -e "${work_dir}/package-infos/${package}.${git_rev}.builds" ] || \
-    [ ! -e "${work_dir}/package-infos/${package}.${git_rev}.needs" ]; then
+  if [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.builds" ] || \
+    [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.needs" ]; then
 
     (
       cd "${PKGBUILD%/*}"
-      mksrcinfo -o "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+      mksrcinfo -o "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
     )
 
-    grep '^\('$'\t''provides\|pkgname\) = ' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO" | \
+    grep '^\('$'\t''provides\|pkgname\) = ' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO" | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
       sort -u > \
-      "${work_dir}/package-infos/${package}.${git_rev}.builds"
+      "${work_dir}/package-infos/${package}.${git_revision}.builds"
 
     (
       (
-        sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
-        grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+        sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
+        grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
       ) | \
         cut -d= -f2 | \
         sed 's|^\s\+||; s|[<>]$||' | \
         sort -u
-      cat "${work_dir}/package-infos/${package}.${git_rev}.builds" | \
+      cat "${work_dir}/package-infos/${package}.${git_revision}.builds" | \
         sed 'p'
     ) | \
       sort | \
       uniq -u > \
-      "${work_dir}/package-infos/${package}.${git_rev}.needs"
+      "${work_dir}/package-infos/${package}.${git_revision}.needs"
 
-    rm "${work_dir}/package-infos/${package}.${git_rev}.SRCINFO"
+    rm "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
 
   fi
 
   while read target; do
     echo "${package} ${target}" >> \
       "${work_dir}/build-order"
-  done < "${work_dir}/package-infos/${package}.${git_rev}.builds"
+  done < "${work_dir}/package-infos/${package}.${git_revision}.builds"
 
   while read dependency; do
     echo "${dependency} ${package}" >> \
       "${work_dir}/build-order"
-  done < "${work_dir}/package-infos/${package}.${git_rev}.needs"
+  done < "${work_dir}/package-infos/${package}.${git_revision}.needs"
 
 done < "${work_dir}/build-list.new"
 
