@@ -179,7 +179,7 @@ echo 'Now actually sort it.'
 ) | \
   sort -k4,4 -k1nr | \
   uniq -f3 -D | \
-  sed 'N;s|\n| |' | \
+  sed '/^0 /d;N;s|\n| |' | \
   sort -k1n,1 | \
   awk '{print $4 " " $6 " " $7}' > \
   "${work_dir}/build-list.new.new"
