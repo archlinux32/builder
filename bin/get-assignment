@@ -17,7 +17,7 @@ hand_out_assignment() {
   fi
 
   echo "$1 $2 $3"
-  echo "${SSH_CLIENT}" > "${work_dir}/package-states/$1.$2.$3.locked"
+  echo "${SSH_CLIENT%% *}" > "${work_dir}/package-states/$1.$2.$3.locked"
 
   rm -f "${lock_file}"
   exit 0
