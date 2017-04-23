@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# receive one package to be built from the build-list whose dependencies
+# are already satisfied or which breaks a dependency cycle
+
+# TODO:
+#  respect build-manually-list
+
+. "${0%/*}/../conf/default.conf"
+
+mkdir -p "${work_dir}/package-states"
+
+hand_out_assignment() {
+
+  if [ -f "${work_dir}/package-states/$1.$2.$3.locked" ]; then
+    return 0
+  fi
+
+  echo "$1 $2 $3"
+  echo "${SSH_CLIENT}" > "${work_dir}/package-states/$1.$2.$3.locked"
+
+  rm -f "${lock_file}"
+  exit 0
+
+}
+
+# Create a lock file.
+
+exec 9> "${lock_file}"
+flock -n 9 || exit
+
+while read -r package git_revision repository; do
+
+  [ -z "$(
+    (
+      cat "${work_dir}/package-infos/${package}."*".needs"
+      awk '{print $1}' "${work_dir}/build-list"
+    ) | \
+      sort | \
+      uniq -d
+    )" ] || continue
+
+  hand_out_assignment "${package}" "${git_revision}" "${repository}"
+
+done < "${work_dir}/build-list"
+
+if [ -s "${work_dir}/tsort.error" ]; then
+
+  grep -A1 '^tsort: -: input contains a loop:$' "${work_dir}/tsort.error" | \
+    cut -d' ' -f2 | \
+    grep -v -- '^-:$' | \
+    while read package; do
+
+      grep "^${package} " "${work_dir}/build-list" | \
+        while read -r package git_revision repository; do
+          hand_out_assignment "${package}" "${git_revision}" "${repository}"
+        done
+
+    done
+
+fi
+
+# Remove the lock file
+
+rm -f "${lock_file}"
