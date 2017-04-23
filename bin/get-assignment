@@ -73,6 +73,8 @@ if [ ${num_jobs} -ge ${max_parallel_build_per_client} ]; then
   exit 4
 fi
 
+# Find first package of build-list whose dependencies are all met
+
 while read -r package git_revision repository; do
 
   [ -z "$(
@@ -87,6 +89,8 @@ while read -r package git_revision repository; do
   hand_out_assignment "${package}" "${git_revision}" "${repository}"
 
 done < "${work_dir}/build-list"
+
+# Find first package which breaks a loop and is not locked
 
 if [ -s "${work_dir}/tsort.error" ]; then
 
