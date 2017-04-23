@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# contains functions used by more than one script
+
+# find the PKGBUILD of a given package in a given repository
+# TODO:
+#  _properly_ include repository of package customizations
+
+find_pkgbuild() {
+
+  for prefix in "${repo_paths["packages"]}" "${repo_paths["community"]}"; do
+    [ -d "${prefix}/$1" ] || continue
+    ls "${prefix}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null && break
+  done | \
+    tr ' ' '\n' | \
+    grep -v -- '-i686/PKGBUILD$' | \
+    grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+    sort | \
+    tail -n1
+}
