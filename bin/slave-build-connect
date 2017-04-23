@@ -1,0 +1,9 @@
+#!/bin/bash
+
+. "${0%/*}/../conf/default.conf"
+
+if [ "${SSH_ORIGINAL_COMMAND% *}" == "get-assignment" ]; then
+  /bin/bash -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}" "$@"
+else
+  >&2 echo "Invalid command: ${SSH_ORIGINAL_COMMAND} $@"
+fi

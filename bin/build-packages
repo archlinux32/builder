@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# build packages one by one, then upload the binary package to the repository server
+# Details:
+#  https://github.com/archlinux32/builder/wiki/Build-system#build-packages
+
+# TODOs:
+#  include package customizations
+#  handle failed builds
+#  actually upload the package
+#  use different build commands for different repositories
+#  sign packages
+
+. "${0%/*}/../conf/default.conf"
+
+while true; do
+
+  package="$(
+    ssh \
+      -i "${master_build_server_identity}" \
+      -p "${master_build_server_port}" \
+      "${master_build_server_user}@${master_build_server}" \
+      'get-assignment'
+  )"
+
+  case $? in
+
+    #  0: ok, I gave you an assignment
+    0)
+      repository="${package##* }"
+      package="${package% *}"
+      git_revision="${package##* }"
+      package="${package% *}"
+
+      # Update git repositories (official packages, community packages and the repository of package customizations).
+
+      for repo in "${repo_paths[@]}"; do
+        git -C "${repo}" clean -df
+        git -C "${repo}" checkout master
+        git -C "${repo}" pull
+        git -C "${repo}" checkout "${git_revision}" &> /dev/null || true
+      done
+
+      PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
+
+      if [ ! -r "${PKGBUILD}" ]; then
+        echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
+        exit 1
+      fi
+
+      (
+        cd "${PKGBUILD%/*}"
+        extra-i686-build
+      )
+      # imagine a blinking cursor here
+      >&2 echo 'whoops, end of program reached.'
+      exit 42
+
+    ;;
+
+    #  1: come back (shortly) later - I was running already
+    1)
+      sleep $[15+$RANDOM%30]
+      continue
+    ;;
+
+    #  2: come back later - there are still packages to be built,
+    #     but currently none has all its dependencies ready
+    2)
+      sleep $[60+$RANDOM%30]
+      continue
+    ;;
+
+    #  3: come back after the next run of get-package-updates - currently
+    #     there are no pending packages
+    3)
+
+      >&2 echo 'Done. No more packages left to build.'
+      exit 0
+
+    ;;
+
+    #  4: come back, when you've done your work - you hit the limit on
+    #     maximum allowed parallel jobs per ip
+    4)
+
+      >&2 echo 'ERROR: There are too many parallel builds running on this machine.'
+      exit 1
+
+    ;;
+
+    *)
+
+      >&2 echo "ERROR: Unknown exit code $?."
+      exit 1
+
+    ;;
+
+  esac
+
+done
