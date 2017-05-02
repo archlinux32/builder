@@ -17,6 +17,8 @@ flock -n 9 || exit
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
 for repo in "${repo_paths[@]}"; do
+  git -C "${repo}" clean -df
+  git -C "${repo}" checkout master
   git -C "${repo}" pull
 done
 
