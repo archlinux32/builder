@@ -52,7 +52,7 @@ cp "${work_dir}/deletion-list"{,.new}
           tar -t | \
           sed 's|^|A\t|'
       else
-        git -C "${repo_paths["${repo}"]}" diff --name-status "${old_repo_revisions["${repo}"]}" HEAD
+        git -C "${repo_paths["${repo}"]}" diff --no-renames --name-status "${old_repo_revisions["${repo}"]}" HEAD
       fi
     ) | \
       grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
