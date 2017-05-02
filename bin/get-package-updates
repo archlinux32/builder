@@ -117,7 +117,8 @@ while read -r package git_revision repository; do
   fi
 
   # delete cached values of old versions of this PKGBUILD
-  ls -1 "${work_dir}/package-infos" | \
+  ls -1 "${work_dir}/package-infos/${package}-"* 2> /dev/null | \
+    sed 's|^.*/||' | \
     grep "^${package}"'\.[0-9a-f]\{40\}\.\(builds\|needs\)$' | \
     grep -v "^${package}\.${git_revision}"'\.\(builds\|needs\)$' | \
     while read file; do
