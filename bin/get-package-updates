@@ -49,6 +49,7 @@ cp "${work_dir}/deletion-list"{,.new}
   for repo in "${!repo_paths[@]}"; do
     current_HEAD="$(cat "${work_dir}/${repo}.revision.new")"
     (
+      # if old revision unknown, mimic "git diff"-output
       if [ "${old_repo_revisions["${repo}"]}" == "NONE" ]; then
         git -C "${repo_paths["${repo}"]}" archive --format=tar HEAD | \
           tar -t | \
@@ -57,17 +58,22 @@ cp "${work_dir}/deletion-list"{,.new}
         git -C "${repo_paths["${repo}"]}" diff --no-renames --name-status "${old_repo_revisions["${repo}"]}" HEAD
       fi
     ) | \
+      # only track changes in PKGBUILDs
       grep '^.\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+      # ignore i686
       grep -v -- '-i686/PKGBUILD$' | \
       sed 's|^\(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2 '"${current_HEAD}"' \3|' | \
+      # ignore staging and testing
       grep -v '\(staging\|testing\)$'
   done | \
     sort -u
+  # ignore blacklisted packages by explicitely deleting them _at_the_end_
   sed "s|^\(.*\)\$|D \1 $(cat "${work_dir}/archlinux32.revision.new") archlinux32|" "${repo_paths["archlinux32"]}/blacklist"
 ) | \
   while read -r mode package git_revision repository; do
     case "${mode}" in
 
+      # new or modified PKGBUILD
       "A"|"M")
         sed -i "/^${package} /d" "${work_dir}/build-list"
         echo "${package} ${git_revision} ${repository}" >> \
@@ -75,6 +81,7 @@ cp "${work_dir}/deletion-list"{,.new}
         sed -i "/^${package}\$/d" "${work_dir}/deletion-list.new"
       ;;
 
+      # deleted PKGBUILD
       "D")
         echo "${package}" >> \
           "${work_dir}/deletion-list.new"
@@ -109,6 +116,7 @@ while read -r package git_revision repository; do
     exit 1
   fi
 
+  # delete cached values of old versions of this PKGBUILD
   ls -1 "${work_dir}/package-infos" | \
     grep "^${package}"'\.[0-9a-f]\{40\}\.\(builds\|needs\)$' | \
     grep -v "^${package}\.${git_revision}"'\.\(builds\|needs\)$' | \
@@ -116,6 +124,7 @@ while read -r package git_revision repository; do
       rm "${work_dir}/package-infos/${file}"
     done
 
+  # extract infos from PKGBUILD if not existent yet
   if [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.builds" ] || \
     [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.needs" ]; then
 
@@ -124,12 +133,14 @@ while read -r package git_revision repository; do
       mksrcinfo -o "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
     )
 
+    # extract "builds" = provides \cup pkgname
     grep '^\('$'\t''provides\|pkgname\) = ' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO" | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
       sort -u > \
       "${work_dir}/package-infos/${package}.${git_revision}.builds"
 
+    # extract "needs" = ( pkgsrc.depends \cup makedepends \cup checkdepends ) \setminus "builds"
     (
       (
         sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
@@ -149,11 +160,13 @@ while read -r package git_revision repository; do
 
   fi
 
+  # add "$pkgname -> $build-target" to build-order list
   while read target; do
     echo "${package} ${target}" >> \
       "${work_dir}/build-order"
   done < "${work_dir}/package-infos/${package}.${git_revision}.builds"
 
+  # add "$dependency -> $pkgname" to build-order list
   while read dependency; do
     echo "${dependency} ${package}" >> \
       "${work_dir}/build-order"
@@ -164,15 +177,19 @@ done < "${work_dir}/build-list.new"
 echo 'Now actually sort it.'
 
 (
+  # this part will have the correct build order, but all the infos are missing
   tsort "${work_dir}/build-order" 2> "${work_dir}/tsort.error" | \
     nl -ba | \
     awk '{print $1 " not-git whatever " $2}'
+  # this part has all the infos, but possibly the wrong order
   awk '{print "0 " $2 " " $3 " " $1}' < \
     "${work_dir}/build-list.new"
 ) | \
   sort -k4,4 -k1nr | \
+  # now, we have the correct order and the infos, but in adjacent lines
   uniq -f3 -D | \
   sed '/^0 /d;N;s|\n| |' | \
+  # now in one line, each
   sort -k1n,1 | \
   awk '{print $4 " " $6 " " $7}' > \
   "${work_dir}/build-list.new.new"
