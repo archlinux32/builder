@@ -141,10 +141,11 @@ while read -r package git_revision repository; do
       sort -u > \
       "${work_dir}/package-infos/${package}.${git_revision}.builds"
 
-    # extract "needs" = ( pkgsrc.depends \cup makedepends \cup checkdepends ) \setminus "builds"
+    # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
     (
       (
-        sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
+        # this would include runtime dependencies, too:
+        # sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
         grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${work_dir}/package-infos/${package}.${git_revision}.SRCINFO"
       ) | \
         cut -d= -f2 | \
