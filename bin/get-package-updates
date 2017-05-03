@@ -196,11 +196,23 @@ echo 'Now actually sort it.'
   awk '{print $4 " " $6 " " $7}' > \
   "${work_dir}/build-list.new.new"
 
+rm -f "${work_dir}/build-order.loops/*"
+
 if [ -s "${work_dir}/tsort.error" ]; then
   >&2 echo 'WARNING: There is a dependency cycle!'
   >&2 cat "${work_dir}/tsort.error"
   >&2 echo
   >&2 echo 'I will continue anyway.'
+  # save loops in separate files each, so breaking them is easier
+  awk '
+    /^tsort: \S+: input contains a loop:$/{
+      n++;
+      getline
+    }
+    {
+      print $2 >"'"${work_dir}"'/build-list.loops/loop_" n
+    }
+    ' "${work_dir}/tsort.error"
 else
   rm "${work_dir}/tsort.error"
 fi

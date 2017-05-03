@@ -22,12 +22,20 @@ mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
+  # locked packages won't be handed out
   if [ -f "${work_dir}/package-states/$1.$2.$3.locked" ]; then
     return 0
   fi
 
   echo "$1 $2 $3"
   echo "${SSH_CLIENT%% *}" > "${work_dir}/package-states/$1.$2.$3.locked"
+
+  # lock every loop this package breaks
+  grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/"loop_* | \
+    cut -d: -f1 | \
+    tee -a "${work_dir}/package-states/$1.$2.$3.locked" | \
+    sed 's|$|.locked|' | \
+    xargs -rn1 touch
 
   rm -f "${lock_file}"
   exit 0
@@ -52,7 +60,7 @@ while read -r package git_revision repository; do
 
   if [ -f "${work_dir}/package-states/${package}.${git_revision}.${repository}.locked" ];
   then
-    if [ "${SSH_CLIENT%% *}" = "$(cat "${work_dir}/package-states/${package}.${git_revision}.${repository}.locked")" ]; then
+    if [ "${SSH_CLIENT%% *}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${repository}.locked")" ]; then
       num_jobs=$[${num_jobs}+1];
     fi
   else
@@ -90,23 +98,30 @@ while read -r package git_revision repository; do
 
 done < "${work_dir}/build-list"
 
-# Find first package which breaks a loop and is not locked
+# Find package (of all packages which are not locked)
+# which breaks the most unlocked loops
 
-if [ -s "${work_dir}/tsort.error" ]; then
+for package in $(
+  ls "${work_dir}/build-list.loops/"loop_* | \
+    sed 's|\.locked$||' | \
+    sort | \
+    uniq -u | \
+    # now, we have all unlocked loops
+    xargs cat | \
+    # now, we have their content
+    sort | \
+    uniq -c | \
+    sort -k1nr,1 | \
+    awk '{print $2}'
+  ); do
 
-  grep -A1 '^tsort: -: input contains a loop:$' "${work_dir}/tsort.error" | \
-    cut -d' ' -f2 | \
-    grep -v -- '^-:$' | \
-    while read package; do
+  if assignment="$(grep "^${package} " "${work_dir}/build-list")"; then
+    hand_out_assignment ${assignment}
+  else
+    echo "'${package}' ..."
+  fi
 
-      grep "^${package} " "${work_dir}/build-list" | \
-        while read -r package git_revision repository; do
-          hand_out_assignment "${package}" "${git_revision}" "${repository}"
-        done
-
-    done
-
-fi
+done
 
 # Remove the lock file
 
