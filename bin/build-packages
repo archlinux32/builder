@@ -50,7 +50,7 @@ while true; do
 
       (
         cd "${PKGBUILD%/*}"
-        extra-i686-build
+        staging-i686-build
       )
       # imagine a blinking cursor here
       >&2 echo 'whoops, end of program reached.'
