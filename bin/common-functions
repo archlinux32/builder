@@ -21,7 +21,7 @@ find_pkgbuild() {
 
 find_repository_with_commit() {
   for repository in "${!repo_paths[@]}"; do
-    if [ "$(git -C "${repo_paths["${repository}"]}" cat-file -t "$1")" == "commit" ]; then
+    if [ "$(git -C "${repo_paths["${repository}"]}" cat-file -t "$1" 2> /dev/null)" == "commit" ]; then
       echo "${repository}"
       return 0
     fi
