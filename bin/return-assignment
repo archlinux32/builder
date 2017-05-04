@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# report back on a build assignment
+# either on success via:
+#   "$0 $package $revision $repository" and tar'ed packages on stdin
+# or on failure via:
+#   "$0 $package $revision $repository ERROR"
+
+# TODO:
+#  properly handle if built package is out of date
+#  sign package database
+
+. "${0%/*}/../conf/default.conf"
+
+if [ "$4" == 'ERROR' ]; then
+# the build failed on the build slave
+
+  mv "${work_dir}/package-states/$1.$2.$3."{locked,broken}
+
+  # unlock every loop this package would have broken and which is not
+  # broken by another locked package
+  (
+    # loops broken by another locked package
+    ls "${work_dir}/package-states/"{*.*.*,$1.$2.$3}.locked | \
+      sort | \
+      uniq -u | \
+      sed 's|\.locked$||' | \
+      xargs -n1 sed '1d' | \
+      sort -u | \
+      sed 'p'
+    # loops broken by this package
+    sed '1d' "${work_dir}/package-states/$1.$2.$3"
+  ) | \
+    sort | \
+    uniq -u | \
+    sed 's|$|.locked|' | \
+    xargs -rn1 rm -f
+
+  exit 0
+
+fi
+
+# the build was successful on the build slave
+
+# extract package
+mkdir -p "${master_mirror_directory}/$3-staging/"
+cd "${master_mirror_directory}/$3-staging/"
+new_files="$(tar -xv --wildcards '*.pkg.tar.xz')"
+repo-add "$3-staging.db.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz$')
+#new_files="$(tar -xv --wildcards '*.pkg.tar.xz'{,.sig})"
+#repo-add -v -s -k "${repo_key}" "$3-staging.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz$')
+
+# remove all loops which are broken by this package
+sed '1d' "${work_dir}/package-states/$1.$2.$3" | \
+  sort -u | \
+  sed 'p;s|$|.locked|' | \
+  xargs -rn1 rm -f
+
+# remove package from build list
+sed -i "/^$1 $2 $3\$/d" "${work_dir}/build-list"
+
+# remove package lock file
+rm "${work_dir}/package-states/$1.$2.$3.locked"

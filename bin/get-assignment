@@ -14,7 +14,8 @@
 #     maximum allowed parallel jobs per ip
 
 # TODO:
-#  respect build-manually-list
+#  respect build-manually-list ("blocked")
+#  respect broken packages
 
 . "${0%/*}/../conf/default.conf"
 

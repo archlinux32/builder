@@ -6,9 +6,7 @@
 
 # TODOs:
 #  include package customizations
-#  handle failed builds
-#  actually upload the package
-#  use different build commands for different repositories
+#  use different build commands for different repositories - do we need this actually?
 #  sign packages
 
 . "${0%/*}/../conf/default.conf"
@@ -49,13 +47,32 @@ while true; do
         exit 1
       fi
 
-      (
-        cd "${PKGBUILD%/*}"
-        staging-i686-build
-      )
-      # imagine a blinking cursor here
-      >&2 echo 'whoops, end of program reached.'
-      exit 42
+      cd "${PKGBUILD%/*}"
+      success=false
+      for parameters in '' '-c'; do
+        rm -f *.pkg.tar.xz
+        if staging-i686-build ${parameters}; then
+        # build successful
+          tar -c *.pkg.tar.xz | \
+            ssh \
+              -i "${master_build_server_identity}" \
+              -p "${master_build_server_port}" \
+              "${master_build_server_user}@${master_build_server}" \
+              'return-assignment' "${package}" "${git_revision}" "${repository}"
+          success=true
+          break
+        fi
+      done
+
+      if ! ${success}; then
+        ssh \
+          -i "${master_build_server_identity}" \
+          -p "${master_build_server_port}" \
+          "${master_build_server_user}@${master_build_server}" \
+          'return-assignment' "${package}" "${git_revision}" "${repository}" 'ERROR'
+      fi
+
+      continue
 
     ;;
 
