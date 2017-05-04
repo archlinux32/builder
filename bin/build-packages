@@ -38,8 +38,9 @@ while true; do
         git -C "${repo}" clean -df
         git -C "${repo}" checkout master
         git -C "${repo}" pull
-        git -C "${repo}" checkout "${git_revision}" &> /dev/null || true
       done
+
+      git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}" &> /dev/null
 
       PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 

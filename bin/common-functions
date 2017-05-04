@@ -18,3 +18,14 @@ find_pkgbuild() {
     sort | \
     tail -n1
 }
+
+find_repository_with_commit() {
+  for repository in "${!repo_paths[@]}"; do
+    if [ "$(git -C "${repo_paths["${repository}"]}" cat-file -t "$1")" == "commit" ]; then
+      echo "${repository}"
+      return 0
+    fi
+  done
+  >&2 echo "can't find repository with commit '$1'"
+  exit 1
+}
