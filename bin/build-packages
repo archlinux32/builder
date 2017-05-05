@@ -5,9 +5,9 @@
 #  https://github.com/archlinux32/builder/wiki/Build-system#build-packages
 
 # TODOs:
-#  include package customizations
 #  use different build commands for different repositories - do we need this actually?
 #  sign packages
+#  send logs of failed builds
 
 . "${0%/*}/../conf/default.conf"
 
@@ -27,6 +27,8 @@ while true; do
     0)
       repository="${package##* }"
       package="${package% *}"
+      mod_git_revision="${package##* }"
+      package="${package% *}"
       git_revision="${package##* }"
       package="${package% *}"
 
@@ -34,11 +36,13 @@ while true; do
 
       for repo in "${repo_paths[@]}"; do
         git -C "${repo}" clean -df
+        git -C "${repo}" reset --hard
         git -C "${repo}" checkout master
         git -C "${repo}" pull
       done
 
       git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}" &> /dev/null
+      git -C "${repo_paths["archlinux32"]}" checkout "${mod_git_revision}" &> /dev/null
 
       PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
@@ -58,7 +62,7 @@ while true; do
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \
               "${master_build_server_user}@${master_build_server}" \
-              'return-assignment' "${package}" "${git_revision}" "${repository}"
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
           success=true
           break
         fi
@@ -69,8 +73,11 @@ while true; do
           -i "${master_build_server_identity}" \
           -p "${master_build_server_port}" \
           "${master_build_server_user}@${master_build_server}" \
-          'return-assignment' "${package}" "${git_revision}" "${repository}" 'ERROR'
+          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'
       fi
+
+echo 'This is the end.'
+exit 0
 
       continue
 
