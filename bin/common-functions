@@ -29,3 +29,27 @@ find_repository_with_commit() {
   >&2 echo "can't find repository with commit '$1'"
   exit 1
 }
+
+find_git_repository_to_package_repository() {
+  for repository in "${!repo_paths[@]}"; do
+    if [ "${repository}" == "archlinux32" ]; then
+      continue
+    fi
+    if [ -n "$(
+      (
+        ls "${repo_paths["${repository}"]}/"*"/repos" | \
+          grep -v ':$' | \
+          sed 's|-[^-]\+$||' | \
+          sort -u
+        echo "$1"
+      ) | \
+        sort | \
+        uniq -d
+      )" ]; then
+      echo "${repository}"
+      return 0
+    fi
+  done
+  >&2 echo "can't find git repository with package repository '$1'"
+  exit 1
+}
