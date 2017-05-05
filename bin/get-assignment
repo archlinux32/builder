@@ -24,17 +24,17 @@ mkdir -p "${work_dir}/package-states"
 hand_out_assignment() {
 
   # locked packages won't be handed out
-  if [ -f "${work_dir}/package-states/$1.$2.$3.locked" ]; then
+  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
     return 0
   fi
 
-  echo "$1 $2 $3"
-  echo "${SSH_CLIENT%% *}" > "${work_dir}/package-states/$1.$2.$3.locked"
+  echo "$1 $2 $3 $4"
+  echo "${SSH_CLIENT%% *}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
   grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/"loop_* | \
     cut -d: -f1 | \
-    tee -a "${work_dir}/package-states/$1.$2.$3.locked" | \
+    tee -a "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
     sed 's|$|.locked|' | \
     xargs -rn1 touch
 
@@ -57,11 +57,11 @@ fi
 num_jobs=0
 pending_packages=false
 
-while read -r package git_revision repository; do
+while read -r package git_revision mod_git_revision repository; do
 
-  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${repository}.locked" ];
+  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ];
   then
-    if [ "${SSH_CLIENT%% *}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${repository}.locked")" ]; then
+    if [ "${SSH_CLIENT%% *}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked")" ]; then
       num_jobs=$[${num_jobs}+1];
     fi
   else
@@ -84,7 +84,7 @@ fi
 
 # Find first package of build-list whose dependencies are all met
 
-while read -r package git_revision repository; do
+while read -r package git_revision mod_git_revision repository; do
 
   [ -z "$(
     (
@@ -95,7 +95,7 @@ while read -r package git_revision repository; do
       uniq -d
     )" ] || continue
 
-  hand_out_assignment "${package}" "${git_revision}" "${repository}"
+  hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
 done < "${work_dir}/build-list"
 
@@ -118,8 +118,6 @@ for package in $(
 
   if assignment="$(grep "^${package} " "${work_dir}/build-list")"; then
     hand_out_assignment ${assignment}
-  else
-    echo "'${package}' ..."
   fi
 
 done
