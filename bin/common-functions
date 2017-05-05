@@ -8,18 +8,58 @@
 
 find_pkgbuild() {
 
-  for prefix in "${repo_paths["packages"]}" "${repo_paths["community"]}"; do
-    [ -d "${prefix}/$1" ] || continue
-    ls "${prefix}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null && break
-  done | \
-    tr ' ' '\n' | \
-    grep -v -- '-i686/PKGBUILD$' | \
-    grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
-    sort | \
-    tail -n1
+  local PKGBUILD='' repo file
+
+  if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
+    # If this package has some modification,
+    repo="$(find_git_repository_to_package_repository "$2")"
+    if ! [ -d "${repo_paths["${repo}"]}/$1" ]; then
+      # create some dummy files if it is also new.
+      mkdir -p "${repo_paths["${repo}"]}/$1/repos/$2-x86_64"
+      touch "${repo_paths["${repo}"]}/$1/repos/$2-x86_64/PKGBUILD"
+    fi
+  fi
+
+  for repo in "${!repo_paths[@]}"; do
+    if [ "${repo}" == "archlinux32" ]; then
+      continue
+    fi
+    if ! [ -d "${repo_paths["${repo}"]}/$1" ]; then
+      continue
+    fi
+    PKGBUILD="$(
+      ls "${repo_paths["${repo}"]}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null | \
+        tr ' ' '\n' | \
+        grep -v -- '-i686/PKGBUILD$' | \
+        grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+        sort | \
+        tail -n1
+    )"
+    if [ -n "${PKGBUILD}" ]; then
+      echo "${PKGBUILD}"
+      if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ] && \
+        [ ! -f "${PKGBUILD}.changes-applied" ]; then
+        # If this package has modifications (or is new), apply them now:
+        # append PKGBUILD
+        cat "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" >> \
+          "${PKGBUILD}"
+        # copy (and overwrite) other files
+        for file in "${repo_paths["archlinux32"]}/$2/$1/"*; do
+          if [ -f "${file}" ] && [ "${file##*/}" != "PKGBUILD" ]; then
+            cp "${file}" "${PKGBUILD%/*}/"
+          fi
+        done
+        touch "${PKGBUILD}.changes-applied"
+      fi
+      break
+    fi
+  done
 }
 
 find_repository_with_commit() {
+
+  local repository
+
   for repository in "${!repo_paths[@]}"; do
     if [ "$(git -C "${repo_paths["${repository}"]}" cat-file -t "$1" 2> /dev/null)" == "commit" ]; then
       echo "${repository}"
@@ -28,9 +68,13 @@ find_repository_with_commit() {
   done
   >&2 echo "can't find repository with commit '$1'"
   exit 1
+
 }
 
 find_git_repository_to_package_repository() {
+
+  local repository
+
   for repository in "${!repo_paths[@]}"; do
     if [ "${repository}" == "archlinux32" ]; then
       continue
@@ -52,4 +96,5 @@ find_git_repository_to_package_repository() {
   done
   >&2 echo "can't find git repository with package repository '$1'"
   exit 1
+
 }

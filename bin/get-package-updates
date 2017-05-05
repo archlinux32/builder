@@ -4,9 +4,6 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
-# TODO:
-#  include repository of package customizations
-
 . "${0%/*}/../conf/default.conf"
 
 # Create a lock file for build list.
@@ -113,8 +110,6 @@ echo 'Extract dependencies of packages.'
 
 # Put the list in the proper build order.
 # First, we extract the dependencies of each package.
-# TODO:
-#  package modifications need to be included here
 
 mkdir -p "${work_dir}/package-infos"
 
@@ -122,7 +117,7 @@ rm -f "${work_dir}/build-order"
 touch "${work_dir}/build-order"
 
 while read -r package git_revision mod_git_revision repository; do
-  PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
+  PKGBUILD="$(find_pkgbuild "${package}" "${repository}" "${mod_git_revision}")"
 
   if [ ! -r "${PKGBUILD}" ]; then
     echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
