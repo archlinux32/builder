@@ -8,6 +8,7 @@
 #  use different build commands for different repositories - do we need this actually?
 #  sign packages
 #  send logs of failed builds
+#  handle failed uploads to the build master
 
 . "${0%/*}/../conf/default.conf"
 
