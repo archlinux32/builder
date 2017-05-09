@@ -8,6 +8,7 @@
 #  use different build commands for different repositories - do we need this actually?
 #  send logs of failed builds
 #  handle failed uploads to the build master
+#  be more user friendly: let preset a limit on the number of packages being built
 
 . "${0%/*}/../conf/default.conf"
 
