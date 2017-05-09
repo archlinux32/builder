@@ -6,7 +6,6 @@
 
 # TODOs:
 #  use different build commands for different repositories - do we need this actually?
-#  sign packages
 #  send logs of failed builds
 #  handle failed uploads to the build master
 
@@ -58,7 +57,9 @@ while true; do
         rm -f *.pkg.tar.xz
         if staging-i686-build ${parameters}; then
         # build successful
-          tar -c *.pkg.tar.xz | \
+          ls -1 *.pkg.tar.xz | \
+            xargs -rn1 gpg --detach-sign
+          tar -c *.pkg.tar.xz{,.sig} | \
             ssh \
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \

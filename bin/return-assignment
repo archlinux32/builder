@@ -9,7 +9,6 @@
 
 # TODO:
 #  properly handle if built package is out of date
-#  sign package database
 #  use lock file(s)
 #  remove old version(s) of newly compiled packages
 
@@ -48,10 +47,8 @@ fi
 # extract package
 mkdir -p "${master_mirror_directory}/$4-staging/"
 cd "${master_mirror_directory}/$4-staging/"
-new_files="$(tar -xv --wildcards '*.pkg.tar.xz')"
-repo-add "$4-staging.db.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz$')
-#new_files="$(tar -xv --wildcards '*.pkg.tar.xz'{,.sig})"
-#repo-add -v -s -k "${repo_key}" "$4-staging.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz$')
+new_files="$(tar -xv --wildcards '*.pkg.tar.xz'{,.sig})"
+repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz\(\.sig\)\?$')
 
 # remove all loops which are broken by this package
 sed '1d' "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
