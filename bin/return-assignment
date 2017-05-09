@@ -11,6 +11,7 @@
 #  properly handle if built package is out of date
 #  sign package database
 #  use lock file(s)
+#  remove old version(s) of newly compiled packages
 
 . "${0%/*}/../conf/default.conf"
 
