@@ -2,6 +2,15 @@
 tools for building 32-bit archlinux packages from archlinux.org's official, 64-bit tested PKGBUILDs et al.
 This includes scripts to be run on the build master as well as scripts to be run on the build slaves (both residing in `bin`).
 
+## requirements
+* `git`
+### build master only
+* some ssh-server
+* `pkgbuild-introspection`
+### build slave only
+* some ssh-client
+* `devtools32`
+
 ## configuration
 The standard configuration in `conf/default.conf` can be locally overwritten by `conf/local.conf`.
 
