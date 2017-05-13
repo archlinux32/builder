@@ -56,7 +56,7 @@ while true; do
       success=false
       for parameters in '' '-c'; do
         rm -f *.pkg.tar.xz
-        if staging-i686-build ${parameters}; then
+        if staging-i486-build ${parameters}; then
         # build successful
           ls -1 *.pkg.tar.xz | \
             xargs -rn1 gpg --detach-sign
