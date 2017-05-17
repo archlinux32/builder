@@ -8,7 +8,6 @@
 #   "$0 $package $revision $mod_revision $repository ERROR"
 
 # TODO:
-#  properly handle if built package is out of date
 #  use lock file(s)
 #  remove old version(s) of newly compiled packages
 #  check that received archive contains the expected packages
@@ -45,11 +44,46 @@ fi
 
 # the build was successful on the build slave
 
-# extract package
+if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list"; then
+  >&2 echo 'Sorry, the sent package is outdated.'
+  exit 1
+fi
+
+function clean_up {
+  popd > /dev/null
+  rm -rf --one-file-system "${tmp_dir}"
+}
+
+tmp_dir="$(mktemp -d)"
+pushd "${tmp_dir}" > /dev/null
+trap clean_up EXIT
+
+# extract package(s)
+tar -x
+
+signature_errors="$(
+  ls -1 *.pkg.tar.xz{,.sig} | \
+    sed 's|\.sig$||' | \
+    sort | \
+    uniq -c | \
+    grep '^\s*2\s' | \
+    awk '{print $2}'
+)"
+
+if [ -n "${signature_errors}" ]; then
+  >&2 echo 'The following packages lack a signature or vice versa:'
+  >&2 echo "${signature_errors}"
+  exit 1
+fi
+
+# move packages
+packages=(*.pkg.tar.xz)
 mkdir -p "${master_mirror_directory}/i486/$4-staging/"
-cd "${master_mirror_directory}/i486/$4-staging/"
-new_files="$(tar -xv --wildcards '*.pkg.tar.xz'{,.sig})"
-repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz\(\.sig\)\?$')
+mv "*.pkg.tar.xz{,.sig}" "${master_mirror_directory}/i486/$4-staging/"
+
+pushd "${master_mirror_directory}/i486" > /dev/null
+repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
+popd > /dev/null
 
 # remove all loops which are broken by this package
 sed '1d' "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
