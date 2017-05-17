@@ -22,6 +22,7 @@ find_pkgbuild() {
 
   for repo in "${!repo_paths[@]}"; do
     if [ "${repo}" == "archlinux32" ]; then
+      # this is not a repository of packages
       continue
     fi
     if ! [ -d "${repo_paths["${repo}"]}/$1" ]; then
@@ -37,6 +38,8 @@ find_pkgbuild() {
     )"
     if [ -n "${PKGBUILD}" ]; then
       echo "${PKGBUILD}"
+      # add i486 to the arch list
+      sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1i486 \2|' -i "${PKGBUILD}"
       if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ] && \
         [ ! -f "${PKGBUILD}.changes-applied" ]; then
         # If this package has modifications (or is new), apply them now:
