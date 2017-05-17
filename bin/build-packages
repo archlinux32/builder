@@ -111,13 +111,17 @@ while [ ${count} -ne 0 ]; do
           ls -1 *.pkg.tar.xz | \
             xargs -rn1 gpg --local-user="${package_key}" --detach-sign
           tar -c 'package.tar' *.pkg.tar.xz{,.sig}
-          while ! ssh \
-            -i "${master_build_server_identity}" \
-            -p "${master_build_server_port}" \
-            "${master_build_server_user}@${master_build_server}" \
-            'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
-            < 'package.tar'; do
+          while true; do
+            ssh \
+              -i "${master_build_server_identity}" \
+              -p "${master_build_server_port}" \
+              "${master_build_server_user}@${master_build_server}" \
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+              < 'package.tar'
             case $? in
+              0;
+                break
+              ;;
               1)
                 # 'return-assignment' was running already
                 sleep $[15+$RANDOM%30]
