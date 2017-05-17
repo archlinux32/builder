@@ -212,7 +212,7 @@ echo 'Now actually sort it.'
   awk '{print $5 " " $7 " " $8 " " $9}' > \
   "${work_dir}/build-list.new.new"
 
-rm -f "${work_dir}/build-order.loops/*"
+mkdir "${work_dir}/build-order.loops.new"
 
 if [ -s "${work_dir}/tsort.error" ]; then
   >&2 echo 'WARNING: There is a dependency cycle!'
@@ -226,7 +226,7 @@ if [ -s "${work_dir}/tsort.error" ]; then
       getline
     }
     {
-      print $2 >"'"${work_dir}"'/build-list.loops/loop_" n
+      print $2 >"'"${work_dir}"'/build-list.loops.new/loop_" n
     }
     ' "${work_dir}/tsort.error"
 else
@@ -235,8 +235,9 @@ fi
 
 # Move the .new-files to the actual files
 
+rm -rf --one-file-system "${work_dir}/build-order.loops"
 (
-  echo "build-list.new" "build-list" "deletion-list"
+  echo "build-order.loops" "build-list.new" "build-list" "deletion-list"
   echo "${!repo_paths[@]}" | \
     sed 's@\( \|$\)@.revision\1@g'
 ) | \
