@@ -12,7 +12,57 @@
 
 . "${0%/*}/../conf/default.conf"
 
-while true; do
+usage() {
+  >&2 echo ''
+  >&2 echo 'build-packages: build package(s) on the build-list'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:   Show this help and exit.'
+  >&2 echo '  -n count:    Build $count packages (if available), then exit.'
+  >&2 echo '               $count=0 is interpreted as infinity.'
+  >&2 echo '               The default is $count=1.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
+
+eval set -- "$(
+  getopt -o hn: \
+    --long help \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+count=1
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -n)
+      shift
+      count="$1"
+      [ ${count} -eq 0 ] && \
+        count=-1
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit -1
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 0 ]; then
+  >&2 echo 'Too many arguments.'
+  usage
+fi
+
+while [ ${count} -ne 0 ]; do
 
   package="$(
     ssh \
@@ -26,6 +76,8 @@ while true; do
 
     #  0: ok, I gave you an assignment
     0)
+      [ ${count} -gt 0 ] && \
+        count=$[${count}-1]
       repository="${package##* }"
       package="${package% *}"
       mod_git_revision="${package##* }"
@@ -79,9 +131,6 @@ while true; do
           'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'
       fi
 
-echo 'This is the end.'
-exit 0
-
       continue
 
     ;;
@@ -127,3 +176,5 @@ exit 0
   esac
 
 done
+
+>&2 echo 'Done.'
