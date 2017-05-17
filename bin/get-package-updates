@@ -13,8 +13,11 @@
 
 # Create a lock file for build list.
 
-exec 9> "${lock_file}"
-flock -n 9 || exit
+exec 9> "${build_list_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'come back (shortly) later - I cannot lock build list.'
+  exit
+fi
 
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
@@ -244,4 +247,4 @@ fi
 
 # Remove the lock file
 
-rm -f "${lock_file}"
+rm -f "${build_list_lock_file}"
