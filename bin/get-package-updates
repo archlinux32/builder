@@ -133,10 +133,10 @@ while read -r package git_revision mod_git_revision repository; do
   fi
 
   # delete cached values of old versions of this PKGBUILD
-  ls -1 "${work_dir}/package-infos/${package}-"* 2> /dev/null | \
+  ls -1 "${work_dir}/package-infos/${package}."* 2> /dev/null | \
     sed 's|^.*/||' | \
-    grep "^${package}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|needs\)$' | \
-    grep -v "^${package}\.${git_revision}\.${new_repo_revisions["archlinux32"]}"'\.\(builds\|needs\)$' | \
+    grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|needs\|packages\)$' | \
+    grep -v "^${package//./\\.}\.${git_revision}\.${new_repo_revisions["archlinux32"]}"'\.\(builds\|needs\|packages\)$' | \
     while read file; do
       rm "${work_dir}/package-infos/${file}"
     done
