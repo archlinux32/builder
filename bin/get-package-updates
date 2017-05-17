@@ -23,6 +23,7 @@ fi
 
 for repo in "${repo_paths[@]}"; do
   git -C "${repo}" clean -df
+  git -C "${repo}" reset --hard
   git -C "${repo}" checkout master
   git -C "${repo}" pull
 done
