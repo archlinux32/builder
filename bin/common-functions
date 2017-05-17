@@ -3,8 +3,6 @@
 # contains functions used by more than one script
 
 # find the PKGBUILD of a given package in a given repository
-# TODO:
-#  mangle $arch in PKBUILDs to contain i486, i586, i686
 
 find_pkgbuild() {
 
@@ -43,7 +41,12 @@ find_pkgbuild() {
   done
 }
 
-# to be executed in the package directory
+# apply customizations to a package
+#  (to be executed in the package's directory)
+
+# TODO:
+#  mangle $arch in PKBUILDs to contain i486, i586, i686
+
 apply_package_customizations() {
   if [ ! -f 'PKGBUILD' ]; then
     >&2 echo 'PKGBUILD not found.'
