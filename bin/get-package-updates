@@ -176,8 +176,7 @@ while read -r package git_revision mod_git_revision repository; do
         cut -d= -f2 | \
         sed 's|^\s\+||; s|[<>]$||' | \
         sort -u
-      cat "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.builds" | \
-        sed 'p'
+      sed 'p' "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.builds"
     ) | \
       sort | \
       uniq -u > \
