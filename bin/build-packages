@@ -7,8 +7,6 @@
 # TODOs:
 #  use different build commands for different repositories - do we need this actually?
 #  send logs of failed builds
-#  handle failed uploads to the build master
-#  be more user friendly: let preset a limit on the number of packages being built
 
 . "${0%/*}/../conf/default.conf"
 
@@ -107,17 +105,30 @@ while [ ${count} -ne 0 ]; do
       cd "${PKGBUILD%/*}"
       success=false
       for parameters in '' '-c'; do
-        rm -f *.pkg.tar.xz
+        rm -f *.pkg.tar.xz{,.sig}
         if staging-i486-build ${parameters}; then
         # build successful
           ls -1 *.pkg.tar.xz | \
             xargs -rn1 gpg --detach-sign
-          tar -c *.pkg.tar.xz{,.sig} | \
+          if ! tar -c *.pkg.tar.xz{,.sig} | \
             ssh \
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \
               "${master_build_server_user}@${master_build_server}" \
-              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+            case $? in
+              1)
+                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+              ;;
+              2)
+                >& echo "'return-assignment' reports a signature error."
+                exit 1
+              ;;
+              *)
+                >&2 echo "unknown return code $? from 'return-assignment'"
+                exit 1
+            esac
+          fi
           success=true
           break
         fi
