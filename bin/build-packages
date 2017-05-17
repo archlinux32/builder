@@ -110,17 +110,23 @@ while [ ${count} -ne 0 ]; do
         # build successful
           ls -1 *.pkg.tar.xz | \
             xargs -rn1 gpg --detach-sign
-          if ! tar -c *.pkg.tar.xz{,.sig} | \
-            ssh \
-              -i "${master_build_server_identity}" \
-              -p "${master_build_server_port}" \
-              "${master_build_server_user}@${master_build_server}" \
-              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+          tar -c 'package.tar' *.pkg.tar.xz{,.sig}
+          while ! ssh \
+            -i "${master_build_server_identity}" \
+            -p "${master_build_server_port}" \
+            "${master_build_server_user}@${master_build_server}" \
+            'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+            < 'package.tar'; do
             case $? in
               1)
-                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                # 'return-assignment' was running already
+                sleep $[15+$RANDOM%30]
               ;;
               2)
+                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                break
+              ;;
+              3)
                 >& echo "'return-assignment' reports a signature error."
                 exit 1
               ;;
@@ -128,7 +134,7 @@ while [ ${count} -ne 0 ]; do
                 >&2 echo "unknown return code $? from 'return-assignment'"
                 exit 1
             esac
-          fi
+          done
           success=true
           break
         fi
@@ -179,7 +185,7 @@ while [ ${count} -ne 0 ]; do
 
     *)
 
-      >&2 echo "ERROR: Unknown exit code $?."
+      >&2 echo "ERROR: Unknown exit code $? from 'get-assignment'."
       exit 1
 
     ;;

@@ -9,15 +9,30 @@
 
 # exit codes:
 #  0: ok
-#  1: outdated package
-#  2: signature error
+#  1: another instance was already running
+#  2: outdated package
+#  3: signature error
 
 # TODO:
-#  use lock file(s)
+#  use lock file for build list
 #  remove old version(s) of newly compiled packages
 #  check that received archive contains the expected packages
 
 . "${0%/*}/../conf/default.conf"
+
+# Create a lock file and a trap.
+
+exec 9> "${lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'come back (shortly) later - I was running already'
+  exit 1
+fi
+
+function clean_up {
+  rm -f "${lock_file}"
+}
+
+trap clean_up EXIT
 
 if [ "$5" == 'ERROR' ]; then
 # the build failed on the build slave
@@ -51,7 +66,7 @@ fi
 
 if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list"; then
   >&2 echo 'Sorry, the sent package is outdated.'
-  exit 1
+  exit 2
 fi
 
 function clean_up {
@@ -78,7 +93,7 @@ signature_errors="$(
 if [ -n "${signature_errors}" ]; then
   >&2 echo 'The following packages lack a signature or vice versa:'
   >&2 echo "${signature_errors}"
-  exit 2
+  exit 3
 fi
 
 # move packages
