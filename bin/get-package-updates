@@ -149,6 +149,7 @@ while read -r package git_revision mod_git_revision repository; do
 
     (
       cd "${PKGBUILD%/*}"
+      apply_package_customizations
       mksrcinfo -o "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.SRCINFO"
     )
 

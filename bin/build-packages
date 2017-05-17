@@ -103,6 +103,7 @@ while [ ${count} -ne 0 ]; do
       fi
 
       cd "${PKGBUILD%/*}"
+      apply_package_customizations
       success=false
       for parameters in '' '-c'; do
         rm -f *.pkg.tar.xz{,.sig}

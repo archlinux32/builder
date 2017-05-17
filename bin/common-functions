@@ -38,26 +38,36 @@ find_pkgbuild() {
     )"
     if [ -n "${PKGBUILD}" ]; then
       echo "${PKGBUILD}"
-      if [ ! -f "${PKGBUILD}.changes-applied" ]; then
-        # add i486 to the arch list
-        sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1i486 \2|' -i "${PKGBUILD}"
-        if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
-          # If this package has modifications (or is new), apply them now:
-          # append PKGBUILD
-          cat "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" >> \
-            "${PKGBUILD}"
-          # copy (and overwrite) other files
-          for file in "${repo_paths["archlinux32"]}/$2/$1/"*; do
-            if [ -f "${file}" ] && [ "${file##*/}" != "PKGBUILD" ]; then
-              cp "${file}" "${PKGBUILD%/*}/"
-            fi
-          done
-        fi
-        touch "${PKGBUILD}.changes-applied"
-      fi
       break
     fi
   done
+}
+
+# to be executed in the package directory
+apply_package_customizations() {
+  if [ ! -f 'PKGBUILD' ]; then
+    >&2 echo 'PKGBUILD not found.'
+    pwd
+    exit 1
+  fi
+
+  if [ ! -f 'PKGBUILD.changes-applied' ]; then
+    # add i486 to the arch list
+    sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1i486 \2|' -i 'PKGBUILD'
+    if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
+      # If this package has modifications (or is new), apply them now:
+      # append PKGBUILD
+      cat "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" >> \
+        'PKGBUILD'
+      # copy (and overwrite) other files
+      for file in "${repo_paths["archlinux32"]}/$2/$1/"*; do
+        if [ -f "${file}" ] && [ "${file##*/}" != 'PKGBUILD' ]; then
+          cp "${file}" ./
+        fi
+      done
+    fi
+    touch 'PKGBUILD.changes-applied'
+  fi
 }
 
 find_repository_with_commit() {
