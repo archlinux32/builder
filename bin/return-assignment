@@ -11,6 +11,7 @@
 #  properly handle if built package is out of date
 #  use lock file(s)
 #  remove old version(s) of newly compiled packages
+#  check that received archive contains the expected packages
 
 . "${0%/*}/../conf/default.conf"
 

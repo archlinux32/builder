@@ -4,7 +4,7 @@
 
 # find the PKGBUILD of a given package in a given repository
 # TODO:
-#  _properly_ include repository of package customizations
+#  mangle $arch in PKBUILDs to contain i486, i586, i686
 
 find_pkgbuild() {
 

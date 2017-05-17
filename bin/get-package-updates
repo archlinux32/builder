@@ -4,6 +4,9 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
+# TODOs:
+#  additional to blacklisted packages ignore any packages depending on them
+
 . "${0%/*}/../conf/default.conf"
 
 # Create a lock file for build list.
