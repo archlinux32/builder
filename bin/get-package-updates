@@ -143,7 +143,8 @@ while read -r package git_revision mod_git_revision repository; do
 
   # extract infos from PKGBUILD if not existent yet
   if [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.builds" ] || \
-    [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.needs" ]; then
+    [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.needs" ] || \
+    [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.packages" ]; then
 
     (
       cd "${PKGBUILD%/*}"
@@ -156,6 +157,13 @@ while read -r package git_revision mod_git_revision repository; do
       sed 's|^\s\+||; s|[<>]$||' | \
       sort -u > \
       "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.builds"
+
+    # extract "packages" = pkgname
+    grep '^pkgname = ' "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.SRCINFO" | \
+      cut -d= -f2 | \
+      sed 's|^\s\+||; s|[<>]$||' | \
+      sort -u > \
+      "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.packages"
 
     # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
     (
