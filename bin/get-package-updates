@@ -126,19 +126,19 @@ rm -f "${work_dir}/build-order"
 touch "${work_dir}/build-order"
 
 while read -r package git_revision mod_git_revision repository; do
-  # delete cached values of old versions of this PKGBUILD
-  ls -1 "${work_dir}/package-infos/${package}."* 2> /dev/null | \
-    sed 's|^.*/||' | \
-    grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|needs\|packages\)$' | \
-    grep -v "^${package//./\\.}\.${git_revision}\.${new_repo_revisions["archlinux32"]}"'\.\(builds\|needs\|packages\)$' | \
-    while read file; do
-      rm "${work_dir}/package-infos/${file}"
-    done
 
   # extract infos from PKGBUILD if not existent yet
   if [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.builds" ] || \
     [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.needs" ] || \
     [ ! -e "${work_dir}/package-infos/${package}.${git_revision}.${new_repo_revisions["archlinux32"]}.packages" ]; then
+
+    # delete cached values of old versions of this PKGBUILD
+    ls -1 "${work_dir}/package-infos/${package}."* 2> /dev/null | \
+      sed 's|^.*/||' | \
+      grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|needs\|packages\)$' | \
+      while read file; do
+        rm "${work_dir}/package-infos/${file}"
+      done
 
     PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
