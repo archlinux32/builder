@@ -15,7 +15,7 @@
 
 # TODO:
 #  respect build-manually-list ("blocked")
-#  respect broken packages
+#  possibly hand out "broken" packages to different build slave
 
 . "${0%/*}/../conf/default.conf"
 
@@ -23,8 +23,9 @@ mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
-  # locked packages won't be handed out
-  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+  # locked and broken packages won't be handed out
+  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] ||
+    [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
     return 0
   fi
 
