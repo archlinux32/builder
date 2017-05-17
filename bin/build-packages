@@ -109,7 +109,7 @@ while [ ${count} -ne 0 ]; do
         if staging-i486-build ${parameters}; then
         # build successful
           ls -1 *.pkg.tar.xz | \
-            xargs -rn1 gpg --detach-sign
+            xargs -rn1 gpg --local-user="${package_key}" --detach-sign
           tar -c 'package.tar' *.pkg.tar.xz{,.sig}
           while ! ssh \
             -i "${master_build_server_identity}" \
