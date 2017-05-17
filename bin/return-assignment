@@ -46,8 +46,8 @@ fi
 # the build was successful on the build slave
 
 # extract package
-mkdir -p "${master_mirror_directory}/$4-staging/"
-cd "${master_mirror_directory}/$4-staging/"
+mkdir -p "${master_mirror_directory}/i486/$4-staging/"
+cd "${master_mirror_directory}/i486/$4-staging/"
 new_files="$(tar -xv --wildcards '*.pkg.tar.xz'{,.sig})"
 repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" $(echo "${new_files}" | grep '\.pkg\.tar\.xz\(\.sig\)\?$')
 
