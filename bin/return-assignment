@@ -7,6 +7,11 @@
 # or on failure via:
 #   "$0 $package $revision $mod_revision $repository ERROR"
 
+# exit codes:
+#  0: ok
+#  1: outdated package
+#  2: signature error
+
 # TODO:
 #  use lock file(s)
 #  remove old version(s) of newly compiled packages
@@ -66,22 +71,22 @@ signature_errors="$(
     sed 's|\.sig$||' | \
     sort | \
     uniq -c | \
-    grep '^\s*2\s' | \
+    grep -v '^\s*2\s' | \
     awk '{print $2}'
 )"
 
 if [ -n "${signature_errors}" ]; then
   >&2 echo 'The following packages lack a signature or vice versa:'
   >&2 echo "${signature_errors}"
-  exit 1
+  exit 2
 fi
 
 # move packages
 packages=(*.pkg.tar.xz)
 mkdir -p "${master_mirror_directory}/i486/$4-staging/"
-mv "*.pkg.tar.xz{,.sig}" "${master_mirror_directory}/i486/$4-staging/"
+mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i486/$4-staging/"
 
-pushd "${master_mirror_directory}/i486" > /dev/null
+pushd "${master_mirror_directory}/i486/$4-staging" > /dev/null
 repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
 popd > /dev/null
 
