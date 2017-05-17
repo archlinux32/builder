@@ -38,18 +38,23 @@ hand_out_assignment() {
     sed 's|$|.locked|' | \
     xargs -rn1 touch
 
-  rm -f "${lock_file}"
   exit 0
 
 }
 
-# Create a lock file.
+# Create a lock file and a trap.
 
 exec 9> "${lock_file}"
 if ! flock -n 9; then
   >&2 echo 'come back (shortly) later - I was running already'
   exit 1
 fi
+
+function clean_up {
+  rm -f "${lock_file}"
+}
+
+trap clean_up EXIT
 
 # Check if there are any pending packages at all and if the requester
 # has already hit its max_parallel_build_per_client limit.
@@ -72,13 +77,11 @@ done < "${work_dir}/build-list"
 
 if ! ${pending_packages}; then
   >&2 echo 'come back after the next run of get-package-updates - currently there are no pending packages'
-  rm -f "${lock_file}"
   exit 3
 fi
 
 if [ ${num_jobs} -ge ${max_parallel_build_per_client} ]; then
   >&2 echo "come back, when you've done your work - you hit the limit on maximum allowed parallel jobs per ip"
-  rm -f "${lock_file}"
   exit 4
 fi
 
@@ -125,5 +128,4 @@ done
 # Remove the lock file
 
 >&2 echo 'come back later - there are still packages to be built, but currently none has all its dependencies ready'
-rm -f "${lock_file}"
 exit 2
