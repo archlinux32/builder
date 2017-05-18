@@ -16,6 +16,7 @@
 
 # TODO:
 #  remove old version(s) of newly compiled packages
+#  fix signing of database
 
 . "${0%/*}/../conf/default.conf"
 
@@ -124,7 +125,8 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i486/$4-staging/"
 
 (
   cd "${master_mirror_directory}/i486/$4-staging"
-  repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
+  repo-add "$4-staging.db.tar.gz" "${packages[@]}"
+  # repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
 )
 
 # remove all loops which are broken by this package
