@@ -42,15 +42,14 @@ if [ "$5" == 'ERROR' ]; then
   # broken by another locked package
   (
     # loops broken by another locked package
-    ls "${work_dir}/package-states/"{*.*.*.*,$1.$2.$3.$4}.locked | \
-      sort | \
-      uniq -u | \
+    ls "${work_dir}/package-states/" | \
+      grep '\.locked$' | \
       sed 's|\.locked$||' | \
       xargs -n1 sed '1d' | \
       sort -u | \
       sed 'p'
     # loops broken by this package
-    sed '1d' "${work_dir}/package-states/$1.$2.$3.$4"
+    sed '1d' "${work_dir}/package-states/$1.$2.$3.$4.broken"
   ) | \
     sort | \
     uniq -u | \
