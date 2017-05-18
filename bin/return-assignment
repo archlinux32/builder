@@ -12,10 +12,10 @@
 #  1: another instance was already running
 #  2: outdated package
 #  3: signature error
+#  4: package error (e.g. wrong packages sent)
 
 # TODO:
 #  remove old version(s) of newly compiled packages
-#  check that received archive contains the expected packages
 
 . "${0%/*}/../conf/default.conf"
 
@@ -81,6 +81,7 @@ trap clean_up_tmp_dir EXIT
 # extract package(s)
 tar -x
 
+# check if all packages are signed and all signatures belong to a package
 signature_errors="$(
   ls -1 *.pkg.tar.xz{,.sig} | \
     sed 's|\.sig$||' | \
@@ -96,8 +97,29 @@ if [ -n "${signature_errors}" ]; then
   exit 3
 fi
 
-# move packages
+# check if the sent packages are the expected ones
 packages=(*.pkg.tar.xz)
+package_errors="$(
+  (
+    echo "${packages[@]}" | \
+      tr ' ' '\n' | \
+      sed '
+        s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz@ \2@
+        / any$/{s|any$|i486|}
+      '
+    sed 's|$| i486|' "${work_dir}/package-infos/$1.$2.$3.packages"
+  ) | \
+    sort | \
+    uniq -u
+)"
+
+if [ -n "${package_errors}" ]; then
+  >&2 echo 'The following packages should have been built but are missing or vice versa:'
+  >&2 echo "${package_errors}"
+  exit 4
+fi
+
+# move packages
 mkdir -p "${master_mirror_directory}/i486/$4-staging/"
 mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i486/$4-staging/"
 
