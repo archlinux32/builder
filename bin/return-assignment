@@ -24,8 +24,6 @@
 exec 9> "${build_list_lock_file}"
 if ! flock -n 9; then
   >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit
-fi
   exit 1
 fi
 
