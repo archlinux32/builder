@@ -120,7 +120,7 @@ while [ ${count} -ne 0 ]; do
               'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
               < 'package.tar'
             case $? in
-              0;
+              0)
                 break
               ;;
               1)
