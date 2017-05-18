@@ -37,5 +37,7 @@ packages to be deleted
 current revisions of the respective repository
 * `package-infos`:
 meta data of packages
-* `packages`, `community`, `packages32`:
+* `package-states`:
+information on build process of packages (lock files, markers for broken packages)
+* `repos/packages`, `repos/community`, `repos/packages32`:
 git repositories of PKGBUILDs and modifications
