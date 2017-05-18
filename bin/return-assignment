@@ -130,10 +130,9 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/$4-staging/"
 )
 
 # remove all loops which are broken by this package
-sed '1d' "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
-  sort -u | \
-  sed 'p;s|$|.locked|' | \
-  xargs -rn1 rm -f
+grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
+  cut -d: -f1 | \
+  xargs -rn1 rm
 
 # remove package from build list
 sed -i "/^${1//./\\.} $2 $3 $4\$/d" "${work_dir}/build-list"
