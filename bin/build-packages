@@ -111,7 +111,7 @@ while [ ${count} -ne 0 ]; do
         # build successful
           ls -1 *.pkg.tar.xz | \
             xargs -rn1 gpg --local-user="${package_key}" --detach-sign
-          tar -c 'package.tar' *.pkg.tar.xz{,.sig}
+          tar -cf 'package.tar' *.pkg.tar.xz{,.sig}
           while true; do
             ssh \
               -i "${master_build_server_identity}" \
