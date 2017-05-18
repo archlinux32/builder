@@ -29,11 +29,11 @@ fi
   exit 1
 fi
 
-function clean_up {
+function clean_up_lock_file {
   rm -f "${build_list_lock_file}"
 }
 
-trap clean_up EXIT
+trap clean_up_lock_file EXIT
 
 if [ "$5" == 'ERROR' ]; then
 # the build failed on the build slave
@@ -70,14 +70,15 @@ if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list"; then
   exit 2
 fi
 
-function clean_up {
+function clean_up_tmp_dir {
   popd > /dev/null
   rm -rf --one-file-system "${tmp_dir}"
+  clean_up_lock_file
 }
 
 tmp_dir="$(mktemp -d)"
 pushd "${tmp_dir}" > /dev/null
-trap clean_up EXIT
+trap clean_up_tmp_dir EXIT
 
 # extract package(s)
 tar -x
