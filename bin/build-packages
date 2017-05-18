@@ -19,12 +19,13 @@ usage() {
   >&2 echo '  -n count:    Build $count packages (if available), then exit.'
   >&2 echo '               $count=0 is interpreted as infinity.'
   >&2 echo '               The default is $count=1.'
+  >&2 echo '  -t seconds:  Do not request new assignment(s) $seconds seconds after start.'
   >&2 echo '  -x:          If package build fails, do not request new assignment(s).'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
 eval set -- "$(
-  getopt -o hn:x \
+  getopt -o hn:t:x \
     --long help \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
@@ -32,6 +33,7 @@ eval set -- "$(
 
 count=1
 exit_after_failure=false
+timeout=0
 
 while true
 do
@@ -44,6 +46,10 @@ do
       count="$1"
       [ ${count} -eq 0 ] && \
         count=-1
+    ;;
+    -t)
+      shift
+      timeout="$1"
     ;;
     -x)
       exit_after_failure=true
@@ -65,7 +71,16 @@ if [ $# -ne 0 ]; then
   usage
 fi
 
+if [ ${timeout} -ne 0 ]; then
+  timeout=$[${timeout}+$(date +%s)]
+fi
+
 while [ ${count} -ne 0 ]; do
+
+  if [ ${timeout} -ne 0 ] && [ ${timeout} -lt $(date +%s) ];
+  then
+    break
+  fi
 
   package="$(
     ssh \
