@@ -82,15 +82,16 @@ while [ ${count} -ne 0 ]; do
     break
   fi
 
+  err=0
   package="$(
     ssh \
       -i "${master_build_server_identity}" \
       -p "${master_build_server_port}" \
       "${master_build_server_user}@${master_build_server}" \
       'get-assignment'
-  )"
+  )" || err=$?
 
-  case $? in
+  case ${err} in
 
     #  0: ok, I gave you an assignment
     0)
@@ -133,13 +134,15 @@ while [ ${count} -ne 0 ]; do
             xargs -rn1 gpg --local-user="${package_key}" --detach-sign
           tar -cf 'package.tar' *.pkg.tar.xz{,.sig}
           while true; do
+            err=0
             ssh \
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \
               "${master_build_server_user}@${master_build_server}" \
               'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
-              < 'package.tar'
-            case $? in
+              < 'package.tar' || \
+              err=$?
+            case ${err} in
               0)
                 # upload successful
                 break
@@ -157,7 +160,7 @@ while [ ${count} -ne 0 ]; do
                 exit 1
               ;;
               *)
-                >&2 echo "unknown return code $? from 'return-assignment'"
+                >&2 echo "unknown return code ${err} from 'return-assignment'"
                 exit 1
             esac
           done
@@ -215,7 +218,7 @@ while [ ${count} -ne 0 ]; do
 
     *)
 
-      >&2 echo "ERROR: Unknown exit code $? from 'get-assignment'."
+      >&2 echo "ERROR: Unknown exit code ${err} from 'get-assignment'."
       exit 1
 
     ;;
