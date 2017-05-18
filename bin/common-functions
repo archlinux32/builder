@@ -56,8 +56,8 @@ apply_package_customizations() {
   fi
 
   if [ ! -f 'PKGBUILD.changes-applied' ]; then
-    # add i486 to the arch list
-    sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1i486 \2|' -i 'PKGBUILD'
+    # add i686 to the arch list
+    sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1'"'i686'"' \2|' -i 'PKGBUILD'
     if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
       # If this package has modifications (or is new), apply them now:
       # append PKGBUILD

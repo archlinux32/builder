@@ -105,9 +105,9 @@ package_errors="$(
       tr ' ' '\n' | \
       sed '
         s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz@ \2@
-        / any$/{s|any$|i486|}
+        / any$/{s|any$|i686|}
       '
-    sed 's|$| i486|' "${work_dir}/package-infos/$1.$2.$3.packages"
+    sed 's|$| i686|' "${work_dir}/package-infos/$1.$2.$3.packages"
   ) | \
     sort | \
     uniq -u
@@ -120,11 +120,11 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move packages
-mkdir -p "${master_mirror_directory}/i486/$4-staging/"
-mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i486/$4-staging/"
+mkdir -p "${master_mirror_directory}/i686/$4-staging/"
+mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/$4-staging/"
 
 (
-  cd "${master_mirror_directory}/i486/$4-staging"
+  cd "${master_mirror_directory}/i686/$4-staging"
   repo-add "$4-staging.db.tar.gz" "${packages[@]}"
   # repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
 )
