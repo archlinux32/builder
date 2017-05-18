@@ -7,7 +7,7 @@
 # TODOs:
 #  additional to blacklisted packages ignore any packages depending on them
 #  be more secure in case of update while build(s) is/are still in progress
-#   -> (stale) lock files, moving loop lock files
+#   -> (stale) lock files, moving (or changing content of) loop lock files
 
 . "${0%/*}/../conf/default.conf"
 

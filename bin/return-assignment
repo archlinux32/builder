@@ -14,7 +14,6 @@
 #  3: signature error
 
 # TODO:
-#  use lock file for build list
 #  remove old version(s) of newly compiled packages
 #  check that received archive contains the expected packages
 
