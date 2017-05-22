@@ -41,21 +41,24 @@ if [ "$5" == 'ERROR' ]; then
 
   # unlock every loop this package would have broken and which is not
   # broken by another locked package
-  (
-    # loops broken by another locked package
-    ls "${work_dir}/package-states/" | \
-      grep '\.locked$' | \
-      sed 's|\.locked$||' | \
-      xargs -n1 sed '1d' | \
-      sort -u | \
-      sed 'p'
-    # loops broken by this package
-    sed '1d' "${work_dir}/package-states/$1.$2.$3.$4.broken"
-  ) | \
-    sort | \
-    uniq -u | \
-    sed 's|$|.locked|' | \
-    xargs -rn1 rm -f
+  locked_packages="$(
+    ls "${work_dir}/package-states/"*".locked" | \
+      sed 's@^.*/\([^/]\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
+  )"
+  grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
+    cut -d: -f1 | \
+    while read -r loop; do
+      if [ -z "$(
+          (
+            echo "${locked_packages}"
+            cat "${loop}"
+          ) | \
+            sort | \
+            uniq -d
+        )" ]; then
+        rm -f "${loop}.locked"
+      fi
+    done
 
   exit 0
 
