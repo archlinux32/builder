@@ -106,21 +106,40 @@ done < "${work_dir}/build-list"
 # Find package (of all packages which are not locked)
 # which breaks the most unlocked loops
 
+locked_packages="$(
+  ls "${work_dir}/package-states/" | \
+    grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$' | \
+    sed 's|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||'
+)"
+
+unlocked_loops="$(
+  ls "${work_dir}/build-list.loops/" | \
+    grep '^loop_[0-9]\+$' | \
+    while read -r loop; do
+      if [ -z "$(
+        (
+          cat "${work_dir}/build-list.loops/${loop}"
+          echo "${locked_packages}"
+        ) | \
+          sort | \
+          uniq -d
+        )" ]; then
+        echo "${loop}"
+      fi
+    done
+)"
+
 for package in $(
-  ls "${work_dir}/build-list.loops/"loop_* | \
-    sed 's|\.locked$||' | \
-    sort | \
-    uniq -u | \
-    # now, we have all unlocked loops
+  echo "${unlocked_loops}" | \
+    sed "s|^|${work_dir}/build-list.loops/|" | \
     xargs cat | \
-    # now, we have their content
     sort | \
     uniq -c | \
     sort -k1nr,1 | \
     awk '{print $2}'
   ); do
 
-  if assignment="$(grep "^${package} " "${work_dir}/build-list")"; then
+  if assignment="$(grep "^${package//./\\.} " "${work_dir}/build-list")"; then
     hand_out_assignment ${assignment}
   fi
 
