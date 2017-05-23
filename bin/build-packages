@@ -18,7 +18,7 @@ usage() {
   >&2 echo '  -h|--help:   Show this help and exit.'
   >&2 echo '  -n count:    Build $count packages (if available), then exit.'
   >&2 echo '               $count=0 is interpreted as infinity.'
-  >&2 echo '               The default is $count=1.'
+  >&2 echo '               The default is $count=1 or 0 iff -t or -x is given.'
   >&2 echo '  -t seconds:  Do not request new assignment(s) $seconds seconds after start.'
   >&2 echo '  -x:          If package build fails, do not request new assignment(s).'
   [ -z "$1" ] && exit 1 || exit $1
@@ -31,7 +31,7 @@ eval set -- "$(
   echo usage
 )"
 
-count=1
+unset count
 exit_after_failure=false
 timeout=0
 
@@ -69,6 +69,14 @@ done
 if [ $# -ne 0 ]; then
   >&2 echo 'Too many arguments.'
   usage
+fi
+
+if [ -z "${count}" ]; then
+  if [ ${timeout} -ne 0 ] || ${exit_after_failure}; then
+    count=-1
+  else
+    count=1
+  fi
 fi
 
 if [ ${timeout} -ne 0 ]; then
