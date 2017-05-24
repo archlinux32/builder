@@ -8,6 +8,7 @@
 #  use different build commands for different repositories - do we need this actually?
 #  send logs of failed builds
 #  handle if build fails due to "local issues" (e.g. unclean build environment, wrong mirror, ...)
+#  force different cache for builds (since we don't want to build against an empty i686 cache on a x86_64 host)
 
 . "${0%/*}/../conf/default.conf"
 
