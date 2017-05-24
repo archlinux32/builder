@@ -10,10 +10,13 @@ This includes scripts to be run on the build master as well as scripts to be run
 ### build slave only
 * some ssh-client
 * `devtools32`
-* set `keyserver-options auto-key-retrieve` in ~/.gnupg/gpg.conf
 
 ## configuration
 The standard configuration in `conf/default.conf` can be locally overwritten by `conf/local.conf`.
+### build master only
+* add `command=".../bin/slave-build-connect $slave-identifier" $ssh-key` to `~/.ssh/authorized_keys` for each build slave
+### build slave only
+* set `keyserver-options auto-key-retrieve` in ~/.gnupg/gpg.conf
 
 ## tools for the build master
 * `get-assignment`:
