@@ -17,6 +17,7 @@ The standard configuration in `conf/default.conf` can be locally overwritten by 
 * add `command=".../bin/slave-build-connect $slave-identifier" $ssh-key` to `~/.ssh/authorized_keys` for each build slave
 ### build slave only
 * set `keyserver-options auto-key-retrieve` in ~/.gnupg/gpg.conf
+* put an i686 mirror into `/etc/pacman.d/mirrorlist` as __first__ mirror
 
 ## tools for the build master
 * `get-assignment`:
