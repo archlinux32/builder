@@ -136,47 +136,62 @@ while [ ${count} -ne 0 ]; do
       cd "${PKGBUILD%/*}"
       apply_package_customizations
       success=false
-      for parameters in '' '-c'; do
-        rm -f *.pkg.tar.xz{,.sig}
-        if staging-i686-build ${parameters}; then
-        # build successful
-          ls -1 *.pkg.tar.xz | \
-            xargs -rn1 gpg --local-user="${package_key}" --detach-sign
-          tar -cf 'package.tar' *.pkg.tar.xz{,.sig}
-          while true; do
-            err=0
-            ssh \
-              -i "${master_build_server_identity}" \
-              -p "${master_build_server_port}" \
-              "${master_build_server_user}@${master_build_server}" \
-              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
-              < 'package.tar' || \
-              err=$?
-            case ${err} in
-              0)
-                # upload successful
-                break
-              ;;
-              1)
-                # 'return-assignment' was running already
-                sleep $[15+$RANDOM%30]
-              ;;
-              2)
-                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
-                break
-              ;;
-              3)
-                >& echo "'return-assignment' reports a signature error."
-                exit 1
-              ;;
-              *)
-                >&2 echo "unknown return code ${err} from 'return-assignment'"
-                exit 1
-            esac
-          done
-          success=true
+      for mirrored_source in 'no' 'yes'; do
+        for parameters in '' '-c'; do
+          rm -f *.pkg.tar.xz{,.sig}
+          if staging-i686-build ${parameters}; then
+          # build successful
+            ls -1 *.pkg.tar.xz | \
+              xargs -rn1 gpg --local-user="${package_key}" --detach-sign
+            tar -cf 'package.tar' *.pkg.tar.xz{,.sig}
+            while true; do
+              err=0
+              ssh \
+                -i "${master_build_server_identity}" \
+                -p "${master_build_server_port}" \
+                "${master_build_server_user}@${master_build_server}" \
+                'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+                < 'package.tar' || \
+                err=$?
+              case ${err} in
+                0)
+                  # upload successful
+                  break
+                ;;
+                1)
+                  # 'return-assignment' was running already
+                  sleep $[15+$RANDOM%30]
+                ;;
+                2)
+                  >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                  break
+                ;;
+                3)
+                  >& echo "'return-assignment' reports a signature error."
+                  exit 1
+                ;;
+                *)
+                  >&2 echo "unknown return code ${err} from 'return-assignment'"
+                  exit 1
+              esac
+            done
+            success=true
+            break
+          fi
+        done
+        if ${success}; then
           break
         fi
+        # maybe a missing source is/was the problem?
+        # try to download them from sources.archlinux.org/sources/$repo/$source
+        tmp_file="$(mktemp)"
+        mksrcinfo -o "${tmp_file}"
+        git_repo="$(find_git_repository_to_package_repository "${repository}")"
+        sed -n '/\s*source = /{s|^\s*source = ||;s|::.*$||;s|^.*/||;p}' "${tmp_file}" | \
+          while read -r source_file; do
+            wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_file}" || true
+          done
+        rm -f "${tmp_file}"
       done
 
       if ! ${success}; then
