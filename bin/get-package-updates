@@ -18,17 +18,11 @@ delete_package() {
   sed -i "/^${1//./\\.} /d" "${work_dir}/build-list.new"
 }
 
-# Create a lock file for build list.
-
-exec 9> "${build_list_lock_file}"
-if ! flock -n 9; then
-  >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit
-fi
-
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
 for repo in "${repo_paths[@]}"; do
+  # TODO:
+  #  this is somewhat redundant and slow -- improve it!
   git -C "${repo}" clean -df
   git -C "${repo}" reset --hard
   git -C "${repo}" checkout master
@@ -50,6 +44,14 @@ for repo in "${!repo_paths[@]}"; do
       tee "${work_dir}/${repo}.revision.new"
   )"
 done
+
+# Create a lock file for build list.
+
+exec 9> "${build_list_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'come back (shortly) later - I cannot lock build list.'
+  exit
+fi
 
 echo 'Check modified packages from the last update, and put them to the build list.'
 
