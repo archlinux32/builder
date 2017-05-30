@@ -23,10 +23,10 @@ delete_package() {
 for repo in "${repo_paths[@]}"; do
   # TODO:
   #  this is somewhat redundant and slow -- improve it!
-  git -C "${repo}" clean -df
-  git -C "${repo}" reset --hard
-  git -C "${repo}" checkout master
-  git -C "${repo}" pull
+  git -C "${repo}" checkout -f master
+  git -C "${repo}" clean -xdf
+  git -C "${repo}" fetch
+  git -C "${repo}" reset --hard origin/master
 done
 
 # Read previous git revision numbers from files.
