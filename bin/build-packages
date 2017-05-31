@@ -184,14 +184,31 @@ while [ ${count} -ne 0 ]; do
         fi
         # maybe a missing source is/was the problem?
         # try to download them from sources.archlinux.org/sources/$repo/$source
-        tmp_file="$(mktemp)"
-        mksrcinfo -o "${tmp_file}"
+        source_name="$(
+          makepkg --printsrcinfo | \
+            sed -n '
+              /^\s*\(epoch\|pkg\(base\|ver\|rel\)\) = /{s|^\s\+||;p}
+              /^pkgname = /q
+            ' | \
+            sed '
+              s|^pkgbase = \(.*\)$|0 \1-|
+              s|^epoch = \(.*\)$|1 \1:|
+              s|^pkgver = \(.*\)$|2 \1-|
+              s|^pkgrel = \(.*\)$|3 \1.src.tar.gz|
+            ' | \
+            sort -k1n,1 | \
+            sed '
+              s|^[0-9] ||
+              :a
+                N
+                s|\n[0-9] ||
+              ta
+            '
+        )"
         git_repo="$(find_git_repository_to_package_repository "${repository}")"
-        sed -n '/\s*source = /{s|^\s*source = ||;s|::.*$||;s|^.*/||;p}' "${tmp_file}" | \
-          while read -r source_file; do
-            wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_file}" || true
-          done
-        rm -f "${tmp_file}"
+        if wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
+          tar -xz --overwrite -f "${source_name}"
+        fi
       done
 
       if ! ${success}; then
