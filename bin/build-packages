@@ -120,7 +120,7 @@ while [ ${count} -ne 0 ]; do
         git -C "${repo}" clean -df
         git -C "${repo}" reset --hard
         git -C "${repo}" checkout master
-        git -C "${repo}" pull
+        git -C "${repo}" pull || true
       done
 
       git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}" &> /dev/null
