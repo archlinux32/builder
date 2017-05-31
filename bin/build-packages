@@ -207,6 +207,7 @@ while [ ${count} -ne 0 ]; do
         )"
         git_repo="$(find_git_repository_to_package_repository "${repository}")"
         if wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
+          # TODO: somehow the build environment does not see the sources - we need to change that!
           tar -xz --overwrite -f "${source_name}"
         fi
       done
