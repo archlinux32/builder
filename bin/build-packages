@@ -138,7 +138,7 @@ while [ ${count} -ne 0 ]; do
       success=false
       for mirrored_source in false true; do
 
-        if ${mirror_source}; then
+        if ${mirrored_source}; then
           # maybe a missing source is/was the problem?
           # try to download them from sources.archlinux.org/sources/$repo/$source
           source_name="$(
