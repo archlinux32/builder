@@ -91,7 +91,9 @@ for repo in "${!repo_paths[@]}"; do
     grep -v -- '-i686/PKGBUILD$' | \
     sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|' | \
     # ignore staging and testing
-    grep -v '\(staging\|testing\)$'
+    grep -v '\(staging\|testing\)$' | \
+    # ignore lib32- packages (they should all have a pendent built for x86_64)
+    grep -v '^. lib32-'
 done | \
   sort -u | \
   while read -r mode package git_revision repository; do
