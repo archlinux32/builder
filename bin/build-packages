@@ -163,9 +163,11 @@ while [ ${count} -ne 0 ]; do
               '
           )"
           git_repo="$(find_git_repository_to_package_repository "${repository}")"
-          if wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
-            tar -xzkf "${source_name}" --exclude PKGBUILD --strip-components=1 || true
+          if ! wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
+            # we can't improve anything
+            break
           fi
+          tar -xzkf "${source_name}" --exclude PKGBUILD --strip-components=1 || true
         fi
 
         for parameters in '' '-c'; do
