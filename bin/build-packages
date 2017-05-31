@@ -216,11 +216,13 @@ while [ ${count} -ne 0 ]; do
       done
 
       if ! ${success}; then
-        ssh \
+        while ! ssh \
           -i "${master_build_server_identity}" \
           -p "${master_build_server_port}" \
           "${master_build_server_user}@${master_build_server}" \
-          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'
+          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'; do
+          sleep $[15+$RANDOM%30]
+        done
         if ${exit_after_failure}; then
           >&2 echo 'Build failed, exiting now'
           exit
