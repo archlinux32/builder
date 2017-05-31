@@ -136,7 +136,38 @@ while [ ${count} -ne 0 ]; do
       cd "${PKGBUILD%/*}"
       apply_package_customizations
       success=false
-      for mirrored_source in 'no' 'yes'; do
+      for mirrored_source in false true; do
+
+        if ${mirror_source}; then
+          # maybe a missing source is/was the problem?
+          # try to download them from sources.archlinux.org/sources/$repo/$source
+          source_name="$(
+            makepkg --printsrcinfo | \
+              sed -n '
+                /^\s*\(epoch\|pkg\(base\|ver\|rel\)\) = /{s|^\s\+||;p}
+                /^pkgname = /q
+              ' | \
+              sed '
+                s|^pkgbase = \(.*\)$|0 \1-|
+                s|^epoch = \(.*\)$|1 \1:|
+                s|^pkgver = \(.*\)$|2 \1-|
+                s|^pkgrel = \(.*\)$|3 \1.src.tar.gz|
+              ' | \
+              sort -k1n,1 | \
+              sed '
+                s|^[0-9] ||
+                :a
+                  N
+                  s|\n[0-9] ||
+                ta
+              '
+          )"
+          git_repo="$(find_git_repository_to_package_repository "${repository}")"
+          if wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
+            tar -xzkf "${source_name}" --exclude PKGBUILD --strip-components=1 || true
+          fi
+        fi
+
         for parameters in '' '-c'; do
           rm -f *.pkg.tar.xz{,.sig}
           if staging-i686-build ${parameters}; then
@@ -181,34 +212,6 @@ while [ ${count} -ne 0 ]; do
         done
         if ${success}; then
           break
-        fi
-        # maybe a missing source is/was the problem?
-        # try to download them from sources.archlinux.org/sources/$repo/$source
-        source_name="$(
-          makepkg --printsrcinfo | \
-            sed -n '
-              /^\s*\(epoch\|pkg\(base\|ver\|rel\)\) = /{s|^\s\+||;p}
-              /^pkgname = /q
-            ' | \
-            sed '
-              s|^pkgbase = \(.*\)$|0 \1-|
-              s|^epoch = \(.*\)$|1 \1:|
-              s|^pkgver = \(.*\)$|2 \1-|
-              s|^pkgrel = \(.*\)$|3 \1.src.tar.gz|
-            ' | \
-            sort -k1n,1 | \
-            sed '
-              s|^[0-9] ||
-              :a
-                N
-                s|\n[0-9] ||
-              ta
-            '
-        )"
-        git_repo="$(find_git_repository_to_package_repository "${repository}")"
-        if wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
-          # TODO: somehow the build environment does not see the sources - we need to change that!
-          tar -xz --overwrite -f "${source_name}"
         fi
       done
 
