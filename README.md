@@ -26,6 +26,8 @@ Receive a build assignment from the `build-list`.
 Update the `build-list`.
 * `build-slave-connect`:
 Proxy command to be allowed for connection via ssh from build slaves - this way, they can execute exactly the commands they need to operate.
+* `build-master-status`:
+Print some informational statistics.
 
 ## tools for the build slaves
 * `build-packages`:
