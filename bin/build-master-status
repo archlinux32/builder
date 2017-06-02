@@ -26,8 +26,8 @@ printf 'The build list contains %d tasks (incl. broken: %d).\n' "$[${tasks}-${br
 printf 'There are %d testing/staging packages.\n' "${staging}"
 printf 'There are %d broken packages.\n' "${broken}"
 if [ $[${broken}+${staging}] -ne 0 ]; then
-  LANG=C printf '%.1f%% of all packages are broken.\n' "$(bc <<< "scale=10; 100*${broken}/(${broken}+${staging})")"
+  printf '%.1f%% of all packages are broken.\n' "$(bc <<< "scale=10; 100*${broken}/(${broken}+${staging})")"
 fi
 if [ $[${staging}+${tasks}-${broken}] -ne 0 ]; then
-  LANG=C printf '%.1f%% of the planned work has been done.\n' "$(bc <<< "scale=10; 100*${staging}/(${staging}+${tasks}-${broken})")"
+  printf '%.1f%% of the planned work has been done.\n' "$(bc <<< "scale=10; 100*${staging}/(${staging}+${tasks}-${broken})")"
 fi
