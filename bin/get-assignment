@@ -29,7 +29,7 @@ hand_out_assignment() {
   fi
 
   echo "$1 $2 $3 $4"
-  echo "${SSH_CLIENT%% *}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
+  echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
   grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/"loop_* | \
@@ -66,7 +66,7 @@ while read -r package git_revision mod_git_revision repository; do
 
   if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ];
   then
-    if [ "${SSH_CLIENT%% *}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked")" ]; then
+    if [ "${slave}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked")" ]; then
       num_jobs=$[${num_jobs}+1];
     fi
   else
