@@ -55,16 +55,26 @@ apply_package_customizations() {
     exit 1
   fi
 
+  local repo
+  local package
+
+  repo="$(pwd)"
+  package="${repo%/*/*}"
+  package="${package##*/}"
+  repo="${repo##*/}"
+  repo="${repo%-any}"
+  repo="${repo%-x86_64}"
+
   if [ ! -f 'PKGBUILD.changes-applied' ]; then
     # add i686 to the arch list
     sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1'"'i686'"' \2|' -i 'PKGBUILD'
-    if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
+    if [ -f "${repo_paths["archlinux32"]}/${repo}/${package}/PKGBUILD" ]; then
       # If this package has modifications (or is new), apply them now:
       # append PKGBUILD
-      cat "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" >> \
+      cat "${repo_paths["archlinux32"]}/${repo}/${package}/PKGBUILD" >> \
         'PKGBUILD'
       # copy (and overwrite) other files
-      for file in "${repo_paths["archlinux32"]}/$2/$1/"*; do
+      for file in "${repo_paths["archlinux32"]}/${repo}/${package}/"*; do
         if [ -f "${file}" ] && [ "${file##*/}" != 'PKGBUILD' ]; then
           cp "${file}" ./
         fi
