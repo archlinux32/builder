@@ -203,6 +203,10 @@ while [ ${count} -ne 0 ]; do
                   >& echo "'return-assignment' reports a signature error."
                   exit 1
                 ;;
+                4)
+                  >& echo "'return-assignment' reports too many or missing packages."
+                  exit 1
+                ;;
                 *)
                   >&2 echo "unknown return code ${err} from 'return-assignment'"
                   exit 1
