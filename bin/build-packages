@@ -176,7 +176,11 @@ while [ ${count} -ne 0 ]; do
           # build successful
             ls -1 *.pkg.tar.xz | \
               xargs -rn1 gpg --local-user="${package_key}" --detach-sign
-            tar -cf 'package.tar' *.pkg.tar.xz{,.sig}
+            tar -cf 'package.tar' $(
+                ls -1 | \
+                  grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
+                  grep -v -- '-debug-'
+              )
             while true; do
               err=0
               ssh \
