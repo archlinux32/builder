@@ -23,9 +23,8 @@ mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
-  # locked and broken packages won't be handed out
-  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] ||
-    [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
+  # locked, broken and blocked packages won't be handed out
+  if package_locked_broken_or_blocked "$1" "$2" "$3" "$4"; then
     return 0
   fi
 
@@ -89,6 +88,10 @@ fi
 # Find first package of build-list whose dependencies are all met
 
 while read -r package git_revision mod_git_revision repository; do
+
+  if package_locked_broken_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+    continue
+  fi
 
   [ -z "$(
     (
