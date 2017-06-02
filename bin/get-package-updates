@@ -10,6 +10,53 @@
 
 . "${0%/*}/../conf/default.conf"
 
+usage() {
+  >&2 echo ''
+  >&2 echo 'get-package-updates: check for packages that need to be built,'
+  >&2 echo ' and build a list in the proper build order'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -b|--block:  If necessary, wait for lock blocking.'
+  >&2 echo '  -h|--help:   Show this help and exit.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
+
+eval set -- "$(
+  getopt -o bh \
+    --long block \
+    --long help \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+block=false
+
+while true
+do
+  case "$1" in
+    -b|--block)
+      block=true
+    ;;
+    -h|--help)
+      usage 0
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit -1
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 0 ]; then
+  >&2 echo 'Too many arguments.'
+  usage
+fi
+
 # delete_package package
 # mark $package for deletion
 delete_package() {
@@ -47,11 +94,17 @@ done
 
 # Create a lock file for build list.
 
-exec 9> "${build_list_lock_file}"
-if ! flock -n 9; then
-  >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit
-fi
+while true; do
+  exec 9> "${build_list_lock_file}"
+  if flock -n 9; then
+    break
+  fi
+  if ! ${block}; then
+    >&2 echo 'come back (shortly) later - I cannot lock build list.'
+    exit
+  fi
+  sleep 0.1
+done
 
 echo 'Check modified packages from the last update, and put them to the build list.'
 
