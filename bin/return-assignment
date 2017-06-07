@@ -128,13 +128,13 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move packages
-mkdir -p "${master_mirror_directory}/i686/$4-staging/"
-mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/$4-staging/"
+mkdir -p "${master_mirror_directory}/i686/staging/"
+mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/staging/"
 
 (
-  cd "${master_mirror_directory}/i686/$4-staging"
-  repo-add "$4-staging.db.tar.gz" "${packages[@]}"
-  # repo-add -v -s -k "${repo_key}" "$4-staging.db.tar.gz" "${packages[@]}"
+  cd "${master_mirror_directory}/i686/staging"
+  repo-add 'staging.db.tar.gz' "${packages[@]}"
+  # repo-add -v -s -k "${repo_key}" 'staging.db.tar.gz' "${packages[@]}"
 
   # remove old versions of same packages
   for package in "${packages[@]}"; do
@@ -156,4 +156,4 @@ grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
 sed -i "/^${1//./\\.} $2 $3 $4\$/d" "${work_dir}/build-list"
 
 # remove package lock file
-rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
+mv "${work_dir}/package-states/$1.$2.$3.$4."{locked,done}
