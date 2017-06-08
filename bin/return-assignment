@@ -146,6 +146,13 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/staging/"
   done
 )
 
+# remove old stage files
+ls "${work_dir}/package-states" | \
+  grep "^${1//./\\.}\(\.[^.]\+\)\{4\}\$" | \
+  grep -v "^${1//./\\.}\.$2\.$3\.$4\.[^.]\+\$" | \
+  sed "s|^|${work_dir}/package-states/|" | \
+  xargs -rn1 rm -f
+
 # remove all loops which are broken by this package
 grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   cut -d: -f1 | \
