@@ -16,20 +16,23 @@ usage() {
   >&2 echo ' and build a list in the proper build order'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:  If necessary, wait for lock blocking.'
-  >&2 echo '  -h|--help:   Show this help and exit.'
+  >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
+  >&2 echo '  -h|--help:    Show this help and exit.'
+  >&2 echo '  -n|--no-pull: Do not pull git repos, merely reorder build list.'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
 eval set -- "$(
-  getopt -o bh \
+  getopt -o bhn \
     --long block \
     --long help \
+    --long no-pull \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 block_flag='-n'
+pull=true
 
 while true
 do
@@ -39,6 +42,9 @@ do
     ;;
     -h|--help)
       usage 0
+    ;;
+    -n|--no-pull)
+      pull=false
     ;;
     --)
       shift
@@ -73,7 +79,9 @@ for repo in "${repo_paths[@]}"; do
   git -C "${repo}" checkout -f master
   git -C "${repo}" clean -xdf
   git -C "${repo}" fetch
-  git -C "${repo}" reset --hard origin/master
+  if ${pull}; then
+    git -C "${repo}" reset --hard origin/master
+  fi
 done
 
 # Read previous git revision numbers from files.
