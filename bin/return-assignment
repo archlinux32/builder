@@ -146,7 +146,8 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/staging/"
   done
 )
 
-# remove old stage files
+# remove old stage files (these should be only "done" markers, but
+# actually we don't care what it is)
 ls "${work_dir}/package-states" | \
   grep "^${1//./\\.}\(\.[^.]\+\)\{4\}\$" | \
   grep -v "^${1//./\\.}\.$2\.$3\.$4\.[^.]\+\$" | \

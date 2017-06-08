@@ -28,6 +28,13 @@ hand_out_assignment() {
     return 0
   fi
 
+  # we don't care anymore if an older version of this package was
+  # "locked" or "broken" (we keep only marker for older "done" packages)
+  ls "${work_dir}/package-states" | \
+    grep "^${1//./\\.}\(\.[^.]\+\)\{3\}\.\(locked\|broken\)\$" | \
+    sed "s|^|${work_dir}/package-states/|" | \
+    xargs -rn1 rm -f
+
   echo "$1 $2 $3 $4"
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
