@@ -330,6 +330,22 @@ if [ -s "${work_dir}/tsort.error" ]; then
       print $2 >"'"${work_dir}"'/build-list.loops.new/loop_" n
     }
     ' "${work_dir}/tsort.error"
+
+  # remove lines from loop files which are no packages
+  ls "${work_dir}/build-list.loops.new" | \
+    grep '^loop_[0-9]\+$' | \
+    while read -r loop; do
+      (
+        sort -u "${work_dir}/build-list.loops.new/${loop}"
+        cut -d' ' -f1 "${work_dir}/build-list.new.new" | \
+          sort -u
+      ) | \
+        sort | \
+        uniq -d > \
+        "${work_dir}/build-list.loops.new/${loop}.new"
+      mv "${work_dir}/build-list.loops.new/${loop}"{.new,}
+    done
+
 else
   rm "${work_dir}/tsort.error"
 fi
