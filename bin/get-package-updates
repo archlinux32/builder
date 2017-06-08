@@ -29,13 +29,13 @@ eval set -- "$(
   echo usage
 )"
 
-block=false
+block_flag='-n'
 
 while true
 do
   case "$1" in
     -b|--block)
-      block=true
+      block_flag=''
     ;;
     -h|--help)
       usage 0
@@ -94,17 +94,11 @@ done
 
 # Create a lock file for build list.
 
-while true; do
-  exec 9> "${build_list_lock_file}"
-  if flock -n 9; then
-    break
-  fi
-  if ! ${block}; then
-    >&2 echo 'come back (shortly) later - I cannot lock build list.'
-    exit
-  fi
-  sleep 0.1
-done
+exec 9> "${build_list_lock_file}"
+if ! flock ${block_flag} 9; then
+  >&2 echo 'come back (shortly) later - I cannot lock build list.'
+  exit
+fi
 
 echo 'Check modified packages from the last update, and put them to the build list.'
 
