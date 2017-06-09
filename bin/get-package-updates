@@ -149,9 +149,7 @@ for repo in "${!repo_paths[@]}"; do
     grep -v -- '-i686/PKGBUILD$' | \
     sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|' | \
     # ignore staging and testing
-    grep -v '\(staging\|testing\)$' | \
-    # ignore lib32- packages (they should all have a pendent built for x86_64)
-    grep -v '^. lib32-'
+    grep -v '\(staging\|testing\)$'
 done | \
   sort -u | \
   while read -r mode package git_revision repository; do
@@ -274,7 +272,14 @@ echo 'apply blacklisting'
 black_listed=''
 black_listed_new="$(
   cat "${repo_paths["archlinux32"]}/blacklist"
+  ls "${work_dir}/package-infos/" | \
+    grep '^lib32-.*\.depends' | \
+    sed '
+      s|^.*/||
+      s|\(\.[^.]\+\)\{3\}$||
+    '
 )"
+
 while [ -n "${black_listed_new}" ]; do
   black_listed="$(
     printf '%s\n%s' "${black_listed}" "${black_listed_new}"
