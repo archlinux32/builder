@@ -23,7 +23,7 @@ broken="$(
 loops="$(
   ls "${work_dir}/build-list.loops" | \
     grep -c '^loop_[0-9]\+$'
-  )"
+  )" || true
 looped_packages="$(
   ls "${work_dir}/build-list.loops" | \
     grep '^loop_[0-9]\+$' | \
