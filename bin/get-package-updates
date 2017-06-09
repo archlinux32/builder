@@ -177,6 +177,11 @@ done | \
     esac
   done
 
+sort -u "${work_dir}/deletion-list.new" > \
+  "${work_dir}/deletion-list.new.new"
+
+mv "${work_dir}/deletion-list.new"{.new,}
+
 echo 'Extract dependencies of packages.'
 
 # First, we extract the dependencies of each package.
