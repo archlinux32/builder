@@ -9,6 +9,7 @@
 #  send logs of failed builds
 #  handle if build fails due to "local issues" (e.g. unclean build environment, wrong mirror, ...)
 #  force different cache for builds (since we don't want to build against an empty i686 cache on a x86_64 host)
+#  remove explicit installation of archlinux32-keyring inside the build environment
 
 . "${0%/*}/../conf/default.conf"
 
@@ -172,7 +173,7 @@ while [ ${count} -ne 0 ]; do
 
         for parameters in '' '-c'; do
           rm -f *.pkg.tar.xz{,.sig}
-          if staging-i686-build ${parameters}; then
+          if staging-i686-build ${parameters} -- archlinux32-keyring; then
           # build successful
             ls -1 *.pkg.tar.xz | \
               xargs -rn1 gpg --local-user="${package_key}" --detach-sign
