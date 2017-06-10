@@ -1,0 +1,244 @@
+#!/bin/bash
+
+# move binary packages from staging to testing (if possible [1]) and
+# additionally all packages specified on the command line from testing
+# to the respective stable repository
+
+# 1] Condition for moving a package A from staging to testing is that:
+#   a) nothing on the build-list depends on A and
+#   b) no done package B which is not being moved depends on A
+
+# TODO:
+#  the meta data used to evaluate condition "b" might be for a different
+#    version
+#  correctly handle if multiple versions of a single package are marked
+#    as "done"
+
+. "${0%/*}/../conf/default.conf"
+
+usage() {
+  >&2 echo ''
+  >&2 echo 'db-update [options] [packages]:'
+  >&2 echo ' move possible packages from staging to testing.'
+  >&2 echo ' move packages on the command line from testing to stable.'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
+  >&2 echo '  -h|--help:    Show this help and exit.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
+
+eval set -- "$(
+  getopt -o bh \
+    --long block \
+    --long help \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+block_flag='-n'
+
+while true
+do
+  case "$1" in
+    -b|--block)
+      block_flag=''
+    ;;
+    -h|--help)
+      usage 0
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit -1
+    ;;
+  esac
+  shift
+done
+
+packages_to_stabilize=("${@}")
+
+# Create a lock file and a trap.
+
+exec 9> "${build_list_lock_file}"
+if ! flock ${block_flag} 9; then
+  >&2 echo 'come back (shortly) later - I cannot lock build list.'
+  exit 1
+fi
+
+exec 8> "${package_database_lock_file}"
+if ! flock ${block_flag} 8; then
+  >&2 echo 'come back (shortly) later - I cannot lock package database.'
+  exit 1
+fi
+
+function clean_up_lock_file {
+  rm -f "${package_database_lock_file}" "${build_list_lock_file}"
+}
+
+trap clean_up_lock_file EXIT
+
+# packages which can't be un-staged because they're still dependencies
+# of any job on the build-list
+
+keep_packages="$(
+  while read -r pkg pkg_rev mod_rev repo; do
+    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
+  done < \
+    "${work_dir}/build-list" | \
+    sort -u
+)"
+
+# sanity check
+
+if [ -n "$(
+  ls "${work_dir}/package-states" | \
+    grep '\.done$' | \
+    sed 's|\(\.[^.]\+\)\{4\}$||' | \
+    sort | \
+    uniq -d)" ]; then
+  >&2 echo 'Removing duplicates not yet implemented!'
+  exit 42
+fi
+
+# packages which are done
+
+done_packages="$(
+  ls "${work_dir}/package-states" | \
+    grep '\.done$' | \
+    sed 's|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|' | \
+    sort
+)"
+
+# remove packages not yet done from keep-packages list
+
+keep_packages="$(
+  join -1 1 -2 1 -o 2.2 \
+    <(
+      echo "${keep_packages}"
+    ) \
+    <(
+      echo "${done_packages}"
+    )
+)"
+
+# packages which can't be unstaged
+
+new_keep_packages="${keep_packages}"
+keep_packages=''
+
+while [ -n "${new_keep_packages}" ]; do
+
+  for package in ${new_keep_packages}; do
+    if [ ! -f "${work_dir}/package-infos/${package%.*}.depends" ]; then
+      echo "missing meta data for an not unstageable package ('${package}') - abort unstaging!"
+      keep_packages=''
+      done_packages=''
+      break
+    fi
+  done
+  if [ -z "${done_packages}" ]; then
+    break
+  fi
+
+  keep_packages="$(
+    printf '%s\n' "${keep_packages}" "${new_keep_packages}" | \
+      sort -u | \
+      grep -v '^$'
+  )"
+
+  new_keep_packages="$(
+    join -1 1 -2 1 -o 2.2 \
+      <(
+        echo "${new_keep_packages}" | \
+          while read -r package; do
+            cat "${work_dir}/package-infos/${package%.*}.depends"
+          done | \
+          sort -u
+      ) \
+      <(
+        echo "${done_packages}"
+      )
+  )"
+
+  # "new" is only what has not been there before
+  new_keep_packages="$(
+    printf '%s\n' "${keep_packages}" "${keep_packages}" "${new_keep_packages}" | \
+      sort | \
+      uniq -u
+  )"
+
+done
+
+# unlock build list
+
+rm -f "${build_list_lock_file}"
+flock -u 9
+
+function clean_up_lock_file {
+  rm -f "${package_database_lock_file}"
+}
+
+# calculate unstageable packages from keep_packages and done_packages
+
+done_packages="$(
+  echo "${done_packages}" | \
+    cut -d' ' -f2
+)"
+
+done_packages="$(
+  (
+    printf '%s\n' "${done_packages}" "${keep_packages}"
+  ) | \
+    sort | \
+    uniq -u
+)"
+
+unset keep_packages
+
+for package in ${done_packages}; do
+  parts=($(cat "${work_dir}/package-states/${package}.done"))
+  parts_names=(
+    $(
+      printf '%s\n' "${parts[@]}" | \
+        sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
+    )
+  )
+  case "${package##*.}" in
+    'community')
+      destination='community-testing'
+      ;;
+    'multilib')
+      a32_rev="${package%.*}"
+      a32_rev="${a32_rev##*.}"
+      if git -C "${repo_paths['archlinux32']}" archive --format=tar "${a32_rev}" | \
+        tar -Ox 'extra-from-multilib' | \
+        grep -q "^${package%.*.*.*}\$"; then
+        destination='testing'
+      else
+        destination='community-testing'
+      fi
+      ;;
+    *)
+      destination='testing'
+  esac
+
+  pushd "${master_mirror_directory}/i686/staging" > /dev/null
+  mkdir -p "../${destination}"
+  repo-remove 'staging.db.tar.gz' "${parts_names[@]}"
+  for part in "${parts[@]}"; do
+    mv "${part}"{,.sig} "../${destination}/"
+  done
+  popd > /dev/null
+  pushd "${master_mirror_directory}/i686/${destination}" > /dev/null
+  repo-add "${destination}.db.tar.gz" "${parts[@]}"
+  popd > /dev/null
+
+  mv "${work_dir}/package-states/${package}."{done,testing}
+done
+
+# TODO:
+#  move packages from packages_to_stabilize from *testing/ to the stable repos
