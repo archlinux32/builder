@@ -170,4 +170,6 @@ grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
 sed -i "/^${1//./\\.} $2 $3 $4\$/d" "${work_dir}/build-list"
 
 # remove package lock file
-mv "${work_dir}/package-states/$1.$2.$3.$4."{locked,done}
+printf '%s\n' "${packages[@]}" > \
+  "${work_dir}/package-states/$1.$2.$3.$4.done"
+rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
