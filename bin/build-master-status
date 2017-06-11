@@ -37,16 +37,27 @@ looped_packages="$(
     wc -l
   )"
 
-printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' "${stable}" "$[${staging}+${testing}+${tasks}]"
-printf 'The build list contains %d tasks (incl. broken: %d).\n' "$[${tasks}-${broken}]" "${tasks}"
-printf 'There are %d testing and %d staging packages.\n' "${testing}" "${staging}"
-printf 'There are %d broken packages.\n' "${broken}"
+printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
+  "${stable}" \
+  "$[${staging}+${testing}+${tasks}]"
+printf 'The build list contains %d tasks (incl. broken: %d).\n' \
+  "$[${tasks}-${broken}]" \
+  "${tasks}"
+printf 'There are %d testing and %d staging packages.\n' \
+  "${testing}" \
+  "${staging}"
+printf 'There are %d broken packages.\n' \
+  "${broken}"
 if [ "${loops}" -ne 0 ]; then
-  printf 'There are %d loops containing %d packages.\n' "${loops}" "${looped_packages}"
+  printf 'There are %d loops containing %d packages.\n' \
+    "${loops}" \
+    "${looped_packages}"
 fi
-if [ $[${broken}+${staging}] -ne 0 ]; then
-  printf '%.1f%% of all packages are broken.\n' "$(bc <<< "scale=10; 100*${broken}/(${broken}+${staging})")"
+if [ $[${broken}+${testing}+${staging}] -ne 0 ]; then
+  printf '%.1f%% of all packages are broken.\n' \
+    "$(bc <<< "scale=10; 100*${broken}/(${broken}+${testing}+${staging})")"
 fi
-if [ $[${staging}+${tasks}-${broken}] -ne 0 ]; then
-  printf '%.1f%% of the planned work has been done.\n' "$(bc <<< "scale=10; 100*${staging}/(${staging}+${tasks}-${broken})")"
+if [ $[${testing}+${staging}+${tasks}-${broken}] -ne 0 ]; then
+  printf '%.1f%% of the planned work has been done.\n' \
+    "$(bc <<< "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${tasks}-${broken})")"
 fi
