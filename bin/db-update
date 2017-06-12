@@ -133,12 +133,7 @@ keep_packages=''
 while [ -n "${new_keep_packages}" ]; do
 
   for package in ${new_keep_packages}; do
-    if [ ! -f "${work_dir}/package-infos/${package%.*}.depends" ]; then
-      echo "missing meta data for an not unstageable package ('${package}') - abort unstaging!"
-      keep_packages=''
-      done_packages=''
-      break
-    fi
+    generate_package_metadata "${package}"
   done
   if [ -z "${done_packages}" ]; then
     break

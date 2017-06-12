@@ -55,8 +55,7 @@ apply_package_customizations() {
     exit 1
   fi
 
-  local repo
-  local package
+  local repo package
 
   repo="$(pwd)"
   package="${repo%/*/*}"
@@ -140,4 +139,112 @@ package_locked_broken_or_blocked() {
   [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] || \
     [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ] || \
     [ -f "${work_dir}/package-states/$1.$2.$3.$4.blocked" ]
+}
+
+# generate_package_metadata $package $git_revision $mod_git_revision $repository
+# or
+# generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
+# generate the meta data files of a package (dependencies, built packages, ...)
+
+generate_package_metadata() {
+
+  local package="$1"
+  local git_revision="$2"
+  local mod_git_revision="$3"
+  local repository="$4"
+  local file_prefix file PKGBUILD
+
+  if [ $# -eq 1 ]; then
+    # second form
+    repository="${package##*.}"
+    package="${package%.*}"
+    mod_git_revision="${package##*.}"
+    package="${package%.*}"
+    git_revision="${package##*.}"
+    package="${package%.*}"
+  fi
+
+  file_prefix="${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}"
+
+  if [ -e "${file_prefix}.builds" ] && \
+    [ -e "${file_prefix}.depends" ] && \
+    [ -e "${file_prefix}.needs" ] && \
+    [ -e "${file_prefix}.packages" ]; then
+    return 0
+  fi
+
+  git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}"
+  git -C "${repo_paths["$(find_repository_with_commit "${mod_git_revision}")"]}" checkout "${mod_git_revision}"
+
+  PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
+
+  if [ ! -r "${PKGBUILD}" ]; then
+    echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
+    exit 1
+  fi
+
+  (
+    cd "${PKGBUILD%/*}"
+    apply_package_customizations
+    grep -q '\$CARCH' 'PKGBUILD' && \
+      CARCH=i686 makepkg --printsrcinfo > \
+        "${file_prefix}.SRCINFO" || \
+      mksrcinfo -o "${file_prefix}.SRCINFO"
+  )
+
+  # otherwise this just calls for trouble
+  sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
+
+  # extract "builds" = provides \cup pkgname
+  grep '^\('$'\t''provides\|pkgname\) = ' "${file_prefix}.SRCINFO" | \
+    cut -d= -f2 | \
+    sed 's|^\s\+||; s|[<>]$||' | \
+    sort -u > \
+    "${file_prefix}.builds"
+
+  # extract "packages" = pkgname
+  grep '^pkgname = ' "${file_prefix}.SRCINFO" | \
+    cut -d= -f2 | \
+    sed 's|^\s\+||; s|[<>]$||' | \
+    sort -u > \
+    "${file_prefix}.packages"
+
+  # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
+  (
+    grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO" | \
+      cut -d= -f2 | \
+      sed 's|^\s\+||; s|[<>]$||' | \
+      sort -u
+    sed 'p' "${file_prefix}.builds"
+  ) | \
+    sort | \
+    uniq -u > \
+    "${file_prefix}.needs"
+
+  # extract "depends" = makedepends \cup checkdepends \cup depends
+  (
+    sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${file_prefix}.SRCINFO"
+    grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO"
+  ) | \
+    cut -d= -f2 | \
+    sed 's|^\s\+||; s|[<>]$||' | \
+    sort -u > \
+    "${file_prefix}.depends"
+
+  rm "${file_prefix}.SRCINFO"
+
+}
+
+# delete_old_metadata
+# delete old (=unneeded) meta data of packages
+
+delete_old_metadata()
+{
+  true
+#  ls -1 "${file_prefix%.*.*}."* 2> /dev/null | \
+#    sed 's|^.*/||' | \
+#    grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|depends\|needs\|packages\|SRCINFO\)$' | \
+#    while read file; do
+#      rm "${work_dir}/package-infos/${file}"
+#    done
 }

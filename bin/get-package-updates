@@ -189,79 +189,7 @@ mkdir -p "${work_dir}/package-infos"
 
 while read -r package git_revision mod_git_revision repository; do
 
-  file_prefix="${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}"
-
-  # extract infos from PKGBUILD if not existent yet
-  if [ ! -e "${file_prefix}.builds" ] || \
-    [ ! -e "${file_prefix}.depends" ] || \
-    [ ! -e "${file_prefix}.needs" ] || \
-    [ ! -e "${file_prefix}.packages" ]; then
-    # delete cached values of old versions of this PKGBUILD
-    ls -1 "${file_prefix%.*.*}."* 2> /dev/null | \
-      sed 's|^.*/||' | \
-      grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|depends\|needs\|packages\|SRCINFO\)$' | \
-      while read file; do
-        rm "${work_dir}/package-infos/${file}"
-      done
-
-    PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
-
-    if [ ! -r "${PKGBUILD}" ]; then
-      echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
-      exit 1
-    fi
-
-    (
-      cd "${PKGBUILD%/*}"
-      apply_package_customizations
-      grep -q '\$CARCH' 'PKGBUILD' && \
-        CARCH=i686 makepkg --printsrcinfo > \
-          "${file_prefix}.SRCINFO" || \
-        mksrcinfo -o "${file_prefix}.SRCINFO"
-    )
-
-    # otherwise this just calls for trouble
-    sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
-
-    # extract "builds" = provides \cup pkgname
-    grep '^\('$'\t''provides\|pkgname\) = ' "${file_prefix}.SRCINFO" | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u > \
-      "${file_prefix}.builds"
-
-    # extract "packages" = pkgname
-    grep '^pkgname = ' "${file_prefix}.SRCINFO" | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u > \
-      "${file_prefix}.packages"
-
-    # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
-    (
-      grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO" | \
-        cut -d= -f2 | \
-        sed 's|^\s\+||; s|[<>]$||' | \
-        sort -u
-      sed 'p' "${file_prefix}.builds"
-    ) | \
-      sort | \
-      uniq -u > \
-      "${file_prefix}.needs"
-
-    # extract "depends" = makedepends \cup checkdepends \cup depends
-    (
-      sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${file_prefix}.SRCINFO"
-      grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO"
-    ) | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u > \
-      "${file_prefix}.depends"
-
-    rm "${file_prefix}.SRCINFO"
-
-  fi
+  generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
 done < "${work_dir}/build-list.new"
 
@@ -389,6 +317,9 @@ rm -rf --one-file-system "${work_dir}/build-list.loops"
   while read -r file; do
     mv "${work_dir}/${file}.new" "${work_dir}/${file}"
   done
+
+# Delete old package meta data
+delete_old_metadata
 
 # Remove the lock file
 
