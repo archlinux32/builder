@@ -275,3 +275,18 @@ official_or_community() {
       ;;
   esac
 }
+
+# remove_old_package_versions $package_file
+# removes all other versions of $package_file in the current directory
+
+remove_old_package_versions() {
+
+  local package="$1"
+  local pkgname="${package%-*-*-*.pkg.tar.xz}"
+
+  ls | \
+    grep "^${pkgname//./\\.}\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
+    grep -v "^${package//./\\.}\(\.sig\)\?\$" | \
+    xargs -rn1 rm
+
+}

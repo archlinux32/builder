@@ -146,11 +146,7 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/${destination}/"
 
   # remove old versions of same packages
   for package in "${packages[@]}"; do
-    pkgname="${package%-*-*-*.pkg.tar.xz}"
-    ls | \
-      grep "^${pkgname//./\\.}\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
-      grep -v "^${package//./\\.}\(\.sig\)\?\$" | \
-      xargs -rn1 rm
+    remove_old_package_versions "${package}"
   done
 )
 
