@@ -77,7 +77,8 @@ fi
 
 # the build was successful on the build slave
 
-if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list"; then
+if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list" ||
+  ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
   >&2 echo 'Sorry, the sent package is outdated.'
   exit 2
 fi
