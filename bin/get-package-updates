@@ -215,7 +215,7 @@ while [ -n "${black_listed_new}" ]; do
   black_listed_new="$(
     echo "${black_listed_new}" | \
       while read -r bl_package; do
-        grep "^${bl_package//./\\.}\$" "${work_dir}/package-infos/"*.depends | \
+        grep -xF "${bl_package}" "${work_dir}/package-infos/"*.depends | \
           cut -d: -f1 | \
           sed '
             s|^.*/||

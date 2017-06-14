@@ -161,7 +161,7 @@ ls "${work_dir}/package-states" | \
   xargs -rn1 rm -f
 
 # remove all loops which are broken by this package
-grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
+grep -xF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   cut -d: -f1 | \
   sed 'p;s|$|.locked|' | \
   xargs -rn1 rm -f
