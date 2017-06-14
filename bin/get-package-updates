@@ -9,7 +9,7 @@
 #   -> (stale) lock files, moving (or changing content of) loop lock files
 #  dependencies declared inside a PKGBUILD's package function do not
 #   correctly take into account CARCH (see package "gens" from community)
-#  remove extra case for "python-pysocks"
+#  remove extra case for "python-pysocks" and "gens"
 
 . "${0%/*}/../conf/default.conf"
 
@@ -222,7 +222,7 @@ while [ -n "${black_listed_new}" ]; do
             s|\(\.[^.]\+\)\{3\}$||
           '
       done | \
-      grep -v '^python-pysocks$' | \
+      grep -v '^python-pysocks$\|^gens$' | \
       sort -u
   )"
   black_listed_new="$(
