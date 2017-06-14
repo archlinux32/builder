@@ -242,13 +242,27 @@ generate_package_metadata() {
 # delete old (=unneeded) meta data of packages
 
 delete_old_metadata() {
-  true
-#  ls -1 "${file_prefix%.*.*}."* 2> /dev/null | \
-#    sed 's|^.*/||' | \
-#    grep "^${package//./\\.}"'\.\([0-9a-f]\{40\}\.\)\{2\}\(builds\|depends\|needs\|packages\|SRCINFO\)$' | \
-#    while read file; do
-#      rm "${work_dir}/package-infos/${file}"
-#    done
+
+  (
+    ls -1 "${work_dir}/package-infos" | \
+      sed '
+        s|\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2|
+      ' | \
+      sort -u
+    ls -1 "${work_dir}/package-states" | \
+      sed '
+        s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\{2\}$| \1 \2|
+      ' | \
+      sort -u | \
+      sed 'p'
+    cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
+      sed 'p'
+  ) | \
+    sort | \
+    uniq -u | \
+    while read -r pkg rev mod_rev; do
+      rm -f "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}".*
+    done
 }
 
 # official_or_community $package.$repo_revision.$mod_repo_revision.$repository
