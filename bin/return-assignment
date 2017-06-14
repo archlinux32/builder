@@ -156,6 +156,7 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/${destination}/"
 ls "${work_dir}/package-states" | \
   grep "^${1//./\\.}\(\.[^.]\+\)\{4\}\$" | \
   grep -v "^${1//./\\.}\.$2\.$3\.$4\.[^.]\+\$" | \
+  grep -v '\.testing$' | \
   sed "s|^|${work_dir}/package-states/|" | \
   xargs -rn1 rm -f
 
