@@ -204,24 +204,7 @@ for package in ${done_packages}; do
         sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
     )
   )
-  case "${package##*.}" in
-    'community')
-      destination='community-testing'
-      ;;
-    'multilib')
-      a32_rev="${package%.*}"
-      a32_rev="${a32_rev##*.}"
-      if git -C "${repo_paths['archlinux32']}" archive --format=tar "${a32_rev}" | \
-        tar -Ox 'extra-from-multilib' | \
-        grep -q "^${package%.*.*.*}\$"; then
-        destination='testing'
-      else
-        destination='community-testing'
-      fi
-      ;;
-    *)
-      destination='testing'
-  esac
+  destination="$(official_or_community "${package}")testing"
 
   pushd "${master_mirror_directory}/i686/staging" > /dev/null
   mkdir -p "../${destination}"
