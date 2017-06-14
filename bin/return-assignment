@@ -134,13 +134,15 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move packages
-mkdir -p "${master_mirror_directory}/i686/staging/"
-mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/staging/"
+destination="$(official_or_community "$1.$2.$3.$4")staging"
+
+mkdir -p "${master_mirror_directory}/i686/${destination}/"
+mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/${destination}/"
 
 (
-  cd "${master_mirror_directory}/i686/staging"
-  repo-add 'staging.db.tar.gz' "${packages[@]}"
-  # repo-add -v -s -k "${repo_key}" 'staging.db.tar.gz' "${packages[@]}"
+  cd "${master_mirror_directory}/i686/${destination}"
+  repo-add "${destination}.db.tar.gz" "${packages[@]}"
+  # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" "${packages[@]}"
 
   # remove old versions of same packages
   for package in "${packages[@]}"; do
@@ -152,7 +154,7 @@ mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/staging/"
   done
 )
 
-# remove old stage files (these should be only "done" markers, but
+# remove old state files (these should be only "done" markers, but
 # actually we don't care what it is)
 ls "${work_dir}/package-states" | \
   grep "^${1//./\\.}\(\.[^.]\+\)\{4\}\$" | \
