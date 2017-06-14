@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# investigate, why a certain package is not being built
+
+. "${0%/*}/../conf/default.conf"
+
+for pkg in "$@"; do
+  grep "^${pkg//./\\.} " "${work_dir}/build-list" | \
+    while read -r package git_revision mod_git_revision repository; do
+
+      if [ -f "${work_dir}/${package}.${git_revision}.${mod_git_revision}.${repository}.done" ] ||
+        [ -f "${work_dir}/${package}.${git_revision}.${mod_git_revision}.${repository}.testing" ]; then
+        echo 'has been built'
+        continue
+      fi
+
+      if package_locked_broken_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+        echo 'is locked, broken or blocked'
+        continue
+      fi
+
+      if [ -n "$(
+        (
+          cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+          awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+            sed "
+              s|^|${work_dir}/package-infos/|
+              s|\$|\.builds|
+            " | \
+            xargs -r cat | \
+            sort -u
+        ) | \
+          sort | \
+          uniq -d
+        )" ]; then
+        echo 'has unmet dependencies:'
+        (
+          cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+          awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+            sed "
+              s|^|${work_dir}/package-infos/|
+              s|\$|\.builds|
+            " | \
+            xargs -r cat | \
+            sort -u
+        ) | \
+          sort | \
+          uniq -d | \
+          while read -r dep; do
+            grep -Fx "${dep}" "${work_dir}/package-infos/"*".builds" | \
+              cut -d: -f1 | \
+              xargs -rn1 basename | \
+              cut -d. -f1
+          done | \
+          sort -u
+
+        continue
+      fi
+
+      echo 'would be built'
+    done
+
+done
