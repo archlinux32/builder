@@ -204,18 +204,20 @@ for package in ${done_packages}; do
         sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
     )
   )
-  destination="$(official_or_community "${package}")testing"
-
-  pushd "${master_mirror_directory}/i686/staging" > /dev/null
-  mkdir -p "../${destination}"
-  repo-remove 'staging.db.tar.gz' "${parts_names[@]}"
+  is_community="$(official_or_community "${package}")"
+  pushd "${master_mirror_directory}/i686/${is_community}staging" > /dev/null
+  mkdir -p "../${is_community}testing"
+  repo-remove "${is_community}staging.db.tar.gz" "${parts_names[@]}"
   for part in "${parts[@]}"; do
-    mv "${part}"{,.sig} "../${destination}/"
+    mv "${part}"{,.sig} "../${is_community}testing/"
     updated_package_database=true
   done
   popd > /dev/null
-  pushd "${master_mirror_directory}/i686/${destination}" > /dev/null
-  repo-add "${destination}.db.tar.gz" "${parts[@]}"
+  pushd "${master_mirror_directory}/i686/${is_community}testing" > /dev/null
+  repo-add "${is_community}testing.db.tar.gz" "${parts[@]}"
+  for part in "${parts[@]}"; do
+    remove_old_package_versions "${part}"
+  done
   popd > /dev/null
 
   mv "${work_dir}/package-states/${package}."{done,testing}
