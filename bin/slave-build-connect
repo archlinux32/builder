@@ -2,8 +2,8 @@
 
 . "${0%/*}/../conf/default.conf"
 
-if [ "${SSH_ORIGINAL_COMMAND%% *}" == "get-assignment" ] || \
-  [ "${SSH_ORIGINAL_COMMAND%% *}" == "return-assignment" ]; then
+if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
+  [ "${SSH_ORIGINAL_COMMAND%% *}" = "return-assignment" ]; then
   slave="$1" /bin/bash -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
 else
   >&2 echo "Invalid command: '${SSH_ORIGINAL_COMMAND%% *}'"

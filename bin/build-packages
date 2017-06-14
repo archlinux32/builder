@@ -63,7 +63,7 @@ do
     ;;
     *)
       >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
-      exit -1
+      exit 42
     ;;
   esac
   shift
@@ -83,7 +83,7 @@ if [ -z "${count}" ]; then
 fi
 
 if [ ${timeout} -ne 0 ]; then
-  timeout=$[${timeout}+$(date +%s)]
+  timeout=$((${timeout}+$(date +%s)))
 fi
 
 while [ ${count} -ne 0 ]; do
@@ -107,7 +107,7 @@ while [ ${count} -ne 0 ]; do
     #  0: ok, I gave you an assignment
     0)
       [ ${count} -gt 0 ] && \
-        count=$[${count}-1]
+        count=$((${count}-1))
       repository="${package##* }"
       package="${package% *}"
       mod_git_revision="${package##* }"
@@ -124,8 +124,8 @@ while [ ${count} -ne 0 ]; do
         git -C "${repo}" pull || true
       done
 
-      git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}" &> /dev/null
-      git -C "${repo_paths["archlinux32"]}" checkout "${mod_git_revision}" &> /dev/null
+      git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}" > /dev/null 2>&1
+      git -C "${repo_paths["archlinux32"]}" checkout "${mod_git_revision}" > /dev/null 2>&1
 
       PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
@@ -172,7 +172,7 @@ while [ ${count} -ne 0 ]; do
         fi
 
         for parameters in '' '-c'; do
-          rm -f *.pkg.tar.xz{,.sig}
+          rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
           if staging-i686-build ${parameters} -- archlinux32-keyring; then
           # build successful
             ls -1 *.pkg.tar.xz | \
@@ -198,18 +198,18 @@ while [ ${count} -ne 0 ]; do
                 ;;
                 1)
                   # 'return-assignment' was running already
-                  sleep $[15+$RANDOM%30]
+                  wait_some_time 15
                 ;;
                 2)
                   >&2 echo 'I was too slow, the package is outdated. I will continue ...'
                   break
                 ;;
                 3)
-                  >& echo "'return-assignment' reports a signature error."
+                  >&2 echo "'return-assignment' reports a signature error."
                   exit 1
                 ;;
                 4)
-                  >& echo "'return-assignment' reports too many or missing packages."
+                  >&2 echo "'return-assignment' reports too many or missing packages."
                   exit 1
                 ;;
                 *)
@@ -232,7 +232,7 @@ while [ ${count} -ne 0 ]; do
           -p "${master_build_server_port}" \
           "${master_build_server_user}@${master_build_server}" \
           'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'; do
-          sleep $[15+$RANDOM%30]
+          wait_some_time 15
         done
         if ${exit_after_failure}; then
           >&2 echo 'Build failed, exiting now'
@@ -246,14 +246,14 @@ while [ ${count} -ne 0 ]; do
 
     #  1: come back (shortly) later - I was running already
     1)
-      sleep $[15+$RANDOM%30]
+      wait_some_time 15
       continue
     ;;
 
     #  2: come back later - there are still packages to be built,
     #     but currently none has all its dependencies ready
     2)
-      sleep $[60+$RANDOM%30]
+      wait_some_time 60
       continue
     ;;
 

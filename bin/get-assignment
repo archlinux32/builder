@@ -57,7 +57,7 @@ if ! flock -n 9; then
   exit 1
 fi
 
-function clean_up {
+clean_up() {
   rm -f "${build_list_lock_file}"
 }
 
@@ -79,7 +79,7 @@ while read -r package git_revision mod_git_revision repository; do
   if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ];
   then
     if [ "${slave}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked")" ]; then
-      num_jobs=$[${num_jobs}+1];
+      num_jobs=$((${num_jobs}+1));
     fi
   else
     pending_packages=true

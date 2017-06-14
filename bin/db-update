@@ -53,7 +53,7 @@ do
     ;;
     *)
       >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
-      exit -1
+      exit 42
     ;;
   esac
   shift
@@ -85,7 +85,7 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
-function clean_up_lock_file {
+clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
 }
 
@@ -183,7 +183,7 @@ done
 rm -f "${build_list_lock_file}"
 flock -u 9
 
-function clean_up_lock_file {
+clean_up_lock_file() {
   rm -f "${package_database_lock_file}"
 }
 
@@ -217,7 +217,7 @@ for package in ${done_packages}; do
   mkdir -p "../${is_community}testing"
   repo-remove "${is_community}staging.db.tar.gz" "${parts_names[@]}"
   for part in "${parts[@]}"; do
-    mv "${part}"{,.sig} "../${is_community}testing/"
+    mv "${part}" "${part}.sig" "../${is_community}testing/"
     updated_package_database=true
   done
   popd > /dev/null
@@ -228,7 +228,9 @@ for package in ${done_packages}; do
   done
   popd > /dev/null
 
-  mv "${work_dir}/package-states/${package}."{done,testing}
+  mv \
+    "${work_dir}/package-states/${package}.done" \
+    "${work_dir}/package-states/${package}.testing"
 done
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
@@ -245,7 +247,7 @@ for package in "${packages_to_stabilize[@]}"; do
   pushd "${master_mirror_directory}/i686/${source}" > /dev/null
   repo-remove "${source}.db.tar.gz" "${parts_names[@]}"
   for part in "${parts[@]}"; do
-    mv "${part}"{,.sig} "../${destination}/"
+    mv "${part}" "${part}.sig" "../${destination}/"
     updated_package_database=true
   done
   popd > /dev/null

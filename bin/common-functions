@@ -23,7 +23,7 @@ find_pkgbuild() {
   fi
 
   for repo in "${!repo_paths[@]}"; do
-    if [ "${repo}" == "archlinux32" ]; then
+    if [ "${repo}" = "archlinux32" ]; then
       # this is not a repository of packages
       continue
     fi
@@ -112,7 +112,7 @@ find_git_repository_to_package_repository() {
   local repository
 
   for repository in "${!repo_paths[@]}"; do
-    if [ "${repository}" == "archlinux32" ]; then
+    if [ "${repository}" = "archlinux32" ]; then
       continue
     fi
     if [ -n "$(
@@ -303,4 +303,23 @@ remove_old_package_versions() {
     grep -v "^${package//./\\.}\(\.sig\)\?\$" | \
     xargs -rn1 rm
 
+}
+
+# wait_some_time $minimum $maximum-$minimum
+wait_some_time() {
+  local minimum=$1
+  local diff=$2
+  local random
+
+  if [ -z "${diff}" ]; then
+    diff=30
+  fi
+
+  random="$(
+    dd if='/dev/urandom' count=1 2> /dev/null | \
+      cksum | \
+      cut -d' ' -f1
+  )"
+
+  sleep $((${minimum} + ${random} % ${diff}))
 }

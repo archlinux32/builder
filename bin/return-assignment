@@ -32,14 +32,14 @@ if ! flock -n 8; then
   exit 1
 fi
 
-function clean_up_lock_file {
+clean_up_lock_file() {
   rm -f "${build_list_lock_file}"
   rm -f "${package_database_lock_file}"
 }
 
 trap clean_up_lock_file EXIT
 
-if [ "$5" == 'ERROR' ]; then
+if [ "$5" = 'ERROR' ]; then
 # the build failed on the build slave
 
   if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
@@ -47,7 +47,9 @@ if [ "$5" == 'ERROR' ]; then
     exit 0
   fi
 
-  mv "${work_dir}/package-states/$1.$2.$3.$4."{locked,broken}
+  mv \
+    "${work_dir}/package-states/$1.$2.$3.$4.locked" \
+    "${work_dir}/package-states/$1.$2.$3.$4.broken"
 
   # unlock every loop this package would have broken and which is not
   # broken by another locked package
@@ -83,7 +85,7 @@ if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list" ||
   exit 2
 fi
 
-function clean_up_tmp_dir {
+clean_up_tmp_dir() {
   popd > /dev/null
   rm -rf --one-file-system "${tmp_dir}"
   clean_up_lock_file
@@ -138,7 +140,10 @@ fi
 destination="$(official_or_community "$1.$2.$3.$4")staging"
 
 mkdir -p "${master_mirror_directory}/i686/${destination}/"
-mv *.pkg.tar.xz{,.sig} "${master_mirror_directory}/i686/${destination}/"
+mv \
+  *".pkg.tar.xz" \
+  *".pkg.tar.xz.sig" \
+  "${master_mirror_directory}/i686/${destination}/"
 
 (
   cd "${master_mirror_directory}/i686/${destination}"

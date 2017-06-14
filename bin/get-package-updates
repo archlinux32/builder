@@ -55,7 +55,7 @@ do
     ;;
     *)
       >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
-      exit -1
+      exit 42
     ;;
   esac
   shift
@@ -118,13 +118,17 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 # If a new package is added, then ensure that it's not on the deletion list.
 
-cp "${work_dir}/build-list"{,.new}
-cp "${work_dir}/deletion-list"{,.new}
+cp \
+  "${work_dir}/build-list" \
+  "${work_dir}/build-list.new"
+cp \
+  "${work_dir}/deletion-list" \
+  "${work_dir}/deletion-list.new"
 
 for repo in "${!repo_paths[@]}"; do
   (
     # if old revision unknown, mimic "git diff"-output
-    if [ "${old_repo_revisions["${repo}"]}" == "NONE" ]; then
+    if [ "${old_repo_revisions["${repo}"]}" = "NONE" ]; then
       git -C "${repo_paths["${repo}"]}" archive --format=tar HEAD | \
         tar -t | \
         sed 's|^|A\t|'
@@ -134,7 +138,7 @@ for repo in "${!repo_paths[@]}"; do
   ) | \
     # only track changes in PKGBUILDs
     grep '/PKGBUILD$' | \
-    if [ "${repo}" == "archlinux32" ]; then
+    if [ "${repo}" = "archlinux32" ]; then
     # modify the directory structure from the modifiaction-repository
     # to the one of an original source repository
       sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
@@ -179,7 +183,9 @@ done | \
 sort -u "${work_dir}/deletion-list.new" > \
   "${work_dir}/deletion-list.new.new"
 
-mv "${work_dir}/deletion-list.new"{.new,}
+mv \
+  "${work_dir}/deletion-list.new.new" \
+  "${work_dir}/deletion-list.new"
 
 echo 'Extract dependencies of packages.'
 
@@ -240,7 +246,9 @@ echo "${black_listed}" | \
 sort -u "${work_dir}/deletion-list.new" > \
   "${work_dir}/deletion-list.new.new"
 
-mv "${work_dir}/deletion-list.new"{.new,}
+mv \
+  "${work_dir}/deletion-list.new.new" \
+  "${work_dir}/deletion-list.new"
 
 # Now we create the partial order.
 
@@ -303,7 +311,9 @@ if [ -s "${work_dir}/tsort.error" ]; then
         sort | \
         uniq -d > \
         "${work_dir}/build-list.loops.new/${loop}.new"
-      mv "${work_dir}/build-list.loops.new/${loop}"{.new,}
+      mv \
+        "${work_dir}/build-list.loops.new/${loop}.new" \
+        "${work_dir}/build-list.loops.new/${loop}"
     done
 
 else

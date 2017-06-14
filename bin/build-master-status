@@ -48,9 +48,9 @@ looped_packages="$(
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
-  "$[${staging}+${testing}+${pending_packages}]"
+  "$((${staging}+${testing}+${pending_packages}))"
 printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
-  "$[${tasks}-${broken}]" \
+  "$((${tasks}-${broken}))" \
   "${tasks}" \
   "${pending_packages}"
 printf 'There are %d testing and %d staging packages.\n' \
@@ -63,11 +63,17 @@ if [ "${loops}" -ne 0 ]; then
     "${loops}" \
     "${looped_packages}"
 fi
-if [ $[${broken}+${testing}+${staging}] -ne 0 ]; then
+if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
   printf '%.1f%% of all packages are broken.\n' \
-    "$(bc <<< "scale=10; 100*${broken}/(${broken}+${testing}+${staging})")"
+    "$(
+      echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
+        bc
+    )"
 fi
-if [ $[${testing}+${staging}+${pending_packages}-${broken}] -ne 0 ]; then
+if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
   printf '%.1f%% of the planned work has been done.\n' \
-    "$(bc <<< "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})")"
+    "$(
+      echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
+        bc
+    )"
 fi
