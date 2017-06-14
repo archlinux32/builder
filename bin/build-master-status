@@ -12,8 +12,17 @@ tasks="$(
   wc -l < \
     "${work_dir}/build-list"
   )"
+pending_packages="$(
+  sed '
+    s| |.|g
+    s|^|'"${work_dir}"'/package-infos/|
+    s|\.[^.]\+$|.packages|
+  ' "${work_dir}"/build-list | \
+    xargs -r cat | \
+    wc -l
+)"
 staging="$(
-  find "${master_mirror_directory}/i686/staging" -name '*.pkg.tar.xz' | \
+  find "${master_mirror_directory}/i686/"*staging -name '*.pkg.tar.xz' | \
     wc -l
   )"
 testing="$(
@@ -39,17 +48,18 @@ looped_packages="$(
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
-  "$[${staging}+${testing}+${tasks}]"
-printf 'The build list contains %d tasks (incl. broken: %d).\n' \
+  "$[${staging}+${testing}+${pending_packages}]"
+printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
   "$[${tasks}-${broken}]" \
-  "${tasks}"
+  "${tasks}" \
+  "${pending_packages}"
 printf 'There are %d testing and %d staging packages.\n' \
   "${testing}" \
   "${staging}"
-printf 'There are %d broken packages.\n' \
+printf 'There are %d broken package builds.\n' \
   "${broken}"
 if [ "${loops}" -ne 0 ]; then
-  printf 'There are %d loops containing %d packages.\n' \
+  printf 'There are %d loops containing %d package builds.\n' \
     "${loops}" \
     "${looped_packages}"
 fi
@@ -57,7 +67,7 @@ if [ $[${broken}+${testing}+${staging}] -ne 0 ]; then
   printf '%.1f%% of all packages are broken.\n' \
     "$(bc <<< "scale=10; 100*${broken}/(${broken}+${testing}+${staging})")"
 fi
-if [ $[${testing}+${staging}+${tasks}-${broken}] -ne 0 ]; then
+if [ $[${testing}+${staging}+${pending_packages}-${broken}] -ne 0 ]; then
   printf '%.1f%% of the planned work has been done.\n' \
-    "$(bc <<< "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${tasks}-${broken})")"
+    "$(bc <<< "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})")"
 fi
