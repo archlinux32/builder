@@ -61,6 +61,8 @@ done
 
 packages_to_stabilize=("${@}")
 
+updated_package_database=false
+
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
@@ -226,6 +228,7 @@ for package in ${done_packages}; do
   repo-remove 'staging.db.tar.gz' "${parts_names[@]}"
   for part in "${parts[@]}"; do
     mv "${part}"{,.sig} "../${destination}/"
+    updated_package_database=true
   done
   popd > /dev/null
   pushd "${master_mirror_directory}/i686/${destination}" > /dev/null
@@ -237,3 +240,8 @@ done
 
 # TODO:
 #  move packages from packages_to_stabilize from *testing/ to the stable repos
+
+if ${updated_package_database}; then
+  date '+%s' > \
+    "${master_mirror_directory}/lastupdate"
+fi
