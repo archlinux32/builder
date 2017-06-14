@@ -107,8 +107,14 @@ while read -r package git_revision mod_git_revision repository; do
 
   [ -z "$(
     (
-      cat "${work_dir}/package-infos/${package}."*".needs"
-      awk '{print $1}' "${work_dir}/build-list"
+      cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+      awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+        sed "
+          s|^|${work_dir}/package-infos/|
+          s|\$|\.builds|
+        " | \
+        xargs -r cat | \
+        sort -u
     ) | \
       sort | \
       uniq -d
