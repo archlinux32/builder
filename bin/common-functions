@@ -199,7 +199,7 @@ generate_package_metadata() {
   sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
 
   # extract "builds" = provides \cup pkgname
-  grep '^\('$'\t''provides\|pkgname\) = ' "${file_prefix}.SRCINFO" | \
+  grep "$(printf '^\\(\tprovides\\|pkgname\\) = ')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
@@ -214,7 +214,7 @@ generate_package_metadata() {
 
   # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
   (
-    grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO" | \
+    grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO" | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
       sort -u
@@ -226,8 +226,8 @@ generate_package_metadata() {
 
   # extract "depends" = makedepends \cup checkdepends \cup depends
   (
-    sed -n '/^pkgname = /q;/^'$'\t''depends = /p' "${file_prefix}.SRCINFO"
-    grep '^'$'\t''\(makedepends\|checkdepends\) = ' "${file_prefix}.SRCINFO"
+    sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
+    grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
   ) | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
@@ -305,7 +305,8 @@ remove_old_package_versions() {
 
 }
 
-# wait_some_time $minimum $maximum-$minimum
+# wait_some_time $minimum $diff
+# wait between minimum and minimum+diff seconds (diff defaults to 30)
 wait_some_time() {
   local minimum=$1
   local diff=$2
