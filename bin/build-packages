@@ -118,14 +118,14 @@ while [ ${count} -ne 0 ]; do
       # Update git repositories (official packages, community packages and the repository of package customizations).
 
       for repo_name in ${repo_names}; do
-        eval repo_path='$repo_paths__'"${repo}"
+        eval repo_path='$repo_paths__'"${repo_name}"
         git -C "${repo_path}" clean -df
         git -C "${repo_path}" reset --hard
         git -C "${repo_path}" checkout master
         git -C "${repo_path}" pull || true
       done
 
-      git -C "$(eval printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}" > /dev/null 2>&1
+      eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}" > /dev/null 2>&1
       git -C "${repo_paths__archlinux32}" checkout "${mod_git_revision}" > /dev/null 2>&1
 
       PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
