@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # report back on a build assignment
 # either on success via:
@@ -58,7 +58,7 @@ if [ "$5" = 'ERROR' ]; then
       grep '\.locked$' | \
       sed 's@^.*/\([^/]\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
   )"
-  grep "^${1//./\\.}\$" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
+  grep -xF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
     cut -d: -f1 | \
     while read -r loop; do
       if [ -z "$(
@@ -79,20 +79,20 @@ fi
 
 # the build was successful on the build slave
 
-if ! grep -q "^${1//./\\.} $2 $3 $4\$" "${work_dir}/build-list" ||
+if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
   ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
   >&2 echo 'Sorry, the sent package is outdated.'
   exit 2
 fi
 
 clean_up_tmp_dir() {
-  popd > /dev/null
+  cd "${base_dir}"
   rm -rf --one-file-system "${tmp_dir}"
   clean_up_lock_file
 }
 
 tmp_dir="$(mktemp -d)"
-pushd "${tmp_dir}" > /dev/null
+cd "${tmp_dir}"
 trap clean_up_tmp_dir EXIT
 
 # extract package(s)
@@ -115,11 +115,10 @@ if [ -n "${signature_errors}" ]; then
 fi
 
 # check if the sent packages are the expected ones
-packages=(*.pkg.tar.xz)
+packages=*.pkg.tar.xz
 package_errors="$(
   (
-    echo "${packages[@]}" | \
-      tr ' ' '\n' | \
+    printf '%s\n' ${packages} | \
       sed '
         s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz@ \2@
         / any$/{s|any$|i686|}
@@ -147,11 +146,11 @@ mv \
 
 (
   cd "${master_mirror_directory}/i686/${destination}"
-  repo-add "${destination}.db.tar.gz" "${packages[@]}"
-  # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" "${packages[@]}"
+  repo-add "${destination}.db.tar.gz" ${packages}
+  # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
 
   # remove old versions of same packages
-  for package in "${packages[@]}"; do
+  for package in ${packages}; do
     remove_old_package_versions "${package}"
   done
 )
@@ -159,8 +158,8 @@ mv \
 # remove old state files (these should be only "done" markers, but
 # actually we don't care what it is)
 ls "${work_dir}/package-states" | \
-  grep "^${1//./\\.}\(\.[^.]\+\)\{4\}\$" | \
-  grep -v "^${1//./\\.}\.$2\.$3\.$4\.[^.]\+\$" | \
+  grep "^$(str_to_regex "$1")\(\.[^.]\+\)\{4\}\$" | \
+  grep -v "^$(str_to_regex "$1.$2.$3.$4")\.[^.]\+\$" | \
   grep -v '\.testing$' | \
   sed "s|^|${work_dir}/package-states/|" | \
   xargs -rn1 rm -f
@@ -172,9 +171,9 @@ grep -xF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   xargs -rn1 rm -f
 
 # remove package from build list
-sed -i "/^${1//./\\.} $2 $3 $4\$/d" "${work_dir}/build-list"
+sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 
 # remove package lock file
-printf '%s\n' "${packages[@]}" > \
+printf '%s\n' ${packages} > \
   "${work_dir}/package-states/$1.$2.$3.$4.done"
 rm "${work_dir}/package-states/$1.$2.$3.$4.locked"

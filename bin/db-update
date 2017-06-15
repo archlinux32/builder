@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # move binary packages from staging to testing (if possible [1]) and
 # additionally all packages specified on the command line from testing
@@ -59,9 +59,9 @@ do
   shift
 done
 
-packages_to_stabilize=("${@}")
+packages_to_stabilize=${@}
 
-for package in "${packages_to_stabilize[@]}"; do
+for package in ${packages_to_stabilize}; do
   # some sanity checks
   if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then
     >&2 echo "Package '${package}' is not in testing!"
@@ -205,28 +205,24 @@ done_packages="$(
 unset keep_packages
 
 for package in ${done_packages}; do
-  parts=($(cat "${work_dir}/package-states/${package}.done"))
-  parts_names=(
-    $(
-      printf '%s\n' "${parts[@]}" | \
-        sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
-    )
+  parts=$(cat "${work_dir}/package-states/${package}.done")
+  parts_names=$(
+    printf '%s\n' ${parts} | \
+      sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
   )
   is_community="$(official_or_community "${package}")"
-  pushd "${master_mirror_directory}/i686/${is_community}staging" > /dev/null
+  cd "${master_mirror_directory}/i686/${is_community}staging"
   mkdir -p "../${is_community}testing"
-  repo-remove "${is_community}staging.db.tar.gz" "${parts_names[@]}"
-  for part in "${parts[@]}"; do
+  repo-remove "${is_community}staging.db.tar.gz" ${parts_names}
+  for part in ${parts}; do
     mv "${part}" "${part}.sig" "../${is_community}testing/"
     updated_package_database=true
   done
-  popd > /dev/null
-  pushd "${master_mirror_directory}/i686/${is_community}testing" > /dev/null
-  repo-add "${is_community}testing.db.tar.gz" "${parts[@]}"
-  for part in "${parts[@]}"; do
+  cd "${master_mirror_directory}/i686/${is_community}testing"
+  repo-add "${is_community}testing.db.tar.gz" ${parts}
+  for part in ${parts}; do
     remove_old_package_versions "${part}"
   done
-  popd > /dev/null
 
   mv \
     "${work_dir}/package-states/${package}.done" \
@@ -234,29 +230,25 @@ for package in ${done_packages}; do
 done
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
-for package in "${packages_to_stabilize[@]}"; do
-  parts=($(cat "${work_dir}/package-states/${package}.testing"))
-  parts_names=(
-    $(
-      printf '%s\n' "${parts[@]}" | \
-        sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
-    )
+for package in ${packages_to_stabilize}; do
+  parts=$(cat "${work_dir}/package-states/${package}.testing")
+  parts_names=$(
+    printf '%s\n' ${parts} | \
+      sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
   )
   source="$(official_or_community ${package})testing"
   destination="${package##*.}"
-  pushd "${master_mirror_directory}/i686/${source}" > /dev/null
-  repo-remove "${source}.db.tar.gz" "${parts_names[@]}"
-  for part in "${parts[@]}"; do
+  cd "${master_mirror_directory}/i686/${source}"
+  repo-remove "${source}.db.tar.gz" ${parts_names}
+  for part in ${parts}; do
     mv "${part}" "${part}.sig" "../${destination}/"
     updated_package_database=true
   done
-  popd > /dev/null
-  pushd "${master_mirror_directory}/i686/${destination}" > /dev/null
-  repo-add "${destination}.db.tar.gz" "${parts[@]}"
-  for part in "${parts[@]}"; do
+  cd "${master_mirror_directory}/i686/${destination}"
+  repo-add "${destination}.db.tar.gz" ${parts}
+  for part in ${parts}; do
     remove_old_package_versions "${part}"
   done
-  popd > /dev/null
 
   rm "${work_dir}/package-states/${package}.testing"
 done

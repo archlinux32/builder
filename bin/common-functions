@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # contains functions used by more than one script
 
@@ -12,26 +12,28 @@ find_pkgbuild() {
 
   local PKGBUILD='' repo file
 
-  if [ -f "${repo_paths["archlinux32"]}/$2/$1/PKGBUILD" ]; then
+  if [ -f "${repo_paths__archlinux32}/$2/$1/PKGBUILD" ]; then
     # If this package has some modification,
     repo="$(find_git_repository_to_package_repository "$2")"
-    if ! [ -d "${repo_paths["${repo}"]}/$1" ]; then
+    local package_path="$(eval printf '$repo_paths__%s' "${repo}")/$1"
+    if ! [ -d "${package_path}" ]; then
       # create some dummy files if it is also new.
-      mkdir -p "${repo_paths["${repo}"]}/$1/repos/$2-x86_64"
-      touch "${repo_paths["${repo}"]}/$1/repos/$2-x86_64/PKGBUILD"
+      mkdir -p "${package_path}/repos/$2-x86_64"
+      touch "${package_path}/repos/$2-x86_64/PKGBUILD"
     fi
   fi
 
-  for repo in "${!repo_paths[@]}"; do
+  for repo in ${repo_names}; do
     if [ "${repo}" = "archlinux32" ]; then
       # this is not a repository of packages
       continue
     fi
-    if ! [ -d "${repo_paths["${repo}"]}/$1" ]; then
+    local package_path="$(eval printf '$repo_paths__%s' "${repo}")/$1"
+    if ! [ -d "${package_path}" ]; then
       continue
     fi
     PKGBUILD="$(
-      ls "${repo_paths["${repo}"]}/$1/repos/$2-"*"/PKGBUILD" 2> /dev/null | \
+      ls "${package_path}/repos/$2-"*"/PKGBUILD" 2> /dev/null | \
         tr ' ' '\n' | \
         grep -v -- '-i686/PKGBUILD$' | \
         grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
@@ -70,13 +72,13 @@ apply_package_customizations() {
   if [ ! -f 'PKGBUILD.changes-applied' ]; then
     # add i686 to the arch list
     sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1'"'i686'"' \2|' -i 'PKGBUILD'
-    if [ -f "${repo_paths["archlinux32"]}/${repo}/${package}/PKGBUILD" ]; then
+    if [ -f "${repo_paths__archlinux32}/${repo}/${package}/PKGBUILD" ]; then
       # If this package has modifications (or is new), apply them now:
       # append PKGBUILD
-      cat "${repo_paths["archlinux32"]}/${repo}/${package}/PKGBUILD" >> \
+      cat "${repo_paths__archlinux32}/${repo}/${package}/PKGBUILD" >> \
         'PKGBUILD'
       # copy (and overwrite) other files
-      for file in "${repo_paths["archlinux32"]}/${repo}/${package}/"*; do
+      for file in "${repo_paths__archlinux32}/${repo}/${package}/"*; do
         if [ -f "${file}" ] && [ "${file##*/}" != 'PKGBUILD' ]; then
           cp "${file}" ./
         fi
@@ -93,8 +95,8 @@ find_repository_with_commit() {
 
   local repository
 
-  for repository in "${!repo_paths[@]}"; do
-    if [ "$(git -C "${repo_paths["${repository}"]}" cat-file -t "$1" 2> /dev/null)" == "commit" ]; then
+  for repository in ${repo_names}; do
+    if [ "$(git -C "$(eval printf '$repo_paths__%s' "${repository}")" cat-file -t "$1" 2> /dev/null)" = "commit" ]; then
       echo "${repository}"
       return 0
     fi
@@ -111,13 +113,13 @@ find_git_repository_to_package_repository() {
 
   local repository
 
-  for repository in "${!repo_paths[@]}"; do
+  for repository in ${repo_names}; do
     if [ "${repository}" = "archlinux32" ]; then
       continue
     fi
     if [ -n "$(
       (
-        ls "${repo_paths["${repository}"]}/"*"/repos" | \
+        ls "$(eval printf '$repo_paths__%s' "${repository}")/"*"/repos" | \
           grep -v ':$' | \
           sed 's|-[^-]\+$||' | \
           sort -u
@@ -176,8 +178,8 @@ generate_package_metadata() {
     return 0
   fi
 
-  git -C "${repo_paths["$(find_repository_with_commit "${git_revision}")"]}" checkout "${git_revision}"
-  git -C "${repo_paths["$(find_repository_with_commit "${mod_git_revision}")"]}" checkout "${mod_git_revision}"
+  git -C "$(eval printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}"
+  git -C "$(eval printf '$repo_paths__%s' "$(find_repository_with_commit "${mod_git_revision}")")" checkout "${mod_git_revision}"
 
   PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
@@ -281,7 +283,7 @@ official_or_community() {
       echo 'community-'
       ;;
     'multilib')
-      if ! git -C "${repo_paths['archlinux32']}" archive --format=tar "${a32_rev}" -- 'extra-from-multilib' | \
+      if ! git -C "${repo_paths__archlinux32}" archive --format=tar "${a32_rev}" -- 'extra-from-multilib' | \
         tar -Ox | \
         grep -qFx "${package%.*.*.*}"; then
         echo 'community-'
@@ -299,8 +301,8 @@ remove_old_package_versions() {
   local pkgname="${package%-*-*-*.pkg.tar.xz}"
 
   ls | \
-    grep "^${pkgname//./\\.}\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
-    grep -v "^${package//./\\.}\(\.sig\)\?\$" | \
+    grep "^$(str_to_regex "${pkgname}")\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
+    grep -v "^$(str_to_regex "${package}")\(\.sig\)\?\$" | \
     xargs -rn1 rm
 
 }
@@ -323,4 +325,11 @@ wait_some_time() {
   )"
 
   sleep $((${minimum} + ${random} % ${diff}))
+}
+
+# str_to_regex $string
+# escape dots for use in regex
+str_to_regex() {
+  echo "$1" | \
+    sed 's|\.|\\.|g'
 }

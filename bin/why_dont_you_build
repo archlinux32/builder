@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 
 # investigate, why a certain package is not being built
 
 . "${0%/*}/../conf/default.conf"
 
 for pkg in "$@"; do
-  grep "^${pkg//./\\.} " "${work_dir}/build-list" | \
+  grep "^$(str_to_regex "${pkg}") " "${work_dir}/build-list" | \
     while read -r package git_revision mod_git_revision repository; do
 
       if [ -f "${work_dir}/${package}.${git_revision}.${mod_git_revision}.${repository}.done" ] ||

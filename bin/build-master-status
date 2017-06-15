@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # report about status of build master
 
