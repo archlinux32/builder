@@ -10,12 +10,12 @@
 
 find_pkgbuild() {
 
-  local PKGBUILD='' repo file
+  local PKGBUILD='' repo file package_path
 
   if [ -f "${repo_paths__archlinux32}/$2/$1/PKGBUILD" ]; then
     # If this package has some modification,
     repo="$(find_git_repository_to_package_repository "$2")"
-    local package_path="$(eval printf '$repo_paths__%s' "${repo}")/$1"
+    eval package_path="$(printf '$repo_paths__%s' "${repo}")/$1"
     if ! [ -d "${package_path}" ]; then
       # create some dummy files if it is also new.
       mkdir -p "${package_path}/repos/$2-x86_64"
@@ -28,7 +28,7 @@ find_pkgbuild() {
       # this is not a repository of packages
       continue
     fi
-    local package_path="$(eval printf '$repo_paths__%s' "${repo}")/$1"
+    eval package_path="$(printf '$repo_paths__%s' "${repo}")/$1"
     if ! [ -d "${package_path}" ]; then
       continue
     fi
@@ -96,7 +96,7 @@ find_repository_with_commit() {
   local repository
 
   for repository in ${repo_names}; do
-    if [ "$(git -C "$(eval printf '$repo_paths__%s' "${repository}")" cat-file -t "$1" 2> /dev/null)" = "commit" ]; then
+    if [ "$(eval git -C "$(printf '$repo_paths__%s' "${repository}")" cat-file -t "$1" 2> /dev/null)" = "commit" ]; then
       echo "${repository}"
       return 0
     fi
@@ -119,7 +119,7 @@ find_git_repository_to_package_repository() {
     fi
     if [ -n "$(
       (
-        ls "$(eval printf '$repo_paths__%s' "${repository}")/"*"/repos" | \
+        eval ls "$(printf '$repo_paths__%s' "${repository}")/"*"/repos" | \
           grep -v ':$' | \
           sed 's|-[^-]\+$||' | \
           sort -u
@@ -178,8 +178,8 @@ generate_package_metadata() {
     return 0
   fi
 
-  git -C "$(eval printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}"
-  git -C "$(eval printf '$repo_paths__%s' "$(find_repository_with_commit "${mod_git_revision}")")" checkout "${mod_git_revision}"
+  eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}"
+  eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${mod_git_revision}")")" checkout "${mod_git_revision}"
 
   PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
 
