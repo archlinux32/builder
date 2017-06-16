@@ -79,7 +79,7 @@ case "${action}" in
 
       if ! ls -1 "${work_dir}/package-states" | \
         grep -q "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done\$"; then
-        printf 'Package "%s" is not in staging!' "${pkg}"
+        printf 'Package "%s" is not in staging!\n' "${pkg}"
         continue
       fi
 
@@ -127,7 +127,7 @@ case "${action}" in
   ;;
 
   *)
-    >&2 printf 'unknown action "%s"' "${action}"
+    >&2 printf 'unknown action "%s"\n' "${action}"
     exit 1
 
 esac
