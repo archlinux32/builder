@@ -133,10 +133,11 @@ keep_packages="$(
     "${tmp_dir}/keep_packages" \
     "${tmp_dir}/done_packages"
 )"
-printf '%s\n' "${keep_packages}" > \
+printf '%s\n' "${keep_packages}" | \
+  grep -vxF '' || true > \
   "${tmp_dir}/keep_packages"
 
-# packages which can't be unstaged
+# find all dependencies of the unstageable packages
 mv \
   "${tmp_dir}/keep_packages" \
   "${tmp_dir}/new_keep_packages"
@@ -153,8 +154,7 @@ while [ -s "${tmp_dir}/new_keep_packages" ]; do
       printf '%s\n' "${keep_packages}"
       cat "${tmp_dir}/new_keep_packages"
     ) | \
-      sort -u | \
-      grep -v '^$'
+      sort -u
   )"
 
   new_keep_packages="$(
@@ -183,16 +183,37 @@ done
 
 done_packages="$(cat "${tmp_dir}/done_packages")"
 
-# unlock build list
+# if build list is empty, remember all entries of 'deletion-list'
+if [ -s "${work_dir}/build-list" ]; then
+  delete_packages=''
+else
+  delete_packages="$(
+    cat "${work_dir}/deletion-list"
+  )"
+fi
 
-rm -f "${build_list_lock_file}"
-flock -u 9
+if [ -z "${delete_packages}" ]; then
 
-rm -rf --one-file-system "${tmp_dir}"
+  # unlock build list
 
-clean_up_lock_file() {
-  rm -f "${package_database_lock_file}"
-}
+  rm -f "${build_list_lock_file}"
+  flock -u 9
+
+  rm -rf --one-file-system "${tmp_dir}"
+
+  clean_up_lock_file() {
+    rm -f "${package_database_lock_file}"
+  }
+
+else
+
+  rm -rf --one-file-system "${tmp_dir}"
+
+  clean_up_lock_file() {
+    rm -f "${package_database_lock_file}" "${build_list_lock_file}"
+  }
+
+fi
 
 # calculate unstageable packages from keep_packages and done_packages
 
@@ -212,6 +233,9 @@ done_packages="$(
 unset keep_packages
 
 for package in ${done_packages}; do
+  if [ -z "${package}" ]; then
+    continue
+  fi
   parts=$(cat "${work_dir}/package-states/${package}.done")
   parts_names=$(
     printf '%s\n' ${parts} | \
@@ -259,6 +283,11 @@ for package in ${packages_to_stabilize}; do
 
   rm "${work_dir}/package-states/${package}.testing"
 done
+
+if [ -n "${delete_packages}" ]; then
+  echo "there is something to delete:"
+  echo "${delete_packages}"
+fi
 
 if ${updated_package_database}; then
   date '+%s' > \
