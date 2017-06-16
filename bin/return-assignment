@@ -115,13 +115,18 @@ if [ -n "${signature_errors}" ]; then
 fi
 
 # check if the sent packages are the expected ones
-packages=*.pkg.tar.xz
+packages="$(
+  ls -1 | \
+    grep '\.pkg\.tar\.xz$'
+)"
 package_errors="$(
   (
     printf '%s\n' ${packages} | \
       sed '
-        s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz@ \2@
-        / any$/{s|any$|i686|}
+        s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz$@ \2@
+        / any$/{
+          s|any$|i686|
+        }
       '
     sed 's|$| i686|' "${work_dir}/package-infos/$1.$2.$3.packages"
   ) | \
