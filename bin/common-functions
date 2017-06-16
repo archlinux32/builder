@@ -3,7 +3,11 @@
 # contains functions used by more than one script
 
 # TODO:
-#  maybe source PKGBUILD instead of 'makepkg --printsrcinfo' and 'mksrcinfo'?
+
+#  maybe source PKGBUILD instead of 'makepkg --printsrcinfo' and
+#   'mksrcinfo'?
+
+#  mangle $arch in PKBUILDs to contain i486, i586, i686
 
 # find_pkgbuild repository package
 # find the PKGBUILD of $package from $repository
@@ -52,9 +56,6 @@ find_pkgbuild() {
 
 # apply customizations to a package
 #  (to be executed in the package's directory)
-
-# TODO:
-#  mangle $arch in PKBUILDs to contain i486, i586, i686
 
 apply_package_customizations() {
   if [ ! -f 'PKGBUILD' ]; then
@@ -315,6 +316,7 @@ remove_old_package_versions() {
 
 # wait_some_time $minimum $diff
 # wait between minimum and minimum+diff seconds (diff defaults to 30)
+
 wait_some_time() {
   local minimum=$1
   local diff=$2
@@ -335,6 +337,7 @@ wait_some_time() {
 
 # str_to_regex $string
 # escape dots for use in regex
+
 str_to_regex() {
   echo "$1" | \
     sed 's|\.|\\.|g'

@@ -9,8 +9,10 @@
 #   b) no done package B which is not being moved depends on A
 
 # TODO:
+
 #  the meta data used to evaluate condition "b" might be for a different
 #    version
+
 #  correctly handle if multiple versions of a single package are marked
 #    as "done"
 
