@@ -120,7 +120,7 @@ case "${action}" in
       fi
 
       echo 'No dependencies left on build list.'
-        echo "${dependent_packages}"
+      echo "${dependent_packages}"
 
     done
 
