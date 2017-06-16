@@ -7,5 +7,5 @@ if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
   slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
 else
   >&2 echo "Invalid command: '${SSH_ORIGINAL_COMMAND%% *}'"
-  exit 1
+  exit 42
 fi
