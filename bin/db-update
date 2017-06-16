@@ -87,22 +87,14 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
+tmp_dir="$(mktemp -d)"
+
 clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
+  rm -rf --one-file-system "${tmp_dir}"
 }
 
 trap clean_up_lock_file EXIT
-
-# packages which can't be un-staged because they're still dependencies
-# of any job on the build-list
-
-keep_packages="$(
-  while read -r pkg pkg_rev mod_rev repo; do
-    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
-  done < \
-    "${work_dir}/build-list" | \
-    sort -u
-)"
 
 # sanity check
 
@@ -116,69 +108,82 @@ if [ -n "$(
   exit 42
 fi
 
+# packages which can't be un-staged because they're still dependencies
+# of any job on the build-list
+
+while read -r pkg pkg_rev mod_rev repo; do
+  cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
+done < \
+  "${work_dir}/build-list" | \
+  sort -u > \
+  "${tmp_dir}/keep_packages"
+
 # packages which are done
 
-done_packages="$(
-  ls "${work_dir}/package-states" | \
-    grep '\.done$' | \
-    sed 's|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|' | \
-    sort
-)"
+ls "${work_dir}/package-states" | \
+  grep '\.done$' | \
+  sed 's|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|' | \
+  sort > \
+  "${tmp_dir}/done_packages"
 
 # remove packages not yet done from keep-packages list
 
 keep_packages="$(
   join -1 1 -2 1 -o 2.2 \
-    <(
-      echo "${keep_packages}"
-    ) \
-    <(
-      echo "${done_packages}"
-    )
+    "${tmp_dir}/keep_packages" \
+    "${tmp_dir}/done_packages"
 )"
+printf '%s\n' "${keep_packages}" > \
+  "${tmp_dir}/keep_packages"
 
 # packages which can't be unstaged
-
-new_keep_packages="${keep_packages}"
+mv \
+  "${tmp_dir}/keep_packages" \
+  "${tmp_dir}/new_keep_packages"
 keep_packages=''
 
-while [ -n "${new_keep_packages}" ]; do
+while [ -s "${tmp_dir}/new_keep_packages" ]; do
 
-  for package in ${new_keep_packages}; do
+  while read -r package; do
     generate_package_metadata "${package}"
-  done
-  if [ -z "${done_packages}" ]; then
-    break
-  fi
+  done < "${tmp_dir}/new_keep_packages"
 
   keep_packages="$(
-    printf '%s\n' "${keep_packages}" "${new_keep_packages}" | \
+    (
+      printf '%s\n' "${keep_packages}"
+      cat "${tmp_dir}/new_keep_packages"
+    ) | \
       sort -u | \
       grep -v '^$'
   )"
 
   new_keep_packages="$(
+    while read -r package; do
+      cat "${work_dir}/package-infos/${package%.*}.depends"
+    done < \
+      "${tmp_dir}/new_keep_packages" | \
+      sort -u
+  )"
+  printf '%s\n' "${new_keep_packages}" > \
+    "${tmp_dir}/new_keep_packages"
+
+  new_keep_packages="$(
     join -1 1 -2 1 -o 2.2 \
-      <(
-        echo "${new_keep_packages}" | \
-          while read -r package; do
-            cat "${work_dir}/package-infos/${package%.*}.depends"
-          done | \
-          sort -u
-      ) \
-      <(
-        echo "${done_packages}"
-      )
+      "${tmp_dir}/new_keep_packages" \
+      "${tmp_dir}/done_packages"
   )"
 
   # "new" is only what has not been there before
-  new_keep_packages="$(
-    printf '%s\n' "${keep_packages}" "${keep_packages}" "${new_keep_packages}" | \
-      sort | \
-      uniq -u
-  )"
+  printf '%s\n' "${keep_packages}" "${keep_packages}" "${new_keep_packages}" | \
+    sort | \
+    uniq -u > \
+    "${tmp_dir}/new_keep_packages"
 
 done
+
+done_packages="$(cat "${tmp_dir}/done_packages")"
+
+rm -rf --one-file-system "${tmp_dir}"
 
 # unlock build list
 
