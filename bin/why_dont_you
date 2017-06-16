@@ -2,7 +2,7 @@
 
 # usage: why_dont_you $action $package1 $package2 ...
 
-# investigate, why a certain option is not done with a certain package
+# investigate, why a certain operation is not done with certain packages
 
 . "${0%/*}/../conf/default.conf"
 
