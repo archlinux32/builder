@@ -112,6 +112,7 @@ fi
 # of any job on the build-list
 
 while read -r pkg pkg_rev mod_rev repo; do
+  generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
   cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
 done < \
   "${work_dir}/build-list" | \
