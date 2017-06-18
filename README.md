@@ -7,6 +7,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 ### build master only
 * some ssh-server
 * `pkgbuild-introspection`
+* `bc`
 ### build slave only
 * some ssh-client
 * `devtools32`
