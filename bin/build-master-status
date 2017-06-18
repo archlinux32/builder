@@ -5,7 +5,7 @@
 . "${0%/*}/../conf/default.conf"
 
 stable="$(
-  find "${master_mirror_directory}/i686/" \( -name '*testing' -o -name '*staging' \) -prune -o -name '*.pkg.tar.xz' -print | \
+  find "${master_mirror_directory}/i686/" \( -name '*testing' -o -name '*staging' \) -prune -o -name '*.pkg.tar.xz' -print 2> /dev/null | \
     wc -l
   )"
 tasks="$(
@@ -13,20 +13,20 @@ tasks="$(
     "${work_dir}/build-list"
   )"
 pending_packages="$(
-  sed '
-    s| |.|g
-    s|^|'"${work_dir}"'/package-infos/|
-    s|\.[^.]\+$|.packages|
-  ' "${work_dir}"/build-list | \
-    xargs -r cat | \
+  tr ' ' '.' < \
+    "${work_dir}"/build-list | \
+    while read -r package; do
+      generate_package_metadata "${package}" &> /dev/null
+      cat "${work_dir}/package-infos/${package%.*}.packages"
+    done |
     wc -l
 )"
 staging="$(
-  find "${master_mirror_directory}/i686/"*staging -name '*.pkg.tar.xz' | \
+  find "${master_mirror_directory}/i686/"*staging -name '*.pkg.tar.xz' 2> /dev/null | \
     wc -l
   )"
 testing="$(
-  find "${master_mirror_directory}/i686/"*testing -name '*.pkg.tar.xz' | \
+  find "${master_mirror_directory}/i686/"*testing -name '*.pkg.tar.xz' 2> /dev/null | \
     wc -l
   )"
 broken="$(
