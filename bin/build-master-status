@@ -191,7 +191,7 @@ if [ -n "${broken_output}" ]; then
   else
     : > "${broken_output}"
   fi
-  ls work/package-states/ | \
+  ls "${work_dir}/package-states" | \
     grep '\.broken$' | \
     sed 's|\.broken$||' | \
     if ${nice}; then
