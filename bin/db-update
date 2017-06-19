@@ -30,6 +30,131 @@ usage() {
   [ -z "$1" ] && exit 1 || exit $1
 }
 
+# move_package $package $from_repository $to_repository
+# the existence of a directory $tmp_dir is assumed
+
+move_package() {
+
+  if [ -z "${tmp_dir}" ] || [ ! -d "${tmp_dir}" ]; then
+    >&2 echo 'move_package: No tmp_dir provided.'
+    exit 2
+  fi
+
+  local package="$1"
+  local from_repo="$2"
+  local to_repo="$3"
+  local from_ending
+  local to_ending
+  local part
+
+  if echo "${from_repo}" | \
+    grep -q 'staging$' && \
+    echo "${to_repo}" | \
+      grep -q 'testing$'; then
+    from_ending='done'
+    to_ending='testing'
+  elif echo "${from_repo}" | \
+    grep -q 'testing$' && \
+    ! echo "${to_repo}" | \
+      grep -q 'testing$\|staging$'; then
+    from_ending='testing'
+    to_ending=''
+  else
+    >&2 printf 'move_package: Cannot move package from "%s" to "%s".\n' "${from_repo}" "${to_repo}"
+    exit 2
+  fi
+
+  if [ ! -f "${work_dir}/package-states/${package}.${from_ending}" ]; then
+    >&2 printf 'move_package: Cannot find package state file "%s"\n' "${package}.${from_ending}"
+    exit 2
+  fi
+
+  rm -rf --one-file-system "${tmp_dir}/"*
+
+  cp \
+    "${work_dir}/package-states/${package}.${from_ending}" \
+    "${tmp_dir}/parts"
+  sed \
+    's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||' \
+    "${tmp_dir}/parts" > \
+    "${tmp_dir}/parts_names"
+  sed \
+    'p;s|$|.sig|' \
+    "${tmp_dir}/parts" > \
+    "${tmp_dir}/parts_and_signatures"
+
+  mkdir "${tmp_dir}/from"
+  mkdir "${tmp_dir}/to"
+
+  ${master_mirror_command} \
+    --files-from="${tmp_dir}/parts_and_signatures" \
+    "${master_mirror_directory}/i686/${from_repo}/" \
+    "${tmp_dir}/from/"
+
+  ${master_mirror_command} \
+    "${master_mirror_directory}/i686/${from_repo}/${from_repo}.db."* \
+    "${tmp_dir}/from"
+
+  ${master_mirror_command} \
+    "${master_mirror_directory}/i686/${to_repo}/${to_repo}.db."* \
+    "${tmp_dir}/to"
+
+  repo-remove \
+    "${tmp_dir}/from/${from_repo}.db.tar.gz" \
+    $(cat "${tmp_dir}/parts_names")
+
+  while read -r part; do
+    mv \
+      "${tmp_dir}/from/${part}" \
+      "${tmp_dir}/to/"
+  done < \
+    "${tmp_dir}/parts_and_signatures"
+
+  repo-add \
+    "${tmp_dir}/to/${to_repo}.db.tar.gz" \
+    $(
+      sed \
+        "s|^|${tmp_dir}/to/|" \
+        "${tmp_dir}/parts"
+    )
+
+  ${master_mirror_command} \
+    --files-from="${tmp_dir}/parts_and_signatures" \
+    "${tmp_dir}/to/" \
+    "${master_mirror_directory}/i686/${to_repo}/"
+
+  ${master_mirror_command} \
+    "${tmp_dir}/to/${to_repo}.db."* \
+    "${master_mirror_directory}/i686/${to_repo}/"
+
+  ${master_mirror_command} \
+    "${tmp_dir}/from/${from_repo}.db."* \
+    "${master_mirror_directory}/i686/${from_repo}/"
+
+  while read -r part; do
+    echo remove_old_package_versions "i686/${to_repo}" "${part}"
+    remove_old_package_versions "i686/${to_repo}" "${part}"
+    # the next line will remove _all_ versions of the package $part from $from_repo
+    echo remove_old_package_versions "i686/${from_repo}" "${part%.pkg.tar.xz}0.pkg.tar.xz"
+    remove_old_package_versions "i686/${from_repo}" "${part%.pkg.tar.xz}0.pkg.tar.xz"
+  done < \
+    "${tmp_dir}/parts"
+
+  if [ -z "${to_ending}" ]; then
+    rm \
+      "${work_dir}/package-states/${package}.${from_ending}"
+  else
+    mv \
+      "${work_dir}/package-states/${package}.${from_ending}" \
+      "${work_dir}/package-states/${package}.${to_ending}"
+  fi
+
+  updated_package_database=true
+
+  rm -rf --one-file-system "${tmp_dir}/"*
+
+}
+
 eval set -- "$(
   getopt -o bh \
     --long block \
@@ -135,8 +260,9 @@ keep_packages="$(
     "${tmp_dir}/done_packages"
 )"
 printf '%s\n' "${keep_packages}" | \
-  grep -vxF '' || true > \
-  "${tmp_dir}/keep_packages"
+  grep -vxF '' > \
+  "${tmp_dir}/keep_packages" || \
+  true
 
 # find all dependencies of the unstageable packages
 mv \
@@ -200,18 +326,9 @@ if [ -z "${delete_packages}" ]; then
   rm -f "${build_list_lock_file}"
   flock -u 9
 
-  rm -rf --one-file-system "${tmp_dir}"
-
   clean_up_lock_file() {
+    rm -rf --one-file-system "${tmp_dir}"
     rm -f "${package_database_lock_file}"
-  }
-
-else
-
-  rm -rf --one-file-system "${tmp_dir}"
-
-  clean_up_lock_file() {
-    rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   }
 
 fi
@@ -234,55 +351,28 @@ done_packages="$(
 unset keep_packages
 
 for package in ${done_packages}; do
+
   if [ -z "${package}" ]; then
     continue
   fi
-  parts=$(cat "${work_dir}/package-states/${package}.done")
-  parts_names=$(
-    printf '%s\n' ${parts} | \
-      sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
-  )
-  is_community="$(official_or_community "${package}")"
-  cd "${master_mirror_directory}/i686/${is_community}staging"
-  mkdir -p "../${is_community}testing"
-  repo-remove "${is_community}staging.db.tar.gz" ${parts_names}
-  for part in ${parts}; do
-    mv "${part}" "${part}.sig" "../${is_community}testing/"
-    updated_package_database=true
-  done
-  cd "${master_mirror_directory}/i686/${is_community}testing"
-  repo-add "${is_community}testing.db.tar.gz" ${parts}
-  for part in ${parts}; do
-    remove_old_package_versions "${part}"
-  done
 
-  mv \
-    "${work_dir}/package-states/${package}.done" \
-    "${work_dir}/package-states/${package}.testing"
+  is_community="$(official_or_community "${package}")"
+
+  move_package "${package}" "${is_community}staging" "${is_community}testing"
+
 done
+
+exit
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
 for package in ${packages_to_stabilize}; do
-  parts=$(cat "${work_dir}/package-states/${package}.testing")
-  parts_names=$(
-    printf '%s\n' ${parts} | \
-      sed 's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||'
-  )
-  source="$(official_or_community ${package})testing"
-  destination="${package##*.}"
-  cd "${master_mirror_directory}/i686/${source}"
-  repo-remove "${source}.db.tar.gz" ${parts_names}
-  for part in ${parts}; do
-    mv "${part}" "${part}.sig" "../${destination}/"
-    updated_package_database=true
-  done
-  cd "${master_mirror_directory}/i686/${destination}"
-  repo-add "${destination}.db.tar.gz" ${parts}
-  for part in ${parts}; do
-    remove_old_package_versions "${part}"
-  done
 
-  rm "${work_dir}/package-states/${package}.testing"
+  if [ -z "${package}" ]; then
+    continue
+  fi
+
+  move_package "${package}" "$(official_or_community ${package})testing" "${package##*.}"
+
 done
 
 if [ -n "${delete_packages}" ]; then

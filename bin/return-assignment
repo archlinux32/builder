@@ -144,22 +144,21 @@ fi
 # move packages
 destination="$(official_or_community "$1.$2.$3.$4")staging"
 
-mkdir -p "${master_mirror_directory}/i686/${destination}/"
-mv \
+${master_mirror_command} \
+  "${master_mirror_directory}/i686/${destination}/${destination}.db.*" \
+  .
+repo-add "${destination}.db.tar.gz" ${packages}
+# repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
+
+${master_mirror_command} \
+  "${destination}.db."*
   *".pkg.tar.xz" \
   *".pkg.tar.xz.sig" \
   "${master_mirror_directory}/i686/${destination}/"
 
-(
-  cd "${master_mirror_directory}/i686/${destination}"
-  repo-add "${destination}.db.tar.gz" ${packages}
-  # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
-
-  # remove old versions of same packages
-  for package in ${packages}; do
-    remove_old_package_versions "${package}"
-  done
-)
+for package in ${packages}; do
+  remove_old_package_versions "i686/${destination}" "${package}"
+done
 
 # remove old state files (these should be only "done" markers, but
 # actually we don't care what it is)

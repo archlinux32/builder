@@ -106,7 +106,7 @@ find_repository_with_commit() {
       return 0
     fi
   done
-  >&2 echo "can't find repository with commit '$1'"
+  >&2 printf 'find_repository_with_commit: Cannot find repository with commit "%s"\n' "$1"
   exit 1
 
 }
@@ -299,18 +299,30 @@ official_or_community() {
   esac
 }
 
-# remove_old_package_versions $package_file
-# removes all other versions of $package_file in the current directory
+# remove_old_package_versions $directory $package_file
+# removes all other versions of $package_file in $directory on the master mirror
 
 remove_old_package_versions() {
 
-  local package="$1"
+  local directory="$1"
+  local package="$2"
+
   local pkgname="${package%-*-*-*.pkg.tar.xz}"
 
-  ls | \
-    grep "^$(str_to_regex "${pkgname}")\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
-    grep -v "^$(str_to_regex "${package}")\(\.sig\)\?\$" | \
-    xargs -rn1 rm
+  ${master_mirror_command} \
+    --recursive \
+    --delete \
+    $( \
+      ${master_mirror_command} \
+        "${master_mirror_directory}/${directory}/" | \
+        awk '{print $5}' | \
+        grep "^$(str_to_regex "${pkgname}")\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
+        grep -v "^$(str_to_regex "${package}")\(\.sig\)\?\$" | \
+        sed 's|^|--include=|'
+    ) \
+    '--exclude=*' \
+    ./ \
+    "${master_mirror_directory}/${directory}/"
 
 }
 

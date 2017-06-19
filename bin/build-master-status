@@ -5,8 +5,13 @@
 . "${0%/*}/../conf/default.conf"
 
 stable="$(
-  find "${master_mirror_directory}/i686/" \( -name '*testing' -o -name '*staging' \) -prune -o -name '*.pkg.tar.xz' -print 2> /dev/null | \
-    wc -l
+  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
+    awk '{print $5}' | \
+    grep -v 'testing$\|staging$\|^\.$' | \
+    while read -r dir; do
+      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+    done | \
+    grep -c '\.pkg\.tar\.xz$'
   )"
 tasks="$(
   wc -l < \
@@ -22,12 +27,22 @@ pending_packages="$(
     wc -l
 )"
 staging="$(
-  find "${master_mirror_directory}/i686/"*staging -name '*.pkg.tar.xz' 2> /dev/null | \
-    wc -l
+  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
+    awk '{print $5}' | \
+    grep 'staging$' | \
+    while read -r dir; do
+      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+    done | \
+    grep -c '\.pkg\.tar\.xz$'
   )"
 testing="$(
-  find "${master_mirror_directory}/i686/"*testing -name '*.pkg.tar.xz' 2> /dev/null | \
-    wc -l
+  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
+    awk '{print $5}' | \
+    grep 'testing$' | \
+    while read -r dir; do
+      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+    done | \
+    grep -c '\.pkg\.tar\.xz$'
   )"
 broken="$(
   ls "${work_dir}/package-states/" | \
