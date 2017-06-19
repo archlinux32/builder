@@ -132,10 +132,8 @@ move_package() {
     "${master_mirror_directory}/i686/${from_repo}/"
 
   while read -r part; do
-    echo remove_old_package_versions "i686/${to_repo}" "${part}"
     remove_old_package_versions "i686/${to_repo}" "${part}"
     # the next line will remove _all_ versions of the package $part from $from_repo
-    echo remove_old_package_versions "i686/${from_repo}" "${part%.pkg.tar.xz}0.pkg.tar.xz"
     remove_old_package_versions "i686/${from_repo}" "${part%.pkg.tar.xz}0.pkg.tar.xz"
   done < \
     "${tmp_dir}/parts"
