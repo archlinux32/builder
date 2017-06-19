@@ -4,16 +4,78 @@
 
 . "${0%/*}/../conf/default.conf"
 
-if [ "x$1" = "x-o" ]; then
-  output_file="$2"
-  output() {
-    cat >> "${output_file}"
-  }
-  : > "$2"
-else
-  output() {
-    cat
-  }
+usage() {
+  >&2 echo ''
+  >&2 echo 'build-master-status: report about status of build master'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -b|--broken $output:   Write broken packages to $output.'
+  >&2 echo '  -h|--help:             Show this help and exit.'
+  >&2 echo '  -n|--nice:             Write html output.'
+  >&2 echo '  -o|--output $output:   Write to $output instead of stdout.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
+
+eval set -- "$(
+  getopt -o b:hno: \
+    --long broken: \
+    --long help \
+    --long nice \
+    --long output: \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+output() {
+  cat
+}
+
+make_nice() {
+  cat
+}
+
+nice=false
+broken_output=''
+output_file=''
+
+while true
+do
+  case "$1" in
+    -b|--broken)
+      shift
+      broken_output="$1"
+    ;;
+    -h|--help)
+      usage 0
+    ;;
+    -n|--nice)
+      nice=true
+      make_nice() {
+        sed 's|$|<br>|'
+      }
+    ;;
+    -o|--output)
+      shift
+      output_file="$1"
+      output() {
+        cat >> "${output_file}"
+      }
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 0 ]; then
+  >&2 echo 'Too many arguments.'
+  usage
 fi
 
 stable="$(
@@ -73,14 +135,20 @@ looped_packages="$(
     wc -l
   )"
 
+if [ -n "${output_file}" ]; then
+  : > "${output_file}"
+fi
+
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
   "$((${staging}+${testing}+${pending_packages}))" | \
+  make_nice | \
   output
 printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
   "$((${tasks}-${broken}))" \
   "${tasks}" \
   "${pending_packages}" | \
+  make_nice | \
   output
 printf 'There are %d testing and %d staging packages.\n' \
   "${testing}" \
@@ -88,11 +156,13 @@ printf 'There are %d testing and %d staging packages.\n' \
   output
 printf 'There are %d broken package builds.\n' \
   "${broken}" | \
+  make_nice | \
   output
 if [ "${loops}" -ne 0 ]; then
   printf 'There are %d loops containing %d package builds.\n' \
     "${loops}" \
     "${looped_packages}" | \
+    make_nice | \
     output
 fi
 if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
@@ -101,6 +171,7 @@ if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
       echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
         bc
     )" | \
+    make_nice | \
     output
 fi
 if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
@@ -109,5 +180,28 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
       echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
         bc
     )" | \
+    make_nice | \
     output
+fi
+
+if [ -n "${broken_output}" ]; then
+  if ${nice}; then
+    printf '<html>\n<body>\n<table>\n<tr><th>package</th><th>git revision</th><th>modification git revision</th><th>package repository</th></tr>\n' > \
+      "${broken_output}"
+  else
+    : > "${broken_output}"
+  fi
+  ls work/package-states/ | \
+    grep '\.broken$' | \
+    sed 's|\.broken$||' | \
+    if ${nice}; then
+      sed 's|^\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$|<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>|'
+    else
+      cat
+    fi >> \
+    "${broken_output}"
+  if ${nice}; then
+    printf '</table>\n</body>\n</html>\n' >> \
+      "${broken_output}"
+  fi
 fi
