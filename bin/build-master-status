@@ -4,6 +4,18 @@
 
 . "${0%/*}/../conf/default.conf"
 
+if [ "x$1" = "x-o" ]; then
+  output_file="$2"
+  output() {
+    cat >> "${output_file}"
+  }
+  : > "$2"
+else
+  output() {
+    cat
+  }
+fi
+
 stable="$(
   ${master_mirror_command} "${master_mirror_directory}/i686/" | \
     awk '{print $5}' | \
@@ -63,32 +75,39 @@ looped_packages="$(
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
-  "$((${staging}+${testing}+${pending_packages}))"
+  "$((${staging}+${testing}+${pending_packages}))" | \
+  output
 printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
   "$((${tasks}-${broken}))" \
   "${tasks}" \
-  "${pending_packages}"
+  "${pending_packages}" | \
+  output
 printf 'There are %d testing and %d staging packages.\n' \
   "${testing}" \
-  "${staging}"
+  "${staging}" | \
+  output
 printf 'There are %d broken package builds.\n' \
-  "${broken}"
+  "${broken}" | \
+  output
 if [ "${loops}" -ne 0 ]; then
   printf 'There are %d loops containing %d package builds.\n' \
     "${loops}" \
-    "${looped_packages}"
+    "${looped_packages}" | \
+    output
 fi
 if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
   printf '%.1f%% of all packages are broken.\n' \
     "$(
       echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
         bc
-    )"
+    )" | \
+    output
 fi
 if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
   printf '%.1f%% of the planned work has been done.\n' \
     "$(
       echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
         bc
-    )"
+    )" | \
+    output
 fi
