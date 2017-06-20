@@ -14,7 +14,12 @@
 #    version
 
 #  correctly handle if multiple versions of a single package are marked
-#    as "done"
+#    as "done" or "testing"
+
+#  be more atomic
+
+#  do not download and afterwards upload packages which are just being
+#    moved
 
 . "${0%/*}/../conf/default.conf"
 
