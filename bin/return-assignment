@@ -178,7 +178,7 @@ for package in ${packages}; do
 done
 
 # remove old state files (these should be only "done" markers, but
-# actually we don't care what it is)
+# actually we don't care what it is) - as long as it's not "testing"
 ls "${work_dir}/package-states" | \
   grep "^$(str_to_regex "$1")\(\.[^.]\+\)\{4\}\$" | \
   grep -v "^$(str_to_regex "$1.$2.$3.$4")\.[^.]\+\$" | \
