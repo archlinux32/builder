@@ -371,8 +371,6 @@ for package in ${done_packages}; do
 
 done
 
-exit
-
 # move packages in packages_to_stabilize from *testing/ to the stable repos
 for package in ${packages_to_stabilize}; do
 
