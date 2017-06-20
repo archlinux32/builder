@@ -25,8 +25,10 @@ usage() {
   >&2 echo ' move packages on the command line from testing to stable.'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
-  >&2 echo '  -h|--help:    Show this help and exit.'
+  >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
+  >&2 echo '  -f|--from $file:  Read packages to move from testing to'
+  >&2 echo '                    stable from $file (- is stdin).'
+  >&2 echo '  -h|--help:        Show this help and exit.'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
@@ -154,8 +156,9 @@ move_package() {
 }
 
 eval set -- "$(
-  getopt -o bh \
+  getopt -o bf:h \
     --long block \
+    --long from: \
     --long help \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
@@ -168,6 +171,14 @@ do
   case "$1" in
     -b|--block)
       block_flag=''
+    ;;
+    -f|--from)
+      shift
+      if [ "x$1" = "x-" ]; then
+        packages_to_stabilize=$(cat)
+      else
+        packages_to_stabilize=$(cat "$1")
+      fi
     ;;
     -h|--help)
       usage 0
@@ -184,7 +195,7 @@ do
   shift
 done
 
-packages_to_stabilize=${@}
+packages_to_stabilize=${packages_to_stabilize} ${@}
 
 for package in ${packages_to_stabilize}; do
   # some sanity checks
