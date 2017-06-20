@@ -143,6 +143,7 @@ move_packages() {
 
     ${master_mirror_command} \
       "${master_mirror_directory}/i686/${repo}/${repo}.db."* \
+      "${master_mirror_directory}/i686/${repo}/${repo}.files."* \
       "${tmp_dir}/${repo}/"
 
     # add and remove the packages locally
@@ -197,6 +198,7 @@ move_packages() {
 
     ${master_mirror_command} \
       "${tmp_dir}/${repo}/${repo}.db."* \
+      "${tmp_dir}/${repo}/${repo}.files."* \
       "${master_mirror_directory}/i686/${repo}/"
 
   done < \

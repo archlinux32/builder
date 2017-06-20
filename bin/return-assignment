@@ -163,12 +163,14 @@ destination="$(official_or_community "$1.$2.$3.$4")staging"
 
 ${master_mirror_command} \
   "${master_mirror_directory}/i686/${destination}/${destination}.db."* \
+  "${master_mirror_directory}/i686/${destination}/${destination}.files."* \
   .
 repo-add "${destination}.db.tar.gz" ${packages}
 # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
 
 ${master_mirror_command} \
   "${destination}.db."* \
+  "${destination}.files."* \
   ./*".pkg.tar.xz" \
   ./*".pkg.tar.xz.sig" \
   "${master_mirror_directory}/i686/${destination}/"
