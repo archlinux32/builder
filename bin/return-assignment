@@ -23,19 +23,13 @@
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
-exec 8> "${package_database_lock_file}"
 if ! flock -n 9; then
   >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit 1
-fi
-if ! flock -n 8; then
-  >&2 echo 'come back (shortly) later - I cannot lock package database.'
   exit 1
 fi
 
 clean_up_lock_file() {
   rm -f "${build_list_lock_file}"
-  rm -f "${package_database_lock_file}"
 }
 
 trap clean_up_lock_file EXIT
@@ -89,6 +83,19 @@ if [ "$5" = 'ERROR' ]; then
 fi
 
 # the build was successful on the build slave
+
+# so we also need a lock on the package database
+
+exec 8> "${package_database_lock_file}"
+if ! flock -n 8; then
+  >&2 echo 'come back (shortly) later - I cannot lock package database.'
+  exit 1
+fi
+
+clean_up_lock_file() {
+  rm -f "${build_list_lock_file}"
+  rm -f "${package_database_lock_file}"
+}
 
 if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
   ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
