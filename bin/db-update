@@ -234,11 +234,11 @@ fi
 # packages which can't be un-staged because they're still dependencies
 # of any job on the build-list
 
-while read -r pkg pkg_rev mod_rev repo; do
-  generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
-  cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
-done < \
-  "${work_dir}/build-list" | \
+grep -vxF 'break_loops' "${work_dir}/build-list" | \
+  while read -r pkg pkg_rev mod_rev repo; do
+    generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
+    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
+  done | \
   sort -u > \
   "${tmp_dir}/keep_packages"
 
@@ -309,7 +309,7 @@ done
 done_packages="$(cat "${tmp_dir}/done_packages")"
 
 # if build list is empty, remember all entries of 'deletion-list'
-if [ -s "${work_dir}/build-list" ]; then
+if grep -qvxF 'break_loops' "${work_dir}/build-list"; then
   delete_packages=''
 else
   delete_packages="$(

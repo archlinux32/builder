@@ -23,15 +23,16 @@ case "${action}" in
             continue
           fi
 
-          if package_locked_broken_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
-            echo 'is locked, broken or blocked'
+          if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+            echo 'is locked or blocked'
             continue
           fi
 
           if [ -n "$(
             (
               cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
-              awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+              grep -vxF 'break_loops' "${work_dir}/build-list" | \
+                awk '{print $1 "." $2 "." $3}' | \
                 sed "
                   s|^|${work_dir}/package-infos/|
                   s|\$|\.builds|
@@ -45,7 +46,8 @@ case "${action}" in
             echo 'has unmet dependencies:'
             (
               cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
-              awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+              grep -vxF 'break_loops' "${work_dir}/build-list" | \
+                awk '{print $1 "." $2 "." $3}' | \
                 sed "
                   s|^|${work_dir}/package-infos/|
                   s|\$|\.builds|
@@ -95,7 +97,8 @@ case "${action}" in
       build_list_items_file="$(mktemp)"
       dependent_packages_file="$(mktemp)"
 
-      awk '{print $1 "." $2 "." $3 " " $4}' "${work_dir}/build-list" | \
+      grep -vxF 'break_loops' "${work_dir}/build-list" | \
+        awk '{print $1 "." $2 "." $3 " " $4}' | \
         sort -u > \
         "${build_list_items_file}"
 

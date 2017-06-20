@@ -48,9 +48,11 @@ if [ "$5" = 'ERROR' ]; then
     exit 0
   fi
 
-  mv \
-    "${work_dir}/package-states/$1.$2.$3.$4.locked" \
+  cat \
+    "${work_dir}/package-states/$1.$2.$3.$4.locked" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
+
+  rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # unlock every loop this package would have broken and which is not
   # broken by another locked package
@@ -73,6 +75,14 @@ if [ "$5" = 'ERROR' ]; then
         rm -f "${loop}.locked"
       fi
     done
+
+  # move build order to end of build list
+
+  sed -i \
+    "/^$(str_to_regex "$1 $2 $3 $4")\$/d" \
+    "${work_dir}/build-list"
+  echo "$1 $2 $3 $4" >> \
+    "${work_dir}/build-list"
 
   exit 0
 
@@ -152,8 +162,8 @@ repo-add "${destination}.db.tar.gz" ${packages}
 
 ${master_mirror_command} \
   "${destination}.db."* \
-  *".pkg.tar.xz" \
-  *".pkg.tar.xz.sig" \
+  ./*".pkg.tar.xz" \
+  ./*".pkg.tar.xz.sig" \
   "${master_mirror_directory}/i686/${destination}/"
 
 for package in ${packages}; do
@@ -175,10 +185,18 @@ grep -xF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   sed 'p;s|$|.locked|' | \
   xargs -rn1 rm -f
 
+if ! ls "${work_dir}/build-list.loops" | \
+  grep -q '^loop_[0-9]\+$'; then
+  # no loops left
+  sed -i '/^break_loops$/d' "${work_dir}/build-list"
+fi
+
 # remove package from build list
 sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 
 # remove package lock file
 printf '%s\n' ${packages} > \
   "${work_dir}/package-states/$1.$2.$3.$4.done"
-rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
+rm -f \
+  "${work_dir}/package-states/$1.$2.$3.$4.locked" \
+  "${work_dir}/package-states/$1.$2.$3.$4.broken"

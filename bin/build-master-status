@@ -88,9 +88,9 @@ stable="$(
     grep -c '\.pkg\.tar\.xz$'
   )"
 tasks="$(
-  wc -l < \
+  grep -c '^\S\+ \S\+ \S\+ \S\+$' \
     "${work_dir}/build-list"
-  )"
+  )" || true
 pending_packages="$(
   tr ' ' '.' < \
     "${work_dir}"/build-list | \

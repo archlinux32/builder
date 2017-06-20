@@ -17,16 +17,14 @@
 
 #  respect build-manually-list ("blocked")
 
-#  possibly hand out "broken" packages to different build slave
-
 . "${0%/*}/../conf/default.conf"
 
 mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
-  # locked, broken and blocked packages won't be handed out
-  if package_locked_broken_or_blocked "$1" "$2" "$3" "$4"; then
+  # locked and blocked packages won't be handed out
+  if package_locked_or_blocked "$1" "$2" "$3" "$4"; then
     return 0
   fi
 
@@ -34,6 +32,7 @@ hand_out_assignment() {
   # "locked" or "broken" (we keep only marker for older "done" packages)
   ls "${work_dir}/package-states" | \
     grep "^$(str_to_regex "${1}")\(\.[^.]\+\)\{3\}\.\(locked\|broken\)\$" | \
+    grep -v "^$(str_to_regex "$1.$2.$3.$4.")[^.]\+\$" | \
     sed "s|^|${work_dir}/package-states/|" | \
     xargs -rn1 rm -f
 
@@ -73,8 +72,12 @@ pending_packages=false
 
 while read -r package git_revision mod_git_revision repository; do
 
-  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ] ||
-    [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
+  if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
+    [ "${package}" = 'break_loops' ]; then
+    continue
+  fi
+
+  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
     continue
   fi
 
@@ -103,14 +106,25 @@ fi
 
 while read -r package git_revision mod_git_revision repository; do
 
-  if package_locked_broken_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+  if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
+    [ "${package}" = 'break_loops' ]; then
+    sed -i \
+      '/^break_loops$/d' \
+      "${work_dir}/build-list"
+    echo 'break_loops' >> \
+      "${work_dir}/build-list"
+    break
+  fi
+
+  if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
     continue
   fi
 
   [ -z "$(
     (
       cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
-      awk '{print $1 "." $2 "." $3}' "${work_dir}/build-list" | \
+      grep -vxF 'break_loops' "${work_dir}/build-list" | \
+        awk '{print $1 "." $2 "." $3}' | \
         sed "
           s|^|${work_dir}/package-infos/|
           s|\$|\.builds|
@@ -126,7 +140,7 @@ while read -r package git_revision mod_git_revision repository; do
 
 done < "${work_dir}/build-list"
 
-# Find package (of all packages which are not locked)
+# Find package (of all packages which are not locked and have been broken the least times)
 # which breaks the most unlocked loops
 
 locked_packages="$(
@@ -134,6 +148,10 @@ locked_packages="$(
     grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$' | \
     sed 's|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||'
 )"
+
+grep -vxF 'break_loops' "${work_dir}/build-list" | \
+  sort -k1,1 > \
+  "${work_dir}/build-list.sorted-by-package"
 
 for package in $(
   ls "${work_dir}/build-list.loops/" | \
@@ -152,12 +170,33 @@ for package in $(
     done | \
     sort | \
     uniq -c | \
-    sort -k1nr,1 | \
-    awk '{print $2}'
+    join -1 2 -2 1 -o 1.1,2.1,2.2,2.3,2.4 \
+      - \
+      "${work_dir}/build-list.sorted-by-package" | \
+    while read -r count package git_revision git_mod_revision repository; do
+      if [ -f "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken" ]; then
+        versuche="$(
+          wc -l < \
+            "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken"
+        )"
+      else
+        versuche='0'
+      fi
+      printf '%s %s %s.%s.%s.%s\n' \
+        "${versuche}" \
+        "${count}" \
+        "${package}" \
+        "${git_revision}" \
+        "${git_mod_revision}" \
+        "${repository}"
+    done | \
+    sort -k1n,1 -k2nr,2 | \
+    cut -d' ' -f3
 ); do
-  if assignment="$(grep "^$(str_to_regex "${package}") " "${work_dir}/build-list")"; then
-    hand_out_assignment ${assignment}
-  fi
+  hand_out_assignment $(
+    echo "${package}" | \
+      sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|'
+  )
 done
 
 # Remove the lock file
