@@ -18,6 +18,8 @@
 
 #  be (even?) more atomic
 
+#  separate locks for staging, testing (and stable)
+
 . "${0%/*}/../conf/default.conf"
 
 usage() {
@@ -310,7 +312,7 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
-tmp_dir="$(mktemp -d "${work_dir}/tmpdir.XXXXXX")"
+tmp_dir="$(mktemp -d)"
 
 clean_up_lock_file() {
   fusermount -u "${master_mirror_sshfs}"
