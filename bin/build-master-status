@@ -186,7 +186,7 @@ fi
 
 if [ -n "${broken_output}" ]; then
   if ${nice}; then
-    printf '<html>\n<body>\n<table>\n<tr><th>package</th><th>git revision</th><th>modification git revision</th><th>package repository</th></tr>\n' > \
+    printf '<html>\n<body>\n<table>\n<tr><th>package</th><th>git revision</th><th>modification git revision</th><th>package repository</th><th>compilations</th></tr>\n' > \
       "${broken_output}"
   else
     : > "${broken_output}"
@@ -195,7 +195,12 @@ if [ -n "${broken_output}" ]; then
     grep '\.broken$' | \
     sed 's|\.broken$||' | \
     if ${nice}; then
-      sed 's|^\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$|<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>|'
+      sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
+        while read -r sf pkg rev mod_rev repo; do
+          printf '<tr>'
+          printf '<td>%s</td>' "${pkg}" "${rev}" "${mod_rev}" "${repo}" "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
+          printf '</tr>\n'
+        done
     else
       cat
     fi >> \
