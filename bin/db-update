@@ -318,7 +318,7 @@ clean_up_lock_file() {
   rm -rf --one-file-system "${tmp_dir}"
 }
 
-if mountpoint "${master_mirror_sshfs}" &> /dev/null; then
+if mountpoint "${master_mirror_sshfs}" > /dev/null 2>&1; then
   fusermount -u "${master_mirror_sshfs}"
 fi
 mount "${master_mirror_sshfs}"
