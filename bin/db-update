@@ -149,6 +149,11 @@ move_package() {
     rm \
       "${work_dir}/package-states/${package}.${from_ending}"
   else
+    # remove old state files of $package with ending $to_ending
+    ls "${work_dir}/package-states" | \
+      grep "^$(str_to_regex "${package}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
+      sed "s|^|${work_dir}/package-states/|" | \
+      xargs -rn1 rm
     mv \
       "${work_dir}/package-states/${package}.${from_ending}" \
       "${work_dir}/package-states/${package}.${to_ending}"
