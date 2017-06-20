@@ -16,10 +16,7 @@
 #  correctly handle if multiple versions of a single package are marked
 #    as "done" or "testing"
 
-#  be more atomic
-
-#  do not download and afterwards upload packages which are just being
-#    moved
+#  be (even?) more atomic
 
 . "${0%/*}/../conf/default.conf"
 
@@ -37,129 +34,211 @@ usage() {
   [ -z "$1" ] && exit 1 || exit $1
 }
 
-# move_package $package $from_repository $to_repository
+# move_packages $package/$from_repository/$to_repository ...
 # the existence of a directory $tmp_dir is assumed
 
-move_package() {
+move_packages() {
 
   if [ -z "${tmp_dir}" ] || [ ! -d "${tmp_dir}" ]; then
-    >&2 echo 'move_package: No tmp_dir provided.'
+    >&2 echo 'move_packages: No tmp_dir provided.'
     exit 2
   fi
 
-  local package="$1"
-  local from_repo="$2"
-  local to_repo="$3"
+  local package
+  local from_repo
+  local to_repo
   local from_ending
   local to_ending
+  local repo
   local part
-
-  if echo "${from_repo}" | \
-    grep -q 'staging$' && \
-    echo "${to_repo}" | \
-      grep -q 'testing$'; then
-    from_ending='done'
-    to_ending='testing'
-  elif echo "${from_repo}" | \
-    grep -q 'testing$' && \
-    ! echo "${to_repo}" | \
-      grep -q 'testing$\|staging$'; then
-    from_ending='testing'
-    to_ending=''
-  else
-    >&2 printf 'move_package: Cannot move package from "%s" to "%s".\n' "${from_repo}" "${to_repo}"
-    exit 2
-  fi
-
-  if [ ! -f "${work_dir}/package-states/${package}.${from_ending}" ]; then
-    >&2 printf 'move_package: Cannot find package state file "%s"\n' "${package}.${from_ending}"
-    exit 2
-  fi
 
   rm -rf --one-file-system "${tmp_dir}/"*
 
-  cp \
-    "${work_dir}/package-states/${package}.${from_ending}" \
-    "${tmp_dir}/parts"
-  sed \
-    's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||' \
-    "${tmp_dir}/parts" > \
-    "${tmp_dir}/parts_names"
-  sed \
-    'p;s|$|.sig|' \
-    "${tmp_dir}/parts" > \
-    "${tmp_dir}/parts_and_signatures"
+  touch "${tmp_dir}/repos"
 
-  mkdir "${tmp_dir}/from"
-  mkdir "${tmp_dir}/to"
+  for package in $@; do
+    if [ -z "${package}" ]; then
+      continue
+    fi
 
-  ${master_mirror_command} \
-    --files-from="${tmp_dir}/parts_and_signatures" \
-    "${master_mirror_directory}/i686/${from_repo}/" \
-    "${tmp_dir}/from/"
+    to_repo="${package##*/}"
+    package="${package%/*}"
+    from_repo="${package##*/}"
+    package="${package%/*}"
 
-  ${master_mirror_command} \
-    "${master_mirror_directory}/i686/${from_repo}/${from_repo}.db."* \
-    "${tmp_dir}/from"
+    echo "${package}" >> \
+      "${tmp_dir}/packages"
 
-  ${master_mirror_command} \
-    "${master_mirror_directory}/i686/${to_repo}/${to_repo}.db."* \
-    "${tmp_dir}/to"
+    if echo "${from_repo}" | \
+      grep -q 'staging$' && \
+      echo "${to_repo}" | \
+        grep -q 'testing$'; then
+      from_ending='done'
+      to_ending='testing'
+    elif echo "${from_repo}" | \
+      grep -q 'testing$' && \
+      ! echo "${to_repo}" | \
+        grep -q 'testing$\|staging$'; then
+      from_ending='testing'
+      to_ending=''
+    else
+      >&2 printf 'move_packages: Cannot move package from "%s" to "%s".\n' "${from_repo}" "${to_repo}"
+      exit 2
+    fi
 
-  repo-remove \
-    "${tmp_dir}/from/${from_repo}.db.tar.gz" \
-    $(cat "${tmp_dir}/parts_names")
+    echo "${from_repo}" > \
+      "${tmp_dir}/${package}.from_repo"
+    echo "${to_repo}" > \
+      "${tmp_dir}/${package}.to_repo"
+    echo "${from_ending}" > \
+      "${tmp_dir}/${package}.from_ending"
+    echo "${to_ending}" > \
+      "${tmp_dir}/${package}.to_ending"
 
-  while read -r part; do
-    mv \
-      "${tmp_dir}/from/${part}" \
-      "${tmp_dir}/to/"
-  done < \
-    "${tmp_dir}/parts_and_signatures"
+    if [ ! -f "${work_dir}/package-states/${package}.${from_ending}" ]; then
+      >&2 printf 'move_packages: Cannot find package state file "%s"\n' "${package}.${from_ending}"
+      exit 2
+    fi
 
-  repo-add \
-    "${tmp_dir}/to/${to_repo}.db.tar.gz" \
-    $(
-      sed \
-        "s|^|${tmp_dir}/to/|" \
-        "${tmp_dir}/parts"
-    )
-
-  ${master_mirror_command} \
-    --files-from="${tmp_dir}/parts_and_signatures" \
-    "${tmp_dir}/to/" \
-    "${master_mirror_directory}/i686/${to_repo}/"
-
-  ${master_mirror_command} \
-    "${tmp_dir}/to/${to_repo}.db."* \
-    "${master_mirror_directory}/i686/${to_repo}/"
-
-  ${master_mirror_command} \
-    "${tmp_dir}/from/${from_repo}.db."* \
-    "${master_mirror_directory}/i686/${from_repo}/"
-
-  while read -r part; do
-    remove_old_package_versions "i686/${to_repo}" "${part}"
-    # the next line will remove _all_ versions of the package $part from $from_repo
-    remove_old_package_versions "i686/${from_repo}" "${part%.pkg.tar.xz}0.pkg.tar.xz"
-  done < \
-    "${tmp_dir}/parts"
-
-  if [ -z "${to_ending}" ]; then
-    rm \
-      "${work_dir}/package-states/${package}.${from_ending}"
-  else
-    # remove old state files of $package with ending $to_ending
-    ls "${work_dir}/package-states" | \
-      grep "^$(str_to_regex "${package}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
-      sed "s|^|${work_dir}/package-states/|" | \
-      xargs -rn1 rm
-    mv \
+    cp \
       "${work_dir}/package-states/${package}.${from_ending}" \
-      "${work_dir}/package-states/${package}.${to_ending}"
-  fi
+      "${tmp_dir}/${package}.parts"
 
-  updated_package_database=true
+    sed \
+      's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||' \
+      "${tmp_dir}/${package}.parts" > \
+      "${tmp_dir}/${package}.parts_names"
+
+    sed \
+      'p;s|$|.sig|' \
+      "${tmp_dir}/${package}.parts" > \
+      "${tmp_dir}/${package}.parts_and_signatures"
+
+    while read -r part; do
+      if [ ! -f "${master_mirror_sshfs}/i686/${from_repo}/${part}" ]; then
+        >&2 printf \
+          'move_packages: Cannot find file "%s", part of package "%s".\n' \
+          "${master_mirror_sshfs}/i686/${from_repo}/${part}" \
+          "${package}"
+        exit 2
+      fi
+    done < \
+      "${tmp_dir}/${package}.parts"
+
+    mkdir -p "${tmp_dir}/${from_repo}"
+    mkdir -p "${tmp_dir}/${to_repo}"
+
+    repos="$(
+      printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/repos") | \
+      sort -u
+    )"
+    echo "${repos}" > \
+      "${tmp_dir}/repos"
+
+  done
+
+  # receive the *.db.tar.gz's
+
+  while read -r repo; do
+
+    ${master_mirror_command} \
+      "${master_mirror_directory}/i686/${repo}/${repo}.db."* \
+      "${tmp_dir}/${repo}/"
+
+    # add and remove the packages locally
+
+    repo-remove \
+      "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+      $(
+        grep -xF "${repo}" "${tmp_dir}/"*".from_repo" | \
+          sed '
+            s|\.from_repo:[^:]\+$|.parts_names|
+          ' | \
+          xargs -rn1 cat
+      )
+
+    repo-add \
+      "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+      $(
+        grep -xF "${repo}" "${tmp_dir}/"*".to_repo" | \
+          sed '
+            s|\.to_repo:[^:]\+$||
+          ' | \
+          while read -r package; do
+            sed \
+              "s|^|${master_mirror_sshfs}/i686/$(cat "${package}.from_repo")/|" \
+              "${package}.parts"
+          done
+      )
+
+  done < "${tmp_dir}/repos"
+
+  # move the packages remotely via sshfs
+
+  while read -r package; do
+
+    if [ -z "${package}" ]; then
+      continue
+    fi
+
+    while read -r part; do
+      mv \
+        "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.from_repo")/${part}" \
+        "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.to_repo")/"
+    done < \
+      "${tmp_dir}/${package}.parts_and_signatures"
+
+  done < \
+    "${tmp_dir}/packages"
+
+  # and push our local *.db.tar.gz via rsync
+
+  while read -r repo; do
+
+    ${master_mirror_command} \
+      "${tmp_dir}/${repo}/${repo}.db."* \
+      "${master_mirror_directory}/i686/${repo}/"
+
+  done < \
+    "${tmp_dir}/repos"
+
+  while read -r package; do
+
+    # then we can safely remove old versions
+
+    while read -r part; do
+      remove_old_package_versions "i686/$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
+    done < \
+      "${tmp_dir}/${package}.parts"
+
+    # and update the state files
+
+    from_ending="$(
+      cat "${tmp_dir}/${package}.from_ending"
+    )"
+    to_ending="$(
+      cat "${tmp_dir}/${package}.to_ending"
+    )"
+
+    if [ -z "${to_ending}" ]; then
+      rm \
+        "${work_dir}/package-states/${package}.${from_ending}"
+    else
+      # remove old state files of $package with ending $to_ending
+      ls "${work_dir}/package-states" | \
+        grep "^$(str_to_regex "${package}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
+        sed "s|^|${work_dir}/package-states/|" | \
+        xargs -rn1 rm
+      mv \
+        "${work_dir}/package-states/${package}.${from_ending}" \
+       "${work_dir}/package-states/${package}.${to_ending}"
+    fi
+
+  done < \
+    "${tmp_dir}/packages"
+
+  date '+%s' > \
+    "${master_mirror_sshfs}/lastupdate"
 
   rm -rf --one-file-system "${tmp_dir}/"*
 
@@ -215,8 +294,6 @@ for package in ${packages_to_stabilize}; do
   fi
 done
 
-updated_package_database=false
-
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
@@ -234,9 +311,15 @@ fi
 tmp_dir="$(mktemp -d "${work_dir}/tmpdir.XXXXXX")"
 
 clean_up_lock_file() {
+  fusermount -u "${master_mirror_sshfs}"
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"
 }
+
+if mountpoint "${master_mirror_sshfs}" &> /dev/null; then
+  fusermount -u "${master_mirror_sshfs}"
+fi
+mount "${master_mirror_sshfs}"
 
 trap clean_up_lock_file EXIT
 
@@ -383,35 +466,43 @@ done_packages="$(
 
 unset keep_packages
 
-for package in ${done_packages}; do
-
-  if [ -z "${package}" ]; then
-    continue
-  fi
-
-  is_community="$(official_or_community "${package}")"
-
-  move_package "${package}" "${is_community}staging" "${is_community}testing"
-
-done
-
 # move packages in packages_to_stabilize from *testing/ to the stable repos
-for package in ${packages_to_stabilize}; do
 
-  if [ -z "${package}" ]; then
-    continue
-  fi
+move_packages $(
 
-  move_package "${package}" "$(official_or_community ${package})testing" "${package##*.}"
+  for package in ${packages_to_stabilize}; do
 
-done
+    if [ -z "${package}" ]; then
+      continue
+    fi
+
+    printf '%s/%s/%s\n' "${package}" "$(official_or_community ${package})testing" "$(repository_of_package "${package}")"
+
+  done
+
+)
+
+# move packages from *staging to *testing
+
+move_packages $(
+
+  for package in ${done_packages}; do
+
+    if [ -z "${package}" ]; then
+      continue
+    fi
+
+    is_community="$(official_or_community "${package}")"
+
+    printf '%s/%s/%s\n' "${package}" "${is_community}staging" "${is_community}testing"
+
+  done
+
+)
+
+# delete packages from deletion-list
 
 if [ -n "${delete_packages}" ]; then
   echo "there is something to delete:"
   echo "${delete_packages}"
-fi
-
-if ${updated_package_database}; then
-  date '+%s' > \
-    "${master_mirror_directory}/lastupdate"
 fi
