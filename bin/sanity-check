@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# do some basic sanity checks
+
+. "${0%/*}/../conf/default.conf"
+
+while [ $# -gt 0 ]; do
+
+  case "$1" in
+
+    mirror)
+
+      >&2 echo 'sanity-check: checking mirror ...'
+
+      repos='community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
+
+      errors="$(
+        (
+          printf '%s\n' ${repos}
+          ls_master_mirror 'i686'
+        ) | \
+          sort | \
+          uniq -u
+      )"
+      if [ -n "${errors}" ]; then
+        echo "The following repos are missing or obsolete on the mirror:"
+        echo "${errors}"
+        exit 1
+      fi
+
+      for repo in ${repos}; do
+
+        packages="$(
+          ls_master_mirror "i686/${repo}" | \
+            grep '\.pkg\.tar\.xz\(\.sig\)\?$'
+        )"
+
+        errors="$(
+          echo "${packages}" | \
+            sed 's|\.sig$||' | \
+            uniq -c | \
+            grep -v '^\s*2\s' | \
+            awk '{print $2}'
+        )"
+        if [ -n "${errors}" ]; then
+          echo "The following packages in ${repo} are missing a signature or vice versa:"
+          echo "${errors}"
+          exit 1
+        fi
+
+      done
+
+      >&2 echo '... passed.'
+
+    ;;
+
+    *)
+
+      >&2 printf 'sanity-check: unknown check "%s".' "$1"
+      exit 2
+
+    ;;
+
+  esac
+
+  shift
+
+done
