@@ -42,6 +42,13 @@ if [ "$5" = 'ERROR' ]; then
     exit 0
   fi
 
+  # save sent build logs
+  tar -x \
+    -C "${build_log_directory}" \
+    --wildcards \
+    --no-wildcards-match-slash \
+    '*.build-log.gz'
+
   cat \
     "${work_dir}/package-states/$1.$2.$3.$4.locked" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
@@ -114,7 +121,11 @@ cd "${tmp_dir}"
 trap clean_up_tmp_dir EXIT
 
 # extract package(s)
-tar -x
+tar -x \
+  --wildcards \
+  --no-wildcards-match-slash \
+  '*.pkg.tar.xz' \
+  '*.pkg.tar.xz.sig'
 
 # check if all packages are signed and all signatures belong to a package
 signature_errors="$(
