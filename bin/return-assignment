@@ -47,6 +47,7 @@ if [ "$5" = 'ERROR' ]; then
     -C "${build_log_directory}" \
     --wildcards \
     --no-wildcards-match-slash \
+    --transform="s|^|$1.$2.$3.$4.|" \
     '*.build-log.gz'
 
   cat \
