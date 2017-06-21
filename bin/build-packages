@@ -9,8 +9,6 @@
 #  use different build commands for different repositories - do we need
 #   this actually?
 
-#  send logs of failed builds
-
 #  handle if build fails due to "local issues" (e.g. unclean
 #   build environment, wrong mirror, ...)
 
@@ -190,8 +188,13 @@ while [ ${count} -ne 0 ]; do
 
         for parameters in '' '-c'; do
           rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
-          if staging-i686-build ${parameters} -- archlinux32-keyring; then
-          # build successful
+
+          if staging-i686-build ${parameters} -- archlinux32-keyring 2>&1 > \
+            "$(
+              date -u --iso-8601=seconds | \
+                cut -d+ -f1
+            ).build-log"; then
+            # build successful
             ls -1 *.pkg.tar.xz | \
               xargs -rn1 gpg --local-user="${package_key}" --detach-sign
             tar -cf 'package.tar' $(
@@ -244,11 +247,14 @@ while [ ${count} -ne 0 ]; do
       done
 
       if ! ${success}; then
+        tar -czf 'build-logs.tar.gz' \
+          *'.build-log'
         while ! ssh \
           -i "${master_build_server_identity}" \
           -p "${master_build_server_port}" \
           "${master_build_server_user}@${master_build_server}" \
-          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR'; do
+          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' < \
+          'build-logs.tar.gz'; do
           wait_some_time 15
         done
         if ${exit_after_failure}; then
