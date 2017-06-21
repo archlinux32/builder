@@ -8,16 +8,16 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- mirror
+  set -- repos package-database state-files
 fi
 
 while [ $# -gt 0 ]; do
 
   case "$1" in
 
-    mirror)
+    repos)
 
-      >&2 echo 'sanity-check: checking mirror ...'
+      >&2 printf 'sanity-check: checking repos on master mirror ...'
 
       repos='community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
@@ -30,14 +30,21 @@ while [ $# -gt 0 ]; do
           uniq -u
       )"
       if [ -n "${errors}" ]; then
+        echo
         echo "The following repos are missing or obsolete on the mirror:"
         echo "${errors}"
         exit 1
       fi
 
+      >&2 echo ' passed.'
+
+    ;;
+
+    package-database)
+
       for repo in ${repos}; do
 
-        >&2 printf '  checking "%s" ...\n' "${repo}"
+        >&2 printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}"
 
         packages="$(
           ls_master_mirror "i686/${repo}" | \
@@ -52,6 +59,7 @@ while [ $# -gt 0 ]; do
             awk '{print $2}'
         )"
         if [ -n "${errors}" ]; then
+          echo
           echo "The following packages in ${repo} are missing a signature or vice versa:"
           echo "${errors}"
           exit 1
@@ -75,6 +83,7 @@ while [ $# -gt 0 ]; do
             uniq -u
         )"
         if [ -n "${errors}" ]; then
+          echo
           echo "The following packages in ${repo} are missing from the database or vice versa:"
           echo "${errors}"
           exit 1
@@ -93,6 +102,7 @@ while [ $# -gt 0 ]; do
             uniq -u
         )"
         if [ -n "${errors}" ]; then
+          echo
           echo "The following packages in ${repo} are missing from the file-database or vice versa:"
           echo "${errors}"
           exit 1
@@ -100,11 +110,46 @@ while [ $# -gt 0 ]; do
 
         rm -rf --one-file-system "${tmp_dir}/"*
 
-        >&2 printf '  ... "%s" is ok.\n' "${repo}"
+        >&2 echo ' passed.'
 
       done
 
-      >&2 echo '... passed.'
+    ;;
+
+    state-files)
+
+      for status in 'staging:done' 'testing:testing'; do
+
+        >&2 printf 'checking state-files of "%s" ...' "${status%:*}"
+
+        errors="$(
+          (
+            ls "${work_dir}/package-states" | \
+              grep "\.${status#*:}\$" | \
+              sed "s|^|${work_dir}/package-states/|" | \
+              xargs -r cat
+            ls_master_mirror 'i686' | \
+              grep "${status%:*}\$" | \
+              while read -r repo; do
+                ls_master_mirror "i686/${repo}"
+              done | \
+              grep '\.pkg\.tar\.xz$'
+          ) | \
+            sort | \
+            uniq -c | \
+            grep -v '^\s*2\s' | \
+            awk '{print $2}'
+        )"
+        if [ -n "${errors}" ]; then
+          echo
+          echo "The following ${status%:*} packages do not have state files or vice versa:"
+          echo "${errors}"
+          exit 1
+        fi
+
+        >&2 echo ' passed.'
+
+      done
 
     ;;
 
