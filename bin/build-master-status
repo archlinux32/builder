@@ -79,11 +79,10 @@ if [ $# -ne 0 ]; then
 fi
 
 stable="$(
-  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
-    awk '{print $5}' | \
-    grep -v 'testing$\|staging$\|^\.$' | \
+  ls_master_mirror 'i686' | \
+    grep -v 'testing$\|staging$' | \
     while read -r dir; do
-      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+      ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
   )"
@@ -101,20 +100,18 @@ pending_packages="$(
     wc -l
 )"
 staging="$(
-  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
-    awk '{print $5}' | \
+  ls_master_mirror 'i686' | \
     grep 'staging$' | \
     while read -r dir; do
-      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+      ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
   )"
 testing="$(
-  ${master_mirror_command} "${master_mirror_directory}/i686/" | \
-    awk '{print $5}' | \
+  ls_master_mirror 'i686' | \
     grep 'testing$' | \
     while read -r dir; do
-      ${master_mirror_command} "${master_mirror_directory}/i686/${dir}/"
+      ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
   )"

@@ -308,6 +308,20 @@ official_or_community() {
   fi
 }
 
+# ls_master_mirror $path
+# list content of $path on the master mirror (via rsync)
+
+ls_master_mirror() {
+
+  local path="$1"
+
+  ${master_mirror_command} \
+    "${master_mirror_directory}/${path}/" | \
+    grep -v '\s\.$' | \
+    awk '{print $5}'
+
+}
+
 # remove_old_package_versions $directory $package_file
 # removes all other versions of $package_file in $directory on the master mirror
 
@@ -322,9 +336,7 @@ remove_old_package_versions() {
     --recursive \
     --delete \
     $( \
-      ${master_mirror_command} \
-        "${master_mirror_directory}/${directory}/" | \
-        awk '{print $5}' | \
+      ls_master_mirror "${directory}" | \
         grep "^$(str_to_regex "${pkgname}")\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
         grep -v "^$(str_to_regex "${package}")\(\.sig\)\?\$" | \
         sed 's|^|--include=|'
