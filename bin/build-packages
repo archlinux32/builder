@@ -247,14 +247,17 @@ while [ ${count} -ne 0 ]; do
       done
 
       if ! ${success}; then
-        tar -czf 'build-logs.tar.gz' \
-          *'.build-log'
+        for log in *.'.build-log'; do
+          gzip "${log}"
+        done
+        tar -cf 'build-logs.gz.tar' \
+          *'.build-log.gz'
         while ! ssh \
           -i "${master_build_server_identity}" \
           -p "${master_build_server_port}" \
           "${master_build_server_user}@${master_build_server}" \
           'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' < \
-          'build-logs.tar.gz'; do
+          'build-logs.gz.tar'; do
           wait_some_time 15
         done
         if ${exit_after_failure}; then
