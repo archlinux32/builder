@@ -4,6 +4,13 @@
 
 . "${0%/*}/../conf/default.conf"
 
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+if [ $# -eq 0 ]; then
+  set -- mirror
+fi
+
 while [ $# -gt 0 ]; do
 
   case "$1" in
@@ -30,10 +37,12 @@ while [ $# -gt 0 ]; do
 
       for repo in ${repos}; do
 
+        >&2 printf '  checking "%s" ...\n' "${repo}"
+
         packages="$(
           ls_master_mirror "i686/${repo}" | \
             grep '\.pkg\.tar\.xz\(\.sig\)\?$'
-        )"
+        )" || true
 
         errors="$(
           echo "${packages}" | \
@@ -47,6 +56,51 @@ while [ $# -gt 0 ]; do
           echo "${errors}"
           exit 1
         fi
+
+        ${master_mirror_command} \
+          "${master_mirror_directory}/i686/${repo}/${repo}.db.tar.gz" \
+          "${master_mirror_directory}/i686/${repo}/${repo}.files.tar.gz" \
+          "${tmp_dir}/"
+
+        errors="$(
+          (
+            tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
+              grep '/$' | \
+              sed 's|/$||'
+            echo "${packages}" | \
+              sed 's|-[^-]\+$||' | \
+              sort -u
+          ) | \
+            sort | \
+            uniq -u
+        )"
+        if [ -n "${errors}" ]; then
+          echo "The following packages in ${repo} are missing from the database or vice versa:"
+          echo "${errors}"
+          exit 1
+        fi
+
+        errors="$(
+          (
+            tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
+              grep '/$' | \
+              sed 's|/$||'
+            echo "${packages}" | \
+              sed 's|-[^-]\+$||' | \
+              sort -u
+          ) | \
+            sort | \
+            uniq -u
+        )"
+        if [ -n "${errors}" ]; then
+          echo "The following packages in ${repo} are missing from the file-database or vice versa:"
+          echo "${errors}"
+          exit 1
+        fi
+
+        rm -rf --one-file-system "${tmp_dir}/"*
+
+        >&2 printf '  ... "%s" is ok.\n' "${repo}"
 
       done
 
