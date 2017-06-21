@@ -189,11 +189,11 @@ while [ ${count} -ne 0 ]; do
         for parameters in '' '-c'; do
           rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
 
-          if staging-i686-build ${parameters} -- archlinux32-keyring 2>&1 > \
+          if staging-i686-build ${parameters} -- archlinux32-keyring > \
             "$(
               date -u --iso-8601=seconds | \
                 cut -d+ -f1
-            ).build-log"; then
+            ).build-log" 2>&1; then
             # build successful
             ls -1 *.pkg.tar.xz | \
               xargs -rn1 gpg --local-user="${package_key}" --detach-sign
