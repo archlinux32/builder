@@ -271,23 +271,26 @@ while [ ${count} -ne 0 ]; do
     ;;
 
     1)
+
       >&2 echo 'get-assignment told me:'
       >&2 echo ' come back (shortly) later - I was running already'
       wait_some_time 15
       continue
+
     ;;
 
-    #  2: come back later - there are still packages to be built,
-    #     but currently none has all its dependencies ready
     2)
+
       >&2 echo 'get-assignment told me:'
       >&2 echo ' 2: come back later - there are still packages to be built,'
       >&2 echo ' but currently none has all its dependencies ready'
       wait_some_time 60
       continue
+
     ;;
 
     3)
+
       >&2 echo 'get-assignment told me:'
       >&2 echo ' 3: come back after the next run of get-package-updates - currently'
       >&2 echo ' there are no pending packages'
@@ -295,11 +298,11 @@ while [ ${count} -ne 0 ]; do
 
     ;;
 
-    #  4: come back, when you've done your work - you hit the limit on
-    #     maximum allowed parallel jobs per ip
     4)
 
-      >&2 echo 'ERROR: There are too many parallel builds running on this machine.'
+      >&2 echo 'get-assignment told me:'
+      >&2 echo " come back, when you've done your work - you hit the limit on"
+      >&2 echo ' maximum allowed parallel jobs per ip'
       exit 1
 
     ;;
