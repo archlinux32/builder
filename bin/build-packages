@@ -217,7 +217,7 @@ while [ ${count} -ne 0 ]; do
                   break
                 ;;
                 1)
-                  # 'return-assignment' was running already
+                  >&2 echo '"return-assignment" was running already.'
                   wait_some_time 15
                 ;;
                 2)
@@ -270,8 +270,9 @@ while [ ${count} -ne 0 ]; do
 
     ;;
 
-    #  1: come back (shortly) later - I was running already
     1)
+      >&2 echo 'get-assignment told me:'
+      >&2 echo ' come back (shortly) later - I was running already'
       wait_some_time 15
       continue
     ;;
@@ -279,15 +280,17 @@ while [ ${count} -ne 0 ]; do
     #  2: come back later - there are still packages to be built,
     #     but currently none has all its dependencies ready
     2)
+      >&2 echo 'get-assignment told me:'
+      >&2 echo ' 2: come back later - there are still packages to be built,'
+      >&2 echo ' but currently none has all its dependencies ready'
       wait_some_time 60
       continue
     ;;
 
-    #  3: come back after the next run of get-package-updates - currently
-    #     there are no pending packages
     3)
-
-      >&2 echo 'Done. No more packages left to build.'
+      >&2 echo 'get-assignment told me:'
+      >&2 echo ' 3: come back after the next run of get-package-updates - currently'
+      >&2 echo ' there are no pending packages'
       exit 0
 
     ;;
