@@ -290,6 +290,11 @@ done
 
 packages_to_stabilize=${packages_to_stabilize} ${@}
 
+if ! ${base_dir}/bin/sanity-check -r; then
+  >&2 echo 'Build master is not sane.'
+  exit 1
+fi
+
 for package in ${packages_to_stabilize}; do
   # some sanity checks
   if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then

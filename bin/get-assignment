@@ -50,6 +50,11 @@ hand_out_assignment() {
 
 }
 
+if ! ${base_dir}/bin/sanity-check -r; then
+  >&2 echo 'Build master is not sane.'
+  exit 1
+fi
+
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
