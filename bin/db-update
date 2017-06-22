@@ -139,7 +139,7 @@ move_packages() {
 
   done
 
-  # receive the *.db.tar.gz's
+  # receive the *.db.tar.gz's and *.files.tar.gz's
 
   while read -r repo; do
 
