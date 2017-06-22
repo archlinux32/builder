@@ -72,7 +72,7 @@ if [ $# -ne 0 ]; then
   usage
 fi
 
-if ! ${base_dir}/bin/sanity-check -r; then
+if ! "${base_dir}/bin/sanity-check" -r; then
   >&2 echo 'Build master is not sane.'
   exit 1
 fi
