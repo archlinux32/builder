@@ -33,6 +33,7 @@ usage() {
   >&2 echo '  -f|--from $file:  Read packages to move from testing to'
   >&2 echo '                    stable from $file (- is stdin).'
   >&2 echo '  -h|--help:        Show this help and exit.'
+  >&2 echo '  -n|--no-action:   Only print what would be moved.'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
@@ -57,6 +58,7 @@ move_packages() {
   rm -rf --one-file-system "${tmp_dir}/"*
 
   touch "${tmp_dir}/repos"
+  touch "${tmp_dir}/packages"
 
   for package in $@; do
     if [ -z "${package}" ]; then
@@ -67,6 +69,15 @@ move_packages() {
     package="${package%/*}"
     from_repo="${package##*/}"
     package="${package%/*}"
+
+    if ${no_action}; then
+      printf \
+        'move "%s" from "%s" to "%s"\n' \
+        "${package}" \
+        "${from_repo}" \
+        "${to_repo}"
+      continue
+    fi
 
     echo "${package}" >> \
       "${tmp_dir}/packages"
@@ -138,6 +149,10 @@ move_packages() {
       "${tmp_dir}/repos"
 
   done
+
+  if ${no_action}; then
+    return 0
+  fi
 
   # receive the *.db.tar.gz's and *.files.tar.gz's
 
@@ -249,15 +264,17 @@ move_packages() {
 }
 
 eval set -- "$(
-  getopt -o bf:h \
+  getopt -o bf:hn \
     --long block \
     --long from: \
     --long help \
+    --long no-action \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 block_flag='-n'
+no_action=false
 
 while true
 do
@@ -275,6 +292,9 @@ do
     ;;
     -h|--help)
       usage 0
+    ;;
+    -n|--no-action)
+      no_action=true
     ;;
     --)
       shift
