@@ -333,7 +333,7 @@ if [ -s "${work_dir}/tsort.error" ]; then
     done
 
   # add order to break loops to build list
-  echo 'break_loops' >>
+  echo 'break_loops' >> \
     "${work_dir}/build-list.new.new"
 
 else
