@@ -54,11 +54,19 @@ move_packages() {
   local to_ending
   local repo
   local part
+  local dummynator
+  local file
 
   rm -rf --one-file-system "${tmp_dir}/"*
 
   touch "${tmp_dir}/repos"
   touch "${tmp_dir}/packages"
+
+  if ${no_action}; then
+    dummynator='echo'
+  else
+    dummynator=''
+  fi
 
   for package in $@; do
     if [ -z "${package}" ]; then
@@ -76,7 +84,6 @@ move_packages() {
         "${package}" \
         "${from_repo}" \
         "${to_repo}"
-      continue
     fi
 
     echo "${package}" >> \
@@ -151,7 +158,18 @@ move_packages() {
   done
 
   if ${no_action}; then
-    return 0
+    find "${tmp_dir}" -type f | \
+      while read -r file; do
+        if [ "${file%.pkg.tar.xz}.pkg.tar.xz" = "${file}" ] ||
+          [ "${file%.pkg.tar.xz.sig}.pkg.tar.xz.sig" = "${file}" ]; then
+          echo "'${file}'"
+        else
+          echo "${file}:"
+          cat "${file}" | \
+            sed 's|^|<<|;s|$|>>|'
+        fi
+        echo
+      done
   fi
 
   # receive the *.db.tar.gz's and *.files.tar.gz's
@@ -165,31 +183,39 @@ move_packages() {
 
     # add and remove the packages locally
 
-    repo-remove \
-      "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
-      $(
-        grep -xF "${repo}" "${tmp_dir}/"*".from_repo" | \
-          sed '
-            s|\.from_repo:[^:]\+$|.parts_names|
-          ' | \
-          xargs -rn1 cat
-      )
+    if grep -qxF "${repo}" "${tmp_dir}/"*".from_repo"; then
+      ${dummynator} repo-remove -q \
+        "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+        $(
+          grep -xF "${repo}" "${tmp_dir}/"*".from_repo" | \
+            sed '
+              s|\.from_repo:[^:]\+$|.parts_names|
+            ' | \
+            xargs -rn1 cat
+        )
+    fi
 
-    repo-add \
-      "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
-      $(
-        grep -xF "${repo}" "${tmp_dir}/"*".to_repo" | \
-          sed '
-            s|\.to_repo:[^:]\+$||
-          ' | \
-          while read -r package; do
-            sed \
-              "s|^|${master_mirror_sshfs}/i686/$(cat "${package}.from_repo")/|" \
-              "${package}.parts"
-          done
-      )
+    if grep -qxF "${repo}" "${tmp_dir}/"*".to_repo"; then
+      ${dummynator} repo-add -q \
+        "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+        $(
+          grep -xF "${repo}" "${tmp_dir}/"*".to_repo" | \
+            sed '
+              s|\.to_repo:[^:]\+$||
+            ' | \
+            while read -r package; do
+              sed \
+                "s|^|${master_mirror_sshfs}/i686/$(cat "${package}.from_repo")/|" \
+                "${package}.parts"
+            done
+        )
+    fi
 
   done < "${tmp_dir}/repos"
+
+  if ${no_action}; then
+    find "${tmp_dir}" -type f
+  fi
 
   # move the packages remotely via sshfs
 
@@ -200,7 +226,7 @@ move_packages() {
     fi
 
     while read -r part; do
-      mv \
+      ${dummynator} mv \
         "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.from_repo")/${part}" \
         "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.to_repo")/"
     done < \
@@ -213,7 +239,7 @@ move_packages() {
 
   while read -r repo; do
 
-    ${master_mirror_command} \
+    ${dummynator} ${master_mirror_command} \
       "${tmp_dir}/${repo}/${repo}.db."* \
       "${tmp_dir}/${repo}/${repo}.files."* \
       "${master_mirror_directory}/i686/${repo}/"
@@ -226,7 +252,7 @@ move_packages() {
     # then we can safely remove old versions
 
     while read -r part; do
-      remove_old_package_versions "i686/$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
+      ${dummynator} remove_old_package_versions "i686/$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
     done < \
       "${tmp_dir}/${package}.parts"
 
@@ -240,15 +266,15 @@ move_packages() {
     )"
 
     if [ -z "${to_ending}" ]; then
-      rm \
+      ${dummynator} rm \
         "${work_dir}/package-states/${package}.${from_ending}"
     else
       # remove old state files of $package with ending $to_ending
       ls "${work_dir}/package-states" | \
         grep "^$(str_to_regex "${package}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
         sed "s|^|${work_dir}/package-states/|" | \
-        xargs -rn1 rm
-      mv \
+        xargs -rn1 ${dummynator} rm
+      ${dummynator} mv \
         "${work_dir}/package-states/${package}.${from_ending}" \
        "${work_dir}/package-states/${package}.${to_ending}"
     fi
@@ -256,8 +282,10 @@ move_packages() {
   done < \
     "${tmp_dir}/packages"
 
-  date '+%s' > \
-    "${master_mirror_sshfs}/lastupdate"
+  if ! ${no_action}; then
+    date '+%s' > \
+      "${master_mirror_sshfs}/lastupdate"
+  fi
 
   rm -rf --one-file-system "${tmp_dir}/"*
 
@@ -340,6 +368,7 @@ fi
 tmp_dir="$(mktemp -d)"
 
 clean_up_lock_file() {
+  echo sudo /usr/bin/umount "${master_mirror_sshfs}"
   sudo /usr/bin/umount "${master_mirror_sshfs}"
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"
@@ -535,3 +564,5 @@ if [ -n "${delete_packages}" ]; then
   echo "there is something to delete:"
   echo "${delete_packages}"
 fi
+
+clean_up_lock_file
