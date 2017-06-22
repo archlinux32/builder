@@ -184,12 +184,13 @@ move_packages() {
     # add and remove the packages locally
 
     if grep -qxF "${repo}" "${tmp_dir}/"*".from_repo"; then
+
       ${dummynator} repo-remove -q \
         "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
         $(
-          grep -xF "${repo}" "${tmp_dir}/"*".from_repo" | \
+          grep -lxF "${repo}" "${tmp_dir}/"*".from_repo" | \
             sed '
-              s|\.from_repo:[^:]\+$|.parts_names|
+              s|\.from_repo$|.parts_names|
             ' | \
             xargs -rn1 cat
         )
@@ -199,9 +200,9 @@ move_packages() {
       ${dummynator} repo-add -q \
         "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
         $(
-          grep -xF "${repo}" "${tmp_dir}/"*".to_repo" | \
+          grep -lxF "${repo}" "${tmp_dir}/"*".to_repo" | \
             sed '
-              s|\.to_repo:[^:]\+$||
+              s|\.to_repo$||
             ' | \
             while read -r package; do
               sed \

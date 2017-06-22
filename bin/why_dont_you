@@ -58,10 +58,11 @@ case "${action}" in
               sort | \
               uniq -d | \
               while read -r dep; do
-                grep -Fx "${dep}" "${work_dir}/package-infos/"*".builds" | \
-                  cut -d: -f1 | \
-                  xargs -rn1 basename | \
-                  cut -d. -f1
+                grep -lxF "${dep}" "${work_dir}/package-infos/"*".builds" | \
+                  sed '
+                    s|^.*/||
+                    s|\(\.[^.]\+\)\{3\}||
+                  '
               done | \
               sort -u
 
@@ -86,8 +87,7 @@ case "${action}" in
       fi
 
       dependent_packages="$(
-        grep -xF "${pkg}" "${work_dir}/package-infos/"*".depends" | \
-          cut -d: -f1 | \
+        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".depends" | \
           sed '
             s|^.*/||
             s|\.depends$||

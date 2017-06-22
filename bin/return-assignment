@@ -68,8 +68,7 @@ if [ "$5" = 'ERROR' ]; then
       grep '\.locked$' | \
       sed 's@^.*/\([^/]\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
   )"
-  grep -xF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
-    cut -d: -f1 | \
+  grep -lxF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
     while read -r loop; do
       if [ -z "$(
           (
@@ -206,8 +205,7 @@ ls "${work_dir}/package-states" | \
   xargs -rn1 rm -f
 
 # remove all loops which are broken by this package
-grep -xF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
-  cut -d: -f1 | \
+grep -lxF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   sed 'p;s|$|.locked|' | \
   xargs -rn1 rm -f
 

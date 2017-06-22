@@ -40,8 +40,7 @@ hand_out_assignment() {
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
-  grep -xF "${1}" "${work_dir}/build-list.loops/"loop_* | \
-    cut -d: -f1 | \
+  grep -lxF "${1}" "${work_dir}/build-list.loops/"loop_* | \
     tee -a "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
     sed 's|$|.locked|' | \
     xargs -rn1 touch
