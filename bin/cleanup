@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# clean up unnecessary data
+
+. "${0%/*}/../conf/default.conf"
+
+if ! "${base_dir}/bin/sanity-check" -r; then
+  >&2 echo 'Build master is not sane.'
+  exit 1
+fi
+
+(
+  ls '/srv/http/build-logs' | \
+    sed 's|\.[^.]\+\.build-log\.gz$||' | \
+    sort -u
+  ls "${work_dir}/package-states" | \
+    grep '\.broken$\|\.locked$' | \
+    sed '
+      s|\.[^.]\+$||
+      p
+    '
+) | \
+  sort | \
+  uniq -u | \
+  while read -r s t; do
+    rm -f "/srv/http/build-logs/${s}."*
+  done
