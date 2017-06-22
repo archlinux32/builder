@@ -4,6 +4,52 @@
 
 . "${0%/*}/../conf/default.conf"
 
+usage() {
+  >&2 echo ''
+  >&2 echo 'sanity-check [options] [checks]: check sanity of build master'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:             Show this help and exit.'
+  >&2 echo '  -q|--quiet:            Only print errors found.'
+  >&2 echo '  -r|--really-quiet:     Do not print anything.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
+
+eval set -- "$(
+  getopt -o hqr \
+    --long help \
+    --long quiet \
+    --long really-quiet \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+silence=0
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -q|--quiet)
+      silence=1
+    ;;
+    -r|--really-quiet)
+      silence=2
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
@@ -17,7 +63,8 @@ while [ $# -gt 0 ]; do
 
     repos)
 
-      >&2 printf 'sanity-check: checking repos on master mirror ...'
+      [ ${silence} -gt 0 ] || \
+        >&2 printf 'sanity-check: checking repos on master mirror ...'
 
       repos='community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
@@ -30,13 +77,16 @@ while [ $# -gt 0 ]; do
           uniq -u
       )"
       if [ -n "${errors}" ]; then
-        echo
-        echo "The following repos are missing or obsolete on the mirror:"
-        echo "${errors}"
+        if [ ${silence} -le 1 ]; then
+          echo
+          echo "The following repos are missing or obsolete on the mirror:"
+          echo "${errors}"
+        fi
         exit 1
       fi
 
-      >&2 echo ' passed.'
+      [ ${silence} -gt 0 ] || \
+        >&2 echo ' passed.'
 
     ;;
 
@@ -44,7 +94,8 @@ while [ $# -gt 0 ]; do
 
       for repo in ${repos}; do
 
-        >&2 printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}"
+        [ ${silence} -gt 0 ] || \
+          >&2 printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}"
 
         packages="$(
           ls_master_mirror "i686/${repo}" | \
@@ -59,9 +110,11 @@ while [ $# -gt 0 ]; do
             awk '{print $2}'
         )"
         if [ -n "${errors}" ]; then
-          echo
-          echo "The following packages in ${repo} are missing a signature or vice versa:"
-          echo "${errors}"
+          if [ ${silence} -le 1 ]; then
+            echo
+            echo "The following packages in ${repo} are missing a signature or vice versa:"
+            echo "${errors}"
+          fi
           exit 1
         fi
 
@@ -83,9 +136,11 @@ while [ $# -gt 0 ]; do
             uniq -u
         )"
         if [ -n "${errors}" ]; then
-          echo
-          echo "The following packages in ${repo} are missing from the database or vice versa:"
-          echo "${errors}"
+          if [ ${silence} -le 1 ]; then
+            echo
+            echo "The following packages in ${repo} are missing from the database or vice versa:"
+            echo "${errors}"
+          fi
           exit 1
         fi
 
@@ -102,15 +157,18 @@ while [ $# -gt 0 ]; do
             uniq -u
         )"
         if [ -n "${errors}" ]; then
-          echo
-          echo "The following packages in ${repo} are missing from the file-database or vice versa:"
-          echo "${errors}"
+          if [ ${silence} -le 1 ]; then
+            echo
+            echo "The following packages in ${repo} are missing from the file-database or vice versa:"
+            echo "${errors}"
+          fi
           exit 1
         fi
 
         rm -rf --one-file-system "${tmp_dir}/"*
 
-        >&2 echo ' passed.'
+        [ ${silence} -gt 0 ] || \
+          >&2 echo ' passed.'
 
       done
 
@@ -120,7 +178,8 @@ while [ $# -gt 0 ]; do
 
       for status in 'staging:done' 'testing:testing'; do
 
-        >&2 printf 'checking state-files of "%s" ...' "${status%:*}"
+        [ ${silence} -gt 0 ] || \
+          >&2 printf 'checking state-files of "%s" ...' "${status%:*}"
 
         errors="$(
           (
@@ -141,13 +200,16 @@ while [ $# -gt 0 ]; do
             awk '{print $2}'
         )"
         if [ -n "${errors}" ]; then
-          echo
-          echo "The following ${status%:*} packages do not have state files or vice versa:"
-          echo "${errors}"
+          if [ ${silence} -le 1 ]; then
+            echo
+            echo "The following ${status%:*} packages do not have state files or vice versa:"
+            echo "${errors}"
+          fi
           exit 1
         fi
 
-        >&2 echo ' passed.'
+        [ ${silence} -gt 0 ] || \
+          >&2 echo ' passed.'
 
       done
 
@@ -155,7 +217,8 @@ while [ $# -gt 0 ]; do
 
     *)
 
-      >&2 printf 'sanity-check: unknown check "%s".' "$1"
+      [ ${silence} -gt 1 ] || \
+        >&2 printf 'sanity-check: unknown check "%s".' "$1"
       exit 2
 
     ;;
