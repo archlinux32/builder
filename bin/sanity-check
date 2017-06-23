@@ -54,12 +54,49 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- repos package-database state-files
+  set -- build-list repos package-database state-files
 fi
 
 while [ $# -gt 0 ]; do
 
   case "$1" in
+
+    build-list)
+
+      [ ${silence} -gt 0 ] || \
+        >&2 printf 'sanity-check: checking build-list ...'
+
+      errors="$(
+        grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$\|^break_loops$' "${work_dir}/build-list"
+      )" || true
+      if [ -n "${errors}" ]; then
+        if [ ${silence} -le 1 ]; then
+          echo
+          echo "The following build orders are wrongly formatted:"
+          echo "${errors}"
+        fi
+        exit 1
+      fi
+
+      errors="$(
+        grep -vxF 'break_loops' "${work_dir}/build-list" | \
+          awk '{print $1}' | \
+          sort | \
+          uniq -d
+      )"
+      if [ -n "${errors}" ]; then
+        if [ ${silence} -le 1 ]; then
+          echo
+          echo "The following packages have duplicate build orders:"
+          echo "${errors}"
+        fi
+        exit 1
+      fi
+
+      [ ${silence} -gt 0 ] || \
+        >&2 echo ' passed.'
+
+    ;;
 
     repos)
 
@@ -218,7 +255,7 @@ while [ $# -gt 0 ]; do
     *)
 
       [ ${silence} -gt 1 ] || \
-        >&2 printf 'sanity-check: unknown check "%s".' "$1"
+        >&2 printf 'sanity-check: unknown check "%s".\n' "$1"
       exit 2
 
     ;;
