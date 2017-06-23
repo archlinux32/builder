@@ -194,14 +194,35 @@ generate_package_metadata() {
     exit 1
   fi
 
+  overlays_dir="$(mktemp -d)"
+
+  sudo mount -t tmpfs none "${overlays_dir}"
+
+  mkdir \
+    "${overlays_dir}/upper" \
+    "${overlays_dir}/work" \
+    "${overlays_dir}/merged"
+
+  sudo mount -t overlay overlay -o lowerdir="${PKGBUILD%/*}":"/",upperdir="${overlays_dir}/upper",workdir="${overlays_dir}/work" "${overlays_dir}/merged"
+
   (
-    cd "${PKGBUILD%/*}"
+    cd "${overlays_dir}/merged"
     apply_package_customizations
-    grep -q '\$CARCH' 'PKGBUILD' && \
-      CARCH=i686 makepkg --printsrcinfo > \
-        "${file_prefix}.SRCINFO" || \
-      mksrcinfo -o "${file_prefix}.SRCINFO"
   )
+
+  sudo systemd-nspawn -q \
+    -D "${overlays_dir}/merged" \
+    --register=no \
+    ${base_dir}/bin/mksrcinfo
+
+  sudo umount -f "${overlays_dir}/merged"
+
+  mv \
+    "${overlays_dir}/upper/.SRCINFO" \
+    "${file_prefix}.SRCINFO"
+
+  sudo umount -f "${overlays_dir}"
+  rmdir "${overlays_dir}"
 
   # otherwise this just calls for trouble
   sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
