@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# generate .SRCINFO from PKGBUILD
+#  bleh - this should really be handled by makepkg!
+
+# TODO:
+
+#  maybe source PKGBUILD instead of 'makepkg --printsrcinfo' and
+#   'mksrcinfo'?
+
 grep -q '\$CARCH' 'PKGBUILD' && \
   CARCH=i686 makepkg --printsrcinfo > \
     '.SRCINFO' || \
