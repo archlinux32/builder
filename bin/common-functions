@@ -9,24 +9,27 @@
 
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
 
-# find_pkgbuild repository package
+# find_pkgbuild package repository
 # find the PKGBUILD of $package from $repository
 
 find_pkgbuild() {
+
+  local package="$1"
+  local repository="$2"
 
   local PKGBUILD=''
   local repo
   local file
   local package_path
 
-  if [ -f "${repo_paths__archlinux32}/$2/$1/PKGBUILD" ]; then
+  if [ -f "${repo_paths__archlinux32}/${repository}/${package}/PKGBUILD" ]; then
     # If this package has some modification,
-    repo="$(find_git_repository_to_package_repository "$2")"
-    eval package_path="$(printf '$repo_paths__%s' "${repo}")/$1"
+    repo="$(find_git_repository_to_package_repository "${repository}")"
+    eval package_path="$(printf '$repo_paths__%s' "${repo}")/${package}"
     if ! [ -d "${package_path}" ]; then
       # create some dummy files if it is also new.
-      mkdir -p "${package_path}/repos/$2-x86_64"
-      touch "${package_path}/repos/$2-x86_64/PKGBUILD"
+      mkdir -p "${package_path}/repos/${repository}-x86_64"
+      touch "${package_path}/repos/${repository}-x86_64/PKGBUILD"
     fi
   fi
 
@@ -35,12 +38,12 @@ find_pkgbuild() {
       # this is not a repository of packages
       continue
     fi
-    eval package_path="$(printf '$repo_paths__%s' "${repo}")/$1"
+    eval package_path="$(printf '$repo_paths__%s' "${repo}")/${package}"
     if ! [ -d "${package_path}" ]; then
       continue
     fi
     PKGBUILD="$(
-      ls "${package_path}/repos/$2-"*"/PKGBUILD" 2> /dev/null | \
+      ls "${package_path}/repos/${repository}-"*"/PKGBUILD" 2> /dev/null | \
         tr ' ' '\n' | \
         grep -v -- '-i686/PKGBUILD$' | \
         grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
