@@ -1,3 +1,6 @@
 #!/bin/sh
 
-mksrcinfo -o .SRCINFO
+grep -q '\$CARCH' 'PKGBUILD' && \
+  CARCH=i686 makepkg --printsrcinfo > \
+    '.SRCINFO' || \
+  mksrcinfo -o .SRCINFO
