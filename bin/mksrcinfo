@@ -3,12 +3,18 @@
 # generate .SRCINFO from PKGBUILD
 #  bleh - this should really be handled by makepkg!
 
-# TODO:
+(
+  . ./PKGBUILD
 
-#  maybe source PKGBUILD instead of 'makepkg --printsrcinfo' and
-#   'mksrcinfo'?
-
-grep -q '\$CARCH' 'PKGBUILD' && \
-  CARCH=i686 makepkg --printsrcinfo > \
-    '.SRCINFO' || \
-  mksrcinfo -o .SRCINFO
+  if [ -z "${pkgbase}" ]; then
+    printf 'pkgbase = %s\n' "${pkgname}"
+  else
+    printf 'pkgbase = %s\n' "${pkgbase}"
+  fi
+  printf '\tarch = %s\n' "${arch[@]}"
+  printf '\tmakedepends = %s\n' "${makedepends[@]}"
+  printf '\tcheckdepends = %s\n' "${checkdepends[@]}"
+  printf '\tdepends = %s\n' "${depends[@]}"
+  printf '\tprovides = %s\n' "${provides[@]}"
+  printf 'pkgname = %s\n' "${pkgname[@]}"
+) > .SRCINFO
