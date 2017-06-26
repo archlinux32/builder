@@ -215,13 +215,13 @@ generate_package_metadata() {
     --register=no \
     ${base_dir}/bin/mksrcinfo
 
-  sudo umount -f "${overlays_dir}/merged"
+  sudo umount -l "${overlays_dir}/merged"
 
   mv \
     "${overlays_dir}/upper/.SRCINFO" \
     "${file_prefix}.SRCINFO"
 
-  sudo umount -f "${overlays_dir}"
+  sudo umount -l "${overlays_dir}"
   rmdir "${overlays_dir}"
 
   # otherwise this just calls for trouble
