@@ -43,7 +43,7 @@ find_pkgbuild() {
       ls "${package_path}/repos/${repository}-"*"/PKGBUILD" 2> /dev/null | \
         tr ' ' '\n' | \
         grep -v -- '-i686/PKGBUILD$' | \
-        grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+        grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
         sort | \
         tail -n1
     )"
@@ -387,7 +387,7 @@ make_source_info() {
       tar -t 2> /dev/null | \
       grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
       grep -v -- '-i686/PKGBUILD$' | \
-      grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+      grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
       sort | \
       tail -n1
   )"
