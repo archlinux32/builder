@@ -184,45 +184,10 @@ generate_package_metadata() {
     return 0
   fi
 
-  eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}"
-  eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${mod_git_revision}")")" checkout "${mod_git_revision}"
-
-  PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
-
-  if [ ! -r "${PKGBUILD}" ]; then
-    echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
+  if ! make_source_info "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${file_prefix}.SRCINFO"; then
+    echo "make_source_info failed."
     exit 1
   fi
-
-  overlays_dir="$(mktemp -d)"
-
-  sudo mount -t tmpfs none "${overlays_dir}"
-
-  mkdir \
-    "${overlays_dir}/upper" \
-    "${overlays_dir}/work" \
-    "${overlays_dir}/merged"
-
-  sudo mount -t overlay overlay -o lowerdir="${PKGBUILD%/*}":"/",upperdir="${overlays_dir}/upper",workdir="${overlays_dir}/work" "${overlays_dir}/merged"
-
-  (
-    cd "${overlays_dir}/merged"
-    apply_package_customizations
-  )
-
-  sudo systemd-nspawn -q \
-    -D "${overlays_dir}/merged" \
-    --register=no \
-    ${base_dir}/bin/mksrcinfo
-
-  sudo umount -l "${overlays_dir}/merged"
-
-  mv \
-    "${overlays_dir}/upper/.SRCINFO" \
-    "${file_prefix}.SRCINFO"
-
-  sudo umount -l "${overlays_dir}"
-  rmdir "${overlays_dir}"
 
   # otherwise this just calls for trouble
   sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
@@ -395,4 +360,105 @@ wait_some_time() {
 str_to_regex() {
   echo "$1" | \
     sed 's|\.|\\.|g'
+}
+
+# make_source_info $package $repository $git_revision $mod_git_revision $output
+# create .SRCINFO from PKGBUILD within git repositories, output to $output
+
+make_source_info() {
+
+  local package="$1"
+  local repository="$2"
+  local git_revision="$3"
+  local mod_git_revision="$4"
+  local output="$5"
+
+  local git_repo="$(find_repository_with_commit "${git_revision}")"
+  local PKGBUILD
+  local PKGBUILD_mod
+  local content
+
+  if [ -z "${git_repo}" ]; then
+    return 1
+  fi
+
+  PKGBUILD="$(
+    eval git -C "$(printf '$repo_paths__%s' "${git_repo}")" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
+      tar -t 2> /dev/null | \
+      grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
+      grep -v -- '-i686/PKGBUILD$' | \
+      grep -v -- '-\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+      sort | \
+      tail -n1
+  )"
+
+  PKGBUILD_mod="$(
+    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" 2> /dev/null | \
+      tar -t "${repository}/${package}/PKGBUILD" 2> /dev/null
+  )" || true
+
+  if [ -z "${PKGBUILD}" ] && \
+    [ -z "${PKGBUILD_mod}" ]; then
+    >&2 printf 'Neither PKGBUILD nor modification of PKGBUILD found for package %s from %s, revisions %s and %s.\n' \
+      "${package}" \
+      "${repository}" \
+      "${git_revision}" \
+      "${mod_git_revision}"
+    return 1
+  fi
+
+  if [ -n "${PKGBUILD}" ]; then
+    content="$(
+      eval git -C "$(printf '$repo_paths__%s' "${git_repo}")" archive "${git_revision}" -- "${PKGBUILD}" | \
+        tar -Ox
+    )"
+  else
+    unset content
+  fi
+
+  if [ -n "${PKGBUILD_mod}" ]; then
+    content="$(
+      printf '%s\n' \
+        "${content}" \
+        "$(
+          git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
+            tar -Ox
+        )"
+    )"
+  fi
+
+  overlays_dir="$(mktemp -d)"
+
+  sudo mount -t tmpfs none "${overlays_dir}"
+
+  mkdir \
+    "${overlays_dir}/lower" \
+    "${overlays_dir}/upper" \
+    "${overlays_dir}/work" \
+    "${overlays_dir}/merged"
+
+  echo "${content}" > \
+    "${overlays_dir}/lower/PKGBUILD"
+
+  mkdir "${overlays_dir}/lower/etc"
+  head -c16 /dev/random | \
+    hexdump -e '"%x"' > \
+    "${overlays_dir}/lower/etc/machine-id"
+
+  sudo mount -t overlay overlay -o lowerdir="${overlays_dir}/lower":"/",upperdir="${overlays_dir}/upper",workdir="${overlays_dir}/work" "${overlays_dir}/merged"
+
+  sudo systemd-nspawn -q \
+    -D "${overlays_dir}/merged" \
+    --register=no \
+    ${base_dir}/bin/mksrcinfo
+
+  sudo umount -l "${overlays_dir}/merged"
+
+  mv \
+    "${overlays_dir}/upper/.SRCINFO" \
+    "${output}"
+
+  sudo umount -l "${overlays_dir}"
+  rmdir "${overlays_dir}"
+
 }
