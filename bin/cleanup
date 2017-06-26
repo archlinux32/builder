@@ -9,8 +9,10 @@ if ! "${base_dir}/bin/sanity-check" -r; then
   exit 1
 fi
 
+# remove logs where package is not broken/locked anymore
+
 (
-  ls '/srv/http/build-logs' | \
+  ls "${build_log_directory}" | \
     sed 's|\.[^.]\+\.build-log\.gz$||' | \
     sort -u
   ls "${work_dir}/package-states" | \
@@ -23,5 +25,26 @@ fi
   sort | \
   uniq -u | \
   while read -r s t; do
-    rm -f "/srv/http/build-logs/${s}."*
+    rm -f "${build_log_directory}/${s}."*
   done
+
+# only keep 10 newest logs per package
+
+ls "${build_log_directory}" | \
+  sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
+  sort -k3,3 -k2r,2 | \
+  uniq -f2 --group=prepend | \
+  (
+    count=0
+    while read -r a b c; do
+      if [ -z "${a}" ]; then
+        count=0
+        continue
+      fi
+      if [ ${count} -ge 10 ]; then
+        echo "${build_log_directory}/${a}"
+      fi
+      count=$[${count}+1]
+    done
+  ) | \
+  xargs -rn1 rm
