@@ -241,9 +241,9 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.packages"
 
-  # extract "needs" = ( makedepends \cup checkdepends ) \setminus "builds"
+  # extract "needs" = depends \setminus "builds"
   (
-    grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO" | \
+    grep "$(printf '^\tdepends = ')" "${file_prefix}.SRCINFO" | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
       sort -u
