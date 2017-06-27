@@ -44,7 +44,7 @@ ls "${build_log_directory}" | \
       if [ ${count} -ge 10 ]; then
         echo "${build_log_directory}/${a}"
       fi
-      count=$[${count}+1]
+      count=$((${count}+1))
     done
   ) | \
   xargs -rn1 rm
