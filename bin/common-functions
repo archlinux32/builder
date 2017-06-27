@@ -427,9 +427,16 @@ make_source_info() {
     )"
   fi
 
+  bail_out() {
+    err=$?
+    recursively_umount_and_rm "${overlays_dir}"
+    exit ${err}
+  }
+
   overlays_dir="$(mktemp -d)"
 
-  sudo mount -t tmpfs none "${overlays_dir}"
+  sudo mount -t tmpfs none "${overlays_dir}" || \
+    bail_out
 
   mkdir \
     "${overlays_dir}/lower" \
@@ -437,28 +444,52 @@ make_source_info() {
     "${overlays_dir}/work" \
     "${overlays_dir}/merged"
 
-  echo "${content}" > \
+  echo "${content}" | \
+    sed '/^\$Id\$$/d' > \
     "${overlays_dir}/lower/PKGBUILD"
 
   mkdir "${overlays_dir}/lower/etc"
-  head -c16 /dev/random | \
-    hexdump -e '"%x"' > \
+  hexdump -n 16 -e '4/4 "%08x" 1 "\n"' /dev/urandom > \
     "${overlays_dir}/lower/etc/machine-id"
 
-  sudo mount -t overlay overlay -o lowerdir="${overlays_dir}/lower":"/",upperdir="${overlays_dir}/upper",workdir="${overlays_dir}/work" "${overlays_dir}/merged"
+  sudo mount -t overlay overlay -o lowerdir="${overlays_dir}/lower":"/",upperdir="${overlays_dir}/upper",workdir="${overlays_dir}/work" "${overlays_dir}/merged" || \
+    bail_out
 
   sudo systemd-nspawn -q \
     -D "${overlays_dir}/merged" \
     --register=no \
-    ${base_dir}/bin/mksrcinfo
+    ${base_dir}/bin/mksrcinfo || \
+    bail_out
 
-  sudo umount -l "${overlays_dir}/merged"
+  sudo umount -l "${overlays_dir}/merged" || \
+    bail_out
 
   mv \
     "${overlays_dir}/upper/.SRCINFO" \
     "${output}"
 
-  sudo umount -l "${overlays_dir}"
+  sudo umount -l "${overlays_dir}" || \
+    bail_out
   rmdir "${overlays_dir}"
 
+}
+
+# recursively_umount_and_rm $dir
+# umount all mountpoints in $dir which are also in $dir's
+#  filesystem, possibly also $dir itself and then
+#  rm -rf --one-file-system $dir
+
+recursively_umount_and_rm() {
+  local dir="$1"
+
+  if [ -z "${dir}" ]; then
+    >&2 echo 'ERROR: recursively_umount_and_rm requires an argument'
+    exit 42
+  fi
+
+  find "${dir}" \
+    -xdev -depth -type d \
+    -exec 'mountpoint' '-q' '{}' ';' \
+    -exec 'sudo' 'umount' '-l' '{}' ';'
+  rm -rf --one-file-system "${dir}"
 }
