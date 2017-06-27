@@ -135,24 +135,37 @@ while [ ${count} -ne 0 ]; do
 
       for repo_name in ${repo_names}; do
         eval repo_path='$repo_paths__'"${repo_name}"
-        git -C "${repo_path}" clean -df
-        git -C "${repo_path}" reset --hard
-        git -C "${repo_path}" checkout master
-        git -C "${repo_path}" pull || true
+        git -C "${repo_path}" fetch
       done
 
-      eval git -C "$(printf '$repo_paths__%s' "$(find_repository_with_commit "${git_revision}")")" checkout "${git_revision}" > /dev/null 2>&1
-      git -C "${repo_paths__archlinux32}" checkout "${mod_git_revision}" > /dev/null 2>&1
+      git_repo="$(find_repository_with_commit "${git_revision}")"
 
-      PKGBUILD="$(find_pkgbuild "${package}" "${repository}")"
+      find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
-      if [ ! -r "${PKGBUILD}" ]; then
-        echo "can't find PKGBUILD to package '${package}' from repository '${repository}': '${PKGBUILD}'"
-        exit 1
+      bail_out() {
+        err=$?
+        if [ -n $1 ]; then
+          err=$1
+        fi
+        cd "${base_dir}"
+        rm -rf --one-file-system "${tmp_dir}"
+        exit ${err}
+      }
+      tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+
+      if [ -n "${PKGBUILD}" ]; then
+        eval git -C "$(printf '$repo_paths__%s' "${git_repo}")/${PKGBUILD%/*}" archive "${git_revision}" | \
+          tar -x -C "${tmp_dir}"
+      fi
+      if [ -n "${PKGBUILD_mod}" ]; then
+        git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" | \
+          tar -x --overwrite --exclude 'PKGBUILD' -C "${tmp_dir}"
+        git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" | \
+          tar -Ox 'PKGBUILD' >> \
+          "${tmp_dir}/PKGBUILD"
       fi
 
-      cd "${PKGBUILD%/*}"
-      apply_package_customizations
+      cd "${tmp_dir}"
       success=false
       for mirrored_source in false true; do
 
@@ -180,7 +193,6 @@ while [ ${count} -ne 0 ]; do
                 ta
               '
           )"
-          git_repo="$(find_git_repository_to_package_repository "${repository}")"
           if ! wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
             # we can't improve anything
             break
@@ -191,19 +203,25 @@ while [ ${count} -ne 0 ]; do
         for parameters in '' '-c'; do
           rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
 
-          if staging-i686-build ${parameters} -- archlinux32-keyring > \
+          >&2 printf 'building package "%s" ...' "${package}"
+          # by piping the log, we don't see anything in the terminal,
+          # but all ways to duplicate the logs seem pretty elaborate
+          if staging-i686-build ${parameters} > \
             "$(
               date -u --iso-8601=seconds | \
                 cut -d+ -f1
             ).build-log" 2>&1; then
             # build successful
+            >&2 printf ' ok.\n'
             ls -1 *.pkg.tar.xz | \
-              xargs -rn1 gpg --local-user="${package_key}" --detach-sign
+              xargs -rn1 gpg --local-user="${package_key}" --detach-sign || \
+              bail_out
             tar -cf 'package.tar' $(
                 ls -1 | \
                   grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
                   grep -v -- '-debug-'
-              )
+              ) || \
+              bail_out
             while true; do
               err=0
               ssh \
@@ -228,20 +246,21 @@ while [ ${count} -ne 0 ]; do
                 ;;
                 3)
                   >&2 echo "'return-assignment' reports a signature error."
-                  exit 1
+                  bail_out 1
                 ;;
                 4)
                   >&2 echo "'return-assignment' reports too many or missing packages."
-                  exit 1
+                  bail_out 1
                 ;;
                 *)
                   >&2 echo "unknown return code ${err} from 'return-assignment'"
-                  exit 1
+                  bail_out 1
               esac
             done
             success=true
             break
           fi
+          >&2 printf ' failed.\n'
         done
         if ${success}; then
           break
@@ -250,10 +269,14 @@ while [ ${count} -ne 0 ]; do
 
       if ! ${success}; then
         for log in *'.build-log'; do
-          gzip "${log}"
+          if [ -f "${log}" ]; then
+            gzip "${log}" || \
+              bail_out
+          fi
         done
         tar -cf 'build-logs.gz.tar' \
-          *'.build-log.gz'
+          *'.build-log.gz' || \
+          continue # this might happen if we didn't create any logs
         while ! ssh \
           -i "${master_build_server_identity}" \
           -p "${master_build_server_port}" \
@@ -264,9 +287,13 @@ while [ ${count} -ne 0 ]; do
         done
         if ${exit_after_failure}; then
           >&2 echo 'Build failed, exiting now'
-          exit
+          bail_out 0
         fi
       fi
+
+      # clean up tmp_dir
+      cd "${base_dir}"
+      rm -rf --one-file-system "${tmp_dir}"
 
       continue
 

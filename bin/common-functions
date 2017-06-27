@@ -6,91 +6,44 @@
 
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
 
-# find_pkgbuild package repository
-# find the PKGBUILD of $package from $repository
+# find_pkgbuilds package repository git_repository git_revision mod_git_revision
+# find the PKGBUILD and modification of $package from $repository
+# sets $PKGBUILD and $PKGBUILD_mod
 
-find_pkgbuild() {
+find_pkgbuilds() {
 
   local package="$1"
   local repository="$2"
+  local git_repository="$3"
+  local git_revision="$4"
+  local mod_git_revision="$5"
 
-  local PKGBUILD=''
-  local repo
-  local file
-  local package_path
+  PKGBUILD="$(
+    eval git -C "$(printf '$repo_paths__%s' "${git_repository}")" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
+      tar -t 2> /dev/null | \
+      grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
+      grep -v -- '-i686/PKGBUILD$' | \
+      grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+      sort | \
+      tail -n1
+  )"
 
-  if [ -f "${repo_paths__archlinux32}/${repository}/${package}/PKGBUILD" ]; then
-    # If this package has some modification,
-    repo="$(find_git_repository_to_package_repository "${repository}")"
-    eval package_path="$(printf '$repo_paths__%s' "${repo}")/${package}"
-    if ! [ -d "${package_path}" ]; then
-      # create some dummy files if it is also new.
-      mkdir -p "${package_path}/repos/${repository}-x86_64"
-      touch "${package_path}/repos/${repository}-x86_64/PKGBUILD"
-    fi
+  PKGBUILD_mod="$(
+    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" 2> /dev/null | \
+      tar -t "${repository}/${package}/PKGBUILD" 2> /dev/null
+  )" || true
+
+  if [ -z "${PKGBUILD}" ] && \
+    [ -z "${PKGBUILD_mod}" ]; then
+    >&2 printf 'Neither PKGBUILD nor modification of PKGBUILD found for package "%s" from %s (%s), revisions %s and %s.\n' \
+      "${package}" \
+      "${repository}" \
+      "${git_repository}" \
+      "${git_revision}" \
+      "${mod_git_revision}"
+    return 1
   fi
 
-  for repo in ${repo_names}; do
-    if [ "${repo}" = "archlinux32" ]; then
-      # this is not a repository of packages
-      continue
-    fi
-    eval package_path="$(printf '$repo_paths__%s' "${repo}")/${package}"
-    if ! [ -d "${package_path}" ]; then
-      continue
-    fi
-    PKGBUILD="$(
-      ls "${package_path}/repos/${repository}-"*"/PKGBUILD" 2> /dev/null | \
-        tr ' ' '\n' | \
-        grep -v -- '-i686/PKGBUILD$' | \
-        grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
-        sort | \
-        tail -n1
-    )"
-    if [ -n "${PKGBUILD}" ]; then
-      echo "${PKGBUILD}"
-      break
-    fi
-  done
-}
-
-# apply customizations to a package
-#  (to be executed in the package's directory)
-
-apply_package_customizations() {
-  if [ ! -f 'PKGBUILD' ]; then
-    >&2 echo 'PKGBUILD not found.'
-    pwd
-    exit 1
-  fi
-
-  local repo
-  local package
-
-  repo="$(pwd)"
-  package="${repo%/*/*}"
-  package="${package##*/}"
-  repo="${repo##*/}"
-  repo="${repo%-any}"
-  repo="${repo%-x86_64}"
-
-  if [ ! -f 'PKGBUILD.changes-applied' ]; then
-    # add i686 to the arch list
-    sed '/^arch=[^#]*any/!s|^\(arch=(\)\([^#]*)\)\s*\(#.*\)\?$|\1'"'i686'"' \2|' -i 'PKGBUILD'
-    if [ -f "${repo_paths__archlinux32}/${repo}/${package}/PKGBUILD" ]; then
-      # If this package has modifications (or is new), apply them now:
-      # append PKGBUILD
-      cat "${repo_paths__archlinux32}/${repo}/${package}/PKGBUILD" >> \
-        'PKGBUILD'
-      # copy (and overwrite) other files
-      for file in "${repo_paths__archlinux32}/${repo}/${package}/"*; do
-        if [ -f "${file}" ] && [ "${file##*/}" != 'PKGBUILD' ]; then
-          cp "${file}" ./
-        fi
-      done
-    fi
-    touch 'PKGBUILD.changes-applied'
-  fi
 }
 
 # find_repository_with_commit commit
@@ -382,30 +335,7 @@ make_source_info() {
     return 1
   fi
 
-  PKGBUILD="$(
-    eval git -C "$(printf '$repo_paths__%s' "${git_repo}")" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
-      tar -t 2> /dev/null | \
-      grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
-      grep -v -- '-i686/PKGBUILD$' | \
-      grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
-      sort | \
-      tail -n1
-  )"
-
-  PKGBUILD_mod="$(
-    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" 2> /dev/null | \
-      tar -t "${repository}/${package}/PKGBUILD" 2> /dev/null
-  )" || true
-
-  if [ -z "${PKGBUILD}" ] && \
-    [ -z "${PKGBUILD_mod}" ]; then
-    >&2 printf 'Neither PKGBUILD nor modification of PKGBUILD found for package %s from %s, revisions %s and %s.\n' \
-      "${package}" \
-      "${repository}" \
-      "${git_revision}" \
-      "${mod_git_revision}"
-    return 1
-  fi
+  find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
   if [ -n "${PKGBUILD}" ]; then
     content="$(
