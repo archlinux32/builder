@@ -7,25 +7,20 @@
 # TODOs:
 
 #  repair build for signed git repositories (e.g. community/bitcoin)
+#   - this should be ok now (updated devtools32 accordingly)
 
 #  use different build commands for different repositories - do we need
 #   this actually?
 
 #  handle if build fails due to "local issues" (e.g. unclean
-#   build environment, wrong mirror, ...)
+#   build environment, wrong mirror, ...) - how do we detect this (and
+#   not fix the actual issue then)?
 
 #  force different cache for builds (since we don't want to build
 #   against an empty i686 cache on a x86_64 host)
 
-#  remove explicit installation of archlinux32-keyring inside the build
-#   environment - this should be possible after the next pacman upgrade
-
 #  avoid any-packages from x86_64 mirrors in /var/cache/pacman/pkg of
 #   build slave
-
-#  maybe use 'git archive' instead of 'git checkout' to get current
-#   port -- this way we could run more than one build job per repo,
-#   and we could get rid of the 'git clean', ... mess
 
 . "${0%/*}/../conf/default.conf"
 
