@@ -6,6 +6,8 @@
 
 # TODOs:
 
+#  repair build for signed git repositories (e.g. community/bitcoin)
+
 #  use different build commands for different repositories - do we need
 #   this actually?
 
