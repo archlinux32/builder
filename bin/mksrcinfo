@@ -13,9 +13,9 @@
   fi
   printf '\tarch = %s\n' "${arch[@]}"
   for print in 'makedepends' 'checkdepends' 'depends' 'provides'; do
-    eval printf '\t'"${print}"' = %s\n' $(echo '${'"${print}"'[@]}')
+    eval printf "'\t${print} = %s\n'" '"${'"${print}"'[@]}"'
     for a in 'i686'; do
-      eval printf '\t'"${print}"' = %s\n' $(echo '${'"${print}_${a}"'[@]}')
+      eval printf "'\t${print} = %s\n'" '"${'"${print}_${a}"'[@]}"'
     done
   done
   printf 'pkgname = %s\n' "${pkgname[@]}"
