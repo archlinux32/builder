@@ -19,7 +19,7 @@ find_pkgbuilds() {
   local mod_git_revision="$5"
 
   PKGBUILD="$(
-    eval git -C "$(printf '$repo_paths__%s' "${git_repository}")" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
+    eval git -C "$(printf '"${repo_paths__%s}"' "${git_repository}")" 'archive "${git_revision}" -- "${package}/repos/"' 2> /dev/null | \
       tar -t 2> /dev/null | \
       grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
       grep -v -- '-i686/PKGBUILD$' | \
@@ -54,7 +54,7 @@ find_repository_with_commit() {
   local repository
 
   for repository in ${repo_names}; do
-    if [ "$(eval git -C "$(printf '$repo_paths__%s' "${repository}")" cat-file -t "$1" 2> /dev/null)" = "commit" ]; then
+    if [ "$(eval git -C "$(printf '"${repo_paths__%s}"' "${repository}")" cat-file -t '"$1"' 2> /dev/null)" = "commit" ]; then
       echo "${repository}"
       return 0
     fi
@@ -77,7 +77,7 @@ find_git_repository_to_package_repository() {
     fi
     if [ -n "$(
       (
-        eval ls "$(printf '$repo_paths__%s' "${repository}")/"*"/repos" | \
+        eval ls "$(printf '"${repo_paths__%s}"' "${repository}")/"*"/repos" | \
           grep -v ':$' | \
           sed 's|-[^-]\+$||' | \
           sort -u
@@ -339,7 +339,7 @@ make_source_info() {
 
   if [ -n "${PKGBUILD}" ]; then
     content="$(
-      eval git -C "$(printf '$repo_paths__%s' "${git_repo}")" archive "${git_revision}" -- "${PKGBUILD}" | \
+      eval git -C "$(printf '"${repo_paths__%s}"' "${git_repo}")" 'archive "${git_revision}" -- "${PKGBUILD}"' | \
         tar -Ox
     )"
   else

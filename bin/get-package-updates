@@ -88,7 +88,7 @@ delete_package() {
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
 for repo in ${repo_names}; do
-  eval repo_path='$repo_paths__'"${repo}"
+  eval repo_path='"${repo_paths__'"${repo}"'}"'
   # TODO:
   #  this is somewhat redundant and slow -- improve it!
   git -C "${repo_path}" checkout -f master
@@ -106,7 +106,7 @@ for repo in ${repo_names}; do
     cat "${work_dir}/${repo}.revision" 2> /dev/null || \
       echo NONE
   )'"
-  eval repo_path='$repo_paths__'"${repo}"
+  eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval "new_repo_revisions__${repo}='$(
     git -C "${repo_path}" rev-parse HEAD | \
       tee "${work_dir}/${repo}.revision.new"
@@ -137,9 +137,9 @@ cp \
   "${work_dir}/deletion-list.new"
 
 for repo in ${repo_names}; do
-  eval repo_path='$repo_paths__'"${repo}"
-  eval old_repo_revision='$old_repo_revisions__'"${repo}"
-  eval new_repo_revision='$new_repo_revisions__'"${repo}"
+  eval repo_path='"${repo_paths__'"${repo}"'}"'
+  eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
+  eval new_repo_revision='"${new_repo_revisions__'"${repo}"'}"'
   (
     # if old revision unknown, mimic "git diff"-output
     if [ "${old_repo_revision}" = "NONE" ]; then
@@ -158,7 +158,7 @@ for repo in ${repo_names}; do
       sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
         while read -r pkg_repo rest; do
           eval "printf '%s %s\n'" \
-            "$(printf '"$new_repo_revisions__%s"' "$(find_git_repository_to_package_repository "${pkg_repo}")")" \
+            "$(printf '"${new_repo_revisions__%s}"' "$(find_git_repository_to_package_repository "${pkg_repo}")")" \
             "'${rest}'"
         done
     else

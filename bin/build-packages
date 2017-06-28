@@ -129,7 +129,7 @@ while [ ${count} -ne 0 ]; do
       # Update git repositories (official packages, community packages and the repository of package customizations).
 
       for repo_name in ${repo_names}; do
-        eval repo_path='$repo_paths__'"${repo_name}"
+        eval repo_path='"${repo_paths__'"${repo_name}"'}"'
         git -C "${repo_path}" fetch
       done
 
@@ -149,7 +149,7 @@ while [ ${count} -ne 0 ]; do
       tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
 
       if [ -n "${PKGBUILD}" ]; then
-        eval git -C "$(printf '$repo_paths__%s' "${git_repo}")/${PKGBUILD%/*}" archive "${git_revision}" | \
+        eval "git -C \"$(printf '${repo_paths__%s}' "${git_repo}")/${PKGBUILD%/*}\" archive '${git_revision}'" | \
           tar -x -C "${tmp_dir}"
       fi
       if [ -n "${PKGBUILD_mod}" ]; then
