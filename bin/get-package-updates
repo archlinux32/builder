@@ -157,8 +157,8 @@ for repo in ${repo_names}; do
     # to the one of an original source repository
       sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
         while read -r pkg_repo rest; do
-          printf '%s %s\n' \
-            "$(eval printf '$new_repo_revisions__%s' "$(find_git_repository_to_package_repository "${pkg_repo}")")" \
+          eval printf '%s %s\n' \
+            "$(printf '$new_repo_revisions__%s' "$(find_git_repository_to_package_repository "${pkg_repo}")")" \
             "${rest}"
         done
     else
