@@ -369,7 +369,9 @@ fi
 tmp_dir="$(mktemp -d)"
 
 clean_up_lock_file() {
-  sudo /usr/bin/umount -l "${master_mirror_sshfs}"
+  if mountpoint "${master_mirror_sshfs}" > /dev/null 2>&1; then
+    sudo /usr/bin/umount -l "${master_mirror_sshfs}"
+  fi
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"
 }
