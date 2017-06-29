@@ -1,0 +1,147 @@
+#!/bin/sh
+
+# seed the build list from differences between an x86_64 and our master mirror
+
+. "${0%/*}/../conf/default.conf"
+
+if [ $# -ne 1 ]; then
+  >&2 echo 'usage: seed-build-list http://x86_64.mirror.archlinux.org/'
+  exit 1
+fi
+
+repos='core community extra gnome-unstable kde-unstable'
+
+tmp_dir="$(mktemp -d)"
+trap "rm -rf --one-file-system '${tmp_dir}'" EXIT
+
+for repo in ${repo_names}; do
+  if [ "${repo_names}" = 'archlinux32' ]; then
+    continue
+  fi
+  eval 'repo_path="${repo_paths__'"${repo}"'}"'
+  git -C "${repo_path}" archive origin/master | \
+    tar -t | \
+    grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+    grep -v -- '-i686/PKGBUILD$' | \
+    grep -v '\(staging\|testing\)$' | \
+    sed '
+      s|^\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2|
+    '
+done | \
+  sort -k1,1 > \
+  "${tmp_dir}/known_packages"
+
+(
+  # theirs
+  for repo in ${repos}; do
+    curl -sS "$1/${repo}/os/x86_64/${repo}.db.tar.gz" | \
+      tar -tz
+  done | \
+    grep '/$' | \
+    sed '
+      s|/$||
+      s|^\(.*\)-\([^-]\+-[^-]\+\)|theirs \1-\2 \2 \1|
+    '
+
+  # ours
+  for repo in $(ls_master_mirror 'i686'); do
+    ls_master_mirror "i686/$repo" | \
+      grep '\.pkg\.tar\.xz$' | \
+      sed 's|-[^-]\+$||'
+  done | \
+    sed '
+      s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
+    '
+  ) | \
+  sort -k4,4 -k3Vr,3 -k1,1 | \
+  uniq -f3 | \
+  grep '^theirs ' | \
+  awk '{print $4}' | \
+  sort -k1,1 > \
+  "${tmp_dir}/delta_packages"
+
+join -j1 "${tmp_dir}/delta_packages" "${tmp_dir}/known_packages" > \
+  "${tmp_dir}/append_packages"
+
+(
+  awk '{print $1}' "${tmp_dir}/append_packages"
+  cat "${tmp_dir}/delta_packages"
+) | \
+  sort | \
+  uniq -u | \
+  sponge "${tmp_dir}/delta_packages"
+
+while read -r pkg; do
+  success=false
+  for arch in x86_64 any; do
+    pkgbase="$(
+      curl -sS "https://www.archlinux.org/packages/community/x86_64/${pkg}/" | \
+        sed -n '
+          /Base Package:/{
+            :a
+            N
+            s|</tr>.*$||
+            Ta
+            p
+          }
+        ' | \
+        tr '<>' '\n' | \
+        grep '^a href="' | \
+        sed '
+          s|^a href="||
+          s|".*||
+          s|/$||
+          s|^.*/||
+        '
+    )"
+    if [ -n "${pkgbase}" ]; then
+      echo "${pkgbase}" >> \
+        "${tmp_dir}/delta_pkgbases"
+      success=true
+      break
+    fi
+  done
+  if ! ${sucess}; then
+    echo "${pkg}"
+  fi
+done < \
+  "${tmp_dir}/delta_packages" | \
+  sponge "${tmp_dir}/delta_packages"
+
+sort -u "${tmp_dir}/delta_pkgbases" | \
+  sponge "${tmp_dir}/delta_pkgbases"
+
+join -j1 "${tmp_dir}/delta_pkgbases" "${tmp_dir}/known_packages" >> \
+  "${tmp_dir}/append_packages"
+
+sort -u "${tmp_dir}/append_packages" | \
+  sponge "${tmp_dir}/append_packages"
+
+rm "${tmp_dir}/delta_pkgbases"
+
+if [ -s "${tmp_dir}/delta_packages" ]; then
+  echo 'There are still packages newer for x86_64 which I cannot identify :-/'
+  exit 2
+fi
+
+while read -r pkg repo; do
+  git_repo="$(find_git_repository_to_package_repository "${repo}")"
+  printf '%s %s %s %s\n' \
+    "${pkg}" \
+    "$(cat "${work_dir}/${git_repo}.revision")" \
+    "$(cat "${work_dir}/archlinux32.revision")" \
+    "${repo}"
+done < \
+  "${tmp_dir}/append_packages" | \
+  awk '{print "append " $1 " " $2 " " $3 " " $4 " " $1}' > \
+  "${tmp_dir}/build-list.append"
+
+awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list" > \
+  "${tmp_dir}/build-list.old"
+
+cat "${tmp_dir}/build-list.append" "${tmp_dir}/build-list.old" | \
+  sort -k6,6 | \
+  uniq -uf5 | \
+  grep '^append ' | \
+  awk '{print $2 " " $3 " " $4 " " $5}' > \
+  "${work_dir}/build-list.new"
