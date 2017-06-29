@@ -4,15 +4,73 @@
 
 . "${0%/*}/../conf/default.conf"
 
-if [ $# -ne 1 ]; then
-  >&2 echo 'usage: seed-build-list http://x86_64.mirror.archlinux.org/'
-  exit 1
-fi
-
-repos='core community extra gnome-unstable kde-unstable'
+usage() {
+  >&2 echo ''
+  >&2 echo 'seed-build-list [options]:'
+  >&2 echo '  seed the build list from'
+  >&2 echo '    - differences between an x86_64 and our master mirror'
+  >&2 echo '    - a list of packages which need to be rebuilt'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:'
+  >&2 echo '    Show this help and exit.'
+  >&2 echo '  -m|--mirror $url:'
+  >&2 echo '    Get x86_64 packages from mirror at $url.'
+  >&2 echo '  -p|--package $pkg_regex:'
+  >&2 echo '    Update packages matching $pkg_regex.'
+  [ -z "$1" ] && exit 1 || exit $1
+}
 
 tmp_dir="$(mktemp -d)"
 trap "rm -rf --one-file-system '${tmp_dir}'" EXIT
+
+eval set -- "$(
+  getopt -o hm:p: \
+    --long help \
+    --long mirror: \
+    --long package: \
+    -n "$(basename "$0")" -- "$@" || \
+    echo usage
+  )"
+
+touch "${tmp_dir}/mirrors"
+touch "${tmp_dir}/delta_packages"
+touch "${tmp_dir}/delta_pkgbases"
+touch "${tmp_dir}/package_regexes"
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -m|--mirror)
+      shift
+      echo "$1" >> \
+        "${tmp_dir}/mirrors"
+    ;;
+    -p|--package)
+      shift
+      echo "$1" >> \
+        "${tmp_dir}/package_regexes"
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 0 ]; then
+  usage 1
+fi
+
+repos='core community extra gnome-unstable kde-unstable'
 
 for repo in ${repo_names}; do
   if [ "${repo_names}" = 'archlinux32' ]; then
@@ -31,36 +89,59 @@ done | \
   sort -k1,1 > \
   "${tmp_dir}/known_packages"
 
-(
-  # theirs
-  for repo in ${repos}; do
-    curl -sS "$1/${repo}/os/x86_64/${repo}.db.tar.gz" | \
-      tar -tz
-  done | \
-    grep '/$' | \
-    sed '
-      s|/$||
-      s|^\(.*\)-\([^-]\+-[^-]\+\)|theirs \1-\2 \2 \1|
-    '
-
-  # ours
-  for repo in $(ls_master_mirror 'i686'); do
-    ls_master_mirror "i686/$repo" | \
-      grep '\.pkg\.tar\.xz$' | \
-      sed 's|-[^-]\+$||'
-  done | \
-    sed '
-      s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
-    '
-  ) | \
-  sort -k4,4 -k3Vr,3 -k1,1 | \
-  uniq -f3 | \
-  grep '^theirs ' | \
-  awk '{print $4}' | \
-  sort -k1,1 > \
+# generate delta_packages from package_regexes
+while read -r pkg_regex; do
+  if [ -z "${pkg_regex}" ]; then
+    continue
+  fi
+  awk '{print $1}' "${tmp_dir}/known_packages" | \
+    grep "${pkg_regex}" || \
+    true
+done < \
+  "${tmp_dir}/package_regexes" >> \
   "${tmp_dir}/delta_packages"
 
-join -j1 "${tmp_dir}/delta_packages" "${tmp_dir}/known_packages" > \
+# genereate delta_packages from mirror delta
+
+while read -r mirror; do
+  if [ -z "${mirror}" ]; then
+    continue
+  fi
+  (
+    # theirs
+    for repo in ${repos}; do
+      curl -sS "${mirror}/${repo}/os/x86_64/${repo}.db.tar.gz" | \
+        tar -tz
+    done | \
+      grep '/$' | \
+      sed '
+        s|/$||
+        s|^\(.*\)-\([^-]\+-[^-]\+\)|theirs \1-\2 \2 \1|
+      '
+
+    # ours
+    for repo in $(ls_master_mirror 'i686'); do
+      ls_master_mirror "i686/$repo" | \
+        grep '\.pkg\.tar\.xz$' | \
+        sed 's|-[^-]\+$||'
+    done | \
+      sed '
+        s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
+      '
+    ) | \
+    sort -k4,4 -k3Vr,3 -k1,1 | \
+    uniq -f3 | \
+    grep '^theirs ' | \
+    awk '{print $4}' | \
+    sort -k1,1 >> \
+    "${tmp_dir}/delta_packages"
+done < \
+  "${tmp_dir}/mirrors"
+
+sort -k1,1 -u "${tmp_dir}/delta_packages" | \
+  sponge "${tmp_dir}/delta_packages"
+
+join -j1 "${tmp_dir}/delta_packages" "${tmp_dir}/known_packages" >> \
   "${tmp_dir}/append_packages"
 
 (
@@ -72,6 +153,9 @@ join -j1 "${tmp_dir}/delta_packages" "${tmp_dir}/known_packages" > \
   sponge "${tmp_dir}/delta_packages"
 
 while read -r pkg; do
+  if [ -z "${pkg}" ]; then
+    continue
+  fi
   success=false
   for arch in x86_64 any; do
     pkgbase="$(
@@ -124,6 +208,10 @@ if [ -s "${tmp_dir}/delta_packages" ]; then
   exit 2
 fi
 
+rm "${tmp_dir}/delta_packages"
+
+# convert append_packages to build-list.new (add git hashes)
+
 while read -r pkg repo; do
   git_repo="$(find_git_repository_to_package_repository "${repo}")"
   printf '%s %s %s %s\n' \
@@ -136,6 +224,7 @@ done < \
   awk '{print "append " $1 " " $2 " " $3 " " $4 " " $1}' > \
   "${tmp_dir}/build-list.append"
 
+# ignore packages already on the build list
 awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.old"
 
