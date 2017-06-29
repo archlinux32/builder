@@ -159,18 +159,6 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.packages"
 
-  # extract "needs" = depends \setminus "builds"
-  (
-    grep "$(printf '^\tdepends = ')" "${file_prefix}.SRCINFO" | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u
-    sed 'p' "${file_prefix}.builds"
-  ) | \
-    sort | \
-    uniq -u > \
-    "${file_prefix}.needs"
-
   # extract "depends" = makedepends \cup checkdepends \cup depends
   (
     sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
@@ -180,6 +168,15 @@ generate_package_metadata() {
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
     "${file_prefix}.depends"
+
+  # extract "needs" = "depends" \setminus "builds"
+  (
+    cat "${file_prefix}.depends"
+    sed 'p' "${file_prefix}.builds"
+  ) | \
+    sort | \
+    uniq -u > \
+    "${file_prefix}.needs"
 
   rm "${file_prefix}.SRCINFO"
 
