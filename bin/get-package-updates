@@ -289,6 +289,11 @@ done \
   < "${work_dir}/build-list.new" \
   > "${work_dir}/build-order"
 
+if grep -vq '^\S\+ \S\+$' "${work_dir}/build-order"; then
+  >&2 echo 'Created partial order file "build-order" is invalid.'
+  exit 2
+fi
+
 echo 'Now actually sort it.'
 
 (
