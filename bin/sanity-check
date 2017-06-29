@@ -107,11 +107,12 @@ while [ $# -gt 0 ]; do
 
       errors="$(
         (
-          printf '%s\n' ${repos}
-          ls_master_mirror 'i686'
+          printf 'expected %s\n' ${repos}
+          ls_master_mirror 'i686' | \
+            sed 's|^|found |'
         ) | \
-          sort | \
-          uniq -u
+          sort -k2 | \
+          uniq -uf1
       )"
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
@@ -141,16 +142,21 @@ while [ $# -gt 0 ]; do
 
         errors="$(
           echo "${packages}" | \
-            sed 's|\.sig$||' | \
-            uniq -c | \
+            grep '\S' | \
+            sed '
+              s|^\(.*\.pkg\.tar\.xz\)$|package \1|
+              s|^\(.*\.pkg\.tar\.xz\)\.sig$|signature \1|
+            ' | \
+            sort -k2 | \
+            uniq -cf1 | \
             grep -v '^\s*2\s' | \
-            awk '{print $2}'
-        )"
+            awk '{print $2 " " $3}'
+        )" || true
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             echo
             echo "The following packages in ${repo} are missing a signature or vice versa:"
-            echo "${errors}"
+            echo "'${errors}'"
           fi
           exit 1
         fi
@@ -164,13 +170,20 @@ while [ $# -gt 0 ]; do
           (
             tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
               grep '/$' | \
-              sed 's|/$||'
+              sed '
+                s|/$||
+                s|^|in_database |
+              '
             echo "${packages}" | \
-              sed 's|-[^-]\+$||' | \
+              grep '\S' | \
+              sed '
+                s|-[^-]\+$||
+                s|^|in_repository |
+              ' | \
               sort -u
           ) | \
-            sort | \
-            uniq -u
+            sort -k2 | \
+            uniq -uf1
         )"
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
@@ -185,13 +198,20 @@ while [ $# -gt 0 ]; do
           (
             tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
               grep '/$' | \
-              sed 's|/$||'
+              sed '
+                s|/$||
+                s|^|in_database |
+              '
             echo "${packages}" | \
-              sed 's|-[^-]\+$||' | \
+              grep '\S' | \
+              sed '
+                s|-[^-]\+$||
+                s|^|in_repository |
+              ' | \
               sort -u
           ) | \
-            sort | \
-            uniq -u
+            sort -k2 | \
+            uniq -uf1
         )"
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
@@ -223,18 +243,20 @@ while [ $# -gt 0 ]; do
             ls "${work_dir}/package-states" | \
               grep "\.${status#*:}\$" | \
               sed "s|^|${work_dir}/package-states/|" | \
-              xargs -r cat
+              xargs -r cat | \
+              sed 's|^|package-state-file |'
             ls_master_mirror 'i686' | \
               grep "${status%:*}\$" | \
               while read -r repo; do
                 ls_master_mirror "i686/${repo}"
               done | \
-              grep '\.pkg\.tar\.xz$'
+              grep '\.pkg\.tar\.xz$' | \
+              sed 's|^|package-file |'
           ) | \
-            sort | \
-            uniq -c | \
+            sort -k2 | \
+            uniq -cf1 | \
             grep -v '^\s*2\s' | \
-            awk '{print $2}'
+            awk '{print $2 " " $3}'
         )"
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
