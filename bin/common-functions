@@ -141,6 +141,10 @@ generate_package_metadata() {
     echo "make_source_info failed."
     exit 1
   fi
+  if [ ! -f "${file_prefix}.SRCINFO" ]; then
+    >&2 printf '"%s" not created by "make_source_info" - eh, what?' "${file_prefix}.SRCINFO"
+    exit 1
+  fi
 
   # otherwise this just calls for trouble
   sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
