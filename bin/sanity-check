@@ -161,9 +161,9 @@ while [ $# -gt 0 ]; do
           exit 1
         fi
 
-        ${master_mirror_command} \
-          "${master_mirror_directory}/i686/${repo}/${repo}.db.tar.gz" \
-          "${master_mirror_directory}/i686/${repo}/${repo}.files.tar.gz" \
+        ${master_mirror_rsync_command} \
+          "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db.tar.gz" \
+          "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files.tar.gz" \
           "${tmp_dir}/"
 
         errors="$(

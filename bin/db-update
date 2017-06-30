@@ -176,9 +176,9 @@ move_packages() {
 
   while read -r repo; do
 
-    ${master_mirror_command} \
-      "${master_mirror_directory}/i686/${repo}/${repo}.db."* \
-      "${master_mirror_directory}/i686/${repo}/${repo}.files."* \
+    ${master_mirror_rsync_command} \
+      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
+      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
       "${tmp_dir}/${repo}/"
 
     # add and remove the packages locally
@@ -240,10 +240,10 @@ move_packages() {
 
   while read -r repo; do
 
-    ${dummynator} ${master_mirror_command} \
+    ${dummynator} ${master_mirror_rsync_command} \
       "${tmp_dir}/${repo}/${repo}.db."* \
       "${tmp_dir}/${repo}/${repo}.files."* \
-      "${master_mirror_directory}/i686/${repo}/"
+      "${master_mirror_rsync_directory}/i686/${repo}/"
 
   done < \
     "${tmp_dir}/repos"

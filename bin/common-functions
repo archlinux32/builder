@@ -255,8 +255,8 @@ ls_master_mirror() {
 
   local path="$1"
 
-  ${master_mirror_command} \
-    "${master_mirror_directory}/${path}/" | \
+  ${master_mirror_rsync_command} \
+    "${master_mirror_rsync_directory}/${path}/" | \
     grep -v '\s\.$' | \
     awk '{print $5}'
 
@@ -272,7 +272,7 @@ remove_old_package_versions() {
 
   local pkgname="${package%-*-*-*.pkg.tar.xz}"
 
-  ${master_mirror_command} \
+  ${master_mirror_rsync_command} \
     --recursive \
     --delete \
     $( \
@@ -283,7 +283,7 @@ remove_old_package_versions() {
     ) \
     '--exclude=*' \
     ./ \
-    "${master_mirror_directory}/${directory}/"
+    "${master_mirror_rsync_directory}/${directory}/"
 
 }
 
