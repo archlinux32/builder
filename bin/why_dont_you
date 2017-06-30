@@ -24,7 +24,7 @@ case "${action}" in
           fi
 
           if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
-            echo 'is locked or blocked'
+            printf '"%s" is locked or blocked\n' "${pkg}"
             continue
           fi
 
@@ -43,7 +43,7 @@ case "${action}" in
               sort | \
               uniq -d
             )" ]; then
-            echo 'has unmet dependencies:'
+            printf '"%s" has unmet dependencies:\n' "${package}"
             (
               cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
               grep -vxF 'break_loops' "${work_dir}/build-list" | \
@@ -69,7 +69,7 @@ case "${action}" in
             continue
           fi
 
-          echo 'would be built'
+          printf '"%s" would be built\n' "${pkg}"
         done
 
     done
@@ -82,7 +82,7 @@ case "${action}" in
 
       if ! ls -1 "${work_dir}/package-states" | \
         grep -q "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done\$"; then
-        printf 'Package "%s" is not in staging!\n' "${pkg}"
+        printf '"%s" is not in staging!\n' "${pkg}"
         continue
       fi
 
@@ -122,7 +122,7 @@ case "${action}" in
         continue
       fi
 
-      echo 'No dependencies left on build list.'
+      printf 'No dependencies left on build list for "%s".\n' "${pkg}"
       echo "${dependent_packages}"
 
     done
