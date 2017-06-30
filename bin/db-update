@@ -61,12 +61,21 @@ move_packages() {
 
   touch "${tmp_dir}/repos"
   touch "${tmp_dir}/packages"
+  touch "${tmp_dir}/master-mirror-listing"
+  mkdir "${tmp_dir}/transit"
 
   if ${no_action}; then
     dummynator='echo'
   else
     dummynator=''
   fi
+
+  ls_master_mirror 'i686' | \
+    while read -r repo; do
+      ls_master_mirror "i686/${repo}" | \
+        sed "s|^|i686/${repo}/|" >> \
+        "${tmp_dir}/master-mirror-listing"
+    done
 
   for package in $@; do
     if [ -z "${package}" ]; then
@@ -135,10 +144,10 @@ move_packages() {
       "${tmp_dir}/${package}.parts_and_signatures"
 
     while read -r part; do
-      if [ ! -f "${master_mirror_sshfs}/i686/${from_repo}/${part}" ]; then
+      if ! grep -qxF "i686/${from_repo}/${part}" "${tmp_dir}/master-mirror-listing"; then
         >&2 printf \
           'move_packages: Cannot find file "%s", part of package "%s".\n' \
-          "${master_mirror_sshfs}/i686/${from_repo}/${part}" \
+          "i686/${from_repo}/${part}" \
           "${package}"
         exit 2
       fi
@@ -185,7 +194,7 @@ move_packages() {
 
     if grep -qxF "${repo}" "${tmp_dir}/"*".from_repo"; then
 
-      ${dummynator} repo-remove -q \
+      repo-remove -q \
         "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
         $(
           grep -lxF "${repo}" "${tmp_dir}/"*".from_repo" | \
@@ -197,19 +206,25 @@ move_packages() {
     fi
 
     if grep -qxF "${repo}" "${tmp_dir}/"*".to_repo"; then
-      ${dummynator} repo-add -q \
-        "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
-        $(
-          grep -lxF "${repo}" "${tmp_dir}/"*".to_repo" | \
-            sed '
-              s|\.to_repo$||
-            ' | \
-            while read -r package; do
-              sed \
-                "s|^|${master_mirror_sshfs}/i686/$(cat "${package}.from_repo")/|" \
-                "${package}.parts"
-            done
-        )
+      grep -lxF "${repo}" "${tmp_dir}/"*".to_repo" | \
+        sed '
+          s|\.to_repo$||
+        ' | \
+        while read -r package; do
+          while read -r part; do
+            ${master_mirror_rsync_command} \
+              "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}" \
+              "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}.sig" \
+              "${tmp_dir}/transit/"
+            repo-add -q \
+              "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+              "${tmp_dir}/transit/${part}"
+            rm \
+              "${tmp_dir}/transit/${part}" \
+              "${tmp_dir}/transit/${part}.sig"
+          done < \
+            "${package}.parts"
+        done
     fi
 
   done < "${tmp_dir}/repos"
@@ -218,23 +233,35 @@ move_packages() {
     find "${tmp_dir}" -type f
   fi
 
-  # move the packages remotely via sshfs
+  # move the packages remotely via sftp
 
-  while read -r package; do
+  (
+    while read -r package; do
 
-    if [ -z "${package}" ]; then
-      continue
-    fi
+      if [ -z "${package}" ]; then
+        continue
+      fi
 
-    while read -r part; do
-      ${dummynator} mv \
-        "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.from_repo")/${part}" \
-        "${master_mirror_sshfs}/i686/$(cat "${tmp_dir}/${package}.to_repo")/"
+      while read -r part; do
+        if [ -z "${part}" ]; then
+          continue
+        fi
+        printf \
+          'rename "%s" "%s"\n' \
+          "i686/$(cat "${tmp_dir}/${package}.from_repo")/${part}" \
+          "i686/$(cat "${tmp_dir}/${package}.to_repo")/${part}"
+      done < \
+        "${tmp_dir}/${package}.parts_and_signatures"
+
     done < \
-      "${tmp_dir}/${package}.parts_and_signatures"
-
-  done < \
-    "${tmp_dir}/packages"
+      "${tmp_dir}/packages"
+    echo 'quit'
+  ) | \
+    if ${no_action}; then
+      sed 's|^|sftp: |'
+    else
+      ${master_mirror_sftp_command}
+    fi
 
   # and push our local *.db.tar.gz via rsync
 
@@ -285,7 +312,10 @@ move_packages() {
 
   if ! ${no_action}; then
     date '+%s' > \
-      "${master_mirror_sshfs}/lastupdate"
+      "${tmp_dir}/lastupdate"
+    ${dummynator} ${master_mirror_rsync_command} \
+      "${tmp_dir}/lastupdate" \
+      "${master_mirror_rsync_directory}/lastupdate"
   fi
 
   rm -rf --one-file-system "${tmp_dir}/"*
@@ -369,17 +399,9 @@ fi
 tmp_dir="$(mktemp -d)"
 
 clean_up_lock_file() {
-  if mountpoint "${master_mirror_sshfs}" > /dev/null 2>&1; then
-    sudo /usr/bin/umount -l "${master_mirror_sshfs}"
-  fi
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"
 }
-
-if mountpoint "${master_mirror_sshfs}" > /dev/null 2>&1; then
-  sudo /usr/bin/umount -l "${master_mirror_sshfs}"
-fi
-mount "${master_mirror_sshfs}"
 
 trap clean_up_lock_file EXIT
 
