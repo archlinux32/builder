@@ -4,6 +4,13 @@
 
 . "${0%/*}/../conf/default.conf"
 
+# we only clean if run interactive or if no one is logged in
+if ! tty -s && \
+  [ -n "$(users)" ]; then
+  >&2 echo 'Skipping clean up.'
+  exit
+fi
+
 if ! "${base_dir}/bin/sanity-check" -r; then
   >&2 echo 'Build master is not sane.'
   exit 1
