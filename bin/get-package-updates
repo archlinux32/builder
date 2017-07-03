@@ -101,6 +101,8 @@ done
 
 # Read previous git revision numbers from files.
 
+something_new=false
+
 for repo in ${repo_names}; do
   eval "old_repo_revisions__${repo}='$(
     cat "${work_dir}/${repo}.revision" 2> /dev/null || \
@@ -111,7 +113,16 @@ for repo in ${repo_names}; do
     git -C "${repo_path}" rev-parse HEAD | \
       tee "${work_dir}/${repo}.revision.new"
   )'"
+  eval 'if ! [ "${new_repo_revisions__'"${repo}"'}" = "${old_repo_revisions__'"${repo}"'}" ]; then
+    something_new=true
+  fi'
 done
+
+if ${pull} && \
+  ! ${something_new}; then
+  >&2 echo 'Nothing changed.'
+  exit
+fi
 
 # Create a lock file for build list.
 
