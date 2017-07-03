@@ -182,48 +182,48 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
 fi
 
 if [ -n "${broken_output}" ]; then
-  if ${nice}; then
-    printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>'
-    printf '<th>%s</th>' \
-      'package' \
-      'git revision' \
-      'modification git revision' \
-      'package repository' \
-      'compilations'
-    printf '</tr>\n'
-  fi > \
-    "${broken_output}"
-  ls "${work_dir}/package-states" | \
-    grep '\.broken$' | \
-    sed 's|\.broken$||' | \
+  (
     if ${nice}; then
-      sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
-        while read -r sf pkg rev mod_rev repo; do
-          printf '%s ' \
-            "${pkg}" \
-            "${rev}" \
-            "${mod_rev}" \
-            "${repo}" \
-            "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
-          printf '\n'
-        done | \
-        sort -k5n,5 | \
-        while read -r pkg rev mod_rev repo count; do
-          printf '<tr>'
-          printf '<td>%s</td>' \
-            "${pkg}" \
-            "${rev}" \
-            "${mod_rev}" \
-            "${repo}" \
-            "${count}"
-          printf '</tr>\n'
-        done
-    else
-      cat
-    fi >> \
-    "${broken_output}"
-  if ${nice}; then
-    printf '</table>\n</body>\n</html>\n' >> \
-      "${broken_output}"
-  fi
+      printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>'
+      printf '<th>%s</th>' \
+        'package' \
+        'git revision' \
+        'modification git revision' \
+        'package repository' \
+        'compilations'
+      printf '</tr>\n'
+    fi
+    ls "${work_dir}/package-states" | \
+      grep '\.broken$' | \
+      sed 's|\.broken$||' | \
+      if ${nice}; then
+        sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
+          while read -r sf pkg rev mod_rev repo; do
+            printf '%s ' \
+              "${pkg}" \
+              "${rev}" \
+              "${mod_rev}" \
+              "${repo}" \
+              "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
+            printf '\n'
+          done | \
+          sort -k5n,5 | \
+          while read -r pkg rev mod_rev repo count; do
+            printf '<tr>'
+            printf '<td>%s</td>' \
+              "${pkg}" \
+              "${rev}" \
+              "${mod_rev}" \
+              "${repo}" \
+              "${count}"
+            printf '</tr>\n'
+          done
+      else
+        cat
+      fi
+    if ${nice}; then
+      printf '</table>\n</body>\n</html>\n'
+    fi
+  ) | \
+    sponge "${broken_output}"
 fi
