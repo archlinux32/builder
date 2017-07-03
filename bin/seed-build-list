@@ -14,8 +14,12 @@ usage() {
   >&2 echo 'possible options:'
   >&2 echo '  -h|--help:'
   >&2 echo '    Show this help and exit.'
+  >&2 echo '  -i|--ignore $package:'
+  >&2 echo '    Do not update $package.'
   >&2 echo '  -m|--mirror $url:'
   >&2 echo '    Get x86_64 packages from mirror at $url.'
+  >&2 echo '  -n|--no-action:'
+  >&2 echo '    Do not actually update build-list, just print it.'
   >&2 echo '  -p|--package $pkg_regex:'
   >&2 echo '    Update packages matching $pkg_regex.'
   [ -z "$1" ] && exit 1 || exit $1
@@ -25,9 +29,11 @@ tmp_dir="$(mktemp -d)"
 trap "rm -rf --one-file-system '${tmp_dir}'" EXIT
 
 eval set -- "$(
-  getopt -o hm:p: \
+  getopt -o hi:m:np: \
     --long help \
+    --long ignore: \
     --long mirror: \
+    --long no-action \
     --long package: \
     -n "$(basename "$0")" -- "$@" || \
     echo usage
@@ -37,6 +43,9 @@ touch "${tmp_dir}/mirrors"
 touch "${tmp_dir}/delta_packages"
 touch "${tmp_dir}/delta_pkgbases"
 touch "${tmp_dir}/package_regexes"
+touch "${tmp_dir}/ignore_packages"
+
+update=true
 
 while true
 do
@@ -44,10 +53,18 @@ do
     -h|--help)
       usage 0
     ;;
+    -i|--ignore)
+      shift
+      echo "$1" >> \
+        "${tmp_dir}/ignore_packages"
+    ;;
     -m|--mirror)
       shift
       echo "$1" >> \
         "${tmp_dir}/mirrors"
+    ;;
+    -n|--no-action)
+      update=false
     ;;
     -p|--package)
       shift
@@ -226,20 +243,44 @@ done < \
 
 # Create a lock file for build list.
 
-exec 9> "${build_list_lock_file}"
-flock 9
+if ${update}; then
+  exec 9> "${build_list_lock_file}"
+  flock 9
+fi
 
 # ignore packages already on the build list
 awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.old"
 
-cat "${tmp_dir}/build-list.append" "${tmp_dir}/build-list.old" | \
-  sort -k6,6 | \
-  uniq -uf5 | \
-  grep '^append ' | \
-  awk '{print $2 " " $3 " " $4 " " $5}' >> \
-  "${work_dir}/build-list"
+# ignore packages on the deletion-list
+awk '{print "delete " $1 " X X X " $1}' "${work_dir}/deletion-list" >> \
+  "${tmp_dir}/build-list.old"
 
-# Remove the lock file
+# ignore packages on the blacklist
+git -C "${repo_paths__archlinux32}" archive HEAD -- blacklist | \
+  tar -Ox blacklist | \
+  awk '{print "blacklist " $1 " X X X " $1}' >> \
+  "${tmp_dir}/build-list.old"
 
-rm -f "${build_list_lock_file}"
+# ignore explicitely ignored packages
+awk '{print "ignore " $1 " X X X " $1}' "${tmp_dir}/ignore_packages" >> \
+  "${tmp_dir}/build-list.old"
+
+if ${update}; then
+  cat "${tmp_dir}/build-list.append" "${tmp_dir}/build-list.old" | \
+    sort -k6,6 -k1,1 | \
+    uniq -uf5 | \
+    grep '^append ' | \
+    awk '{print $2 " " $3 " " $4 " " $5}' >> \
+    "${work_dir}/build-list"
+
+  # Remove the lock file
+
+  rm -f "${build_list_lock_file}"
+else
+  cat "${tmp_dir}/build-list.append" "${tmp_dir}/build-list.old" | \
+    sort -k6,6 | \
+    uniq -uf5 | \
+    grep '^append ' | \
+    awk '{print $2 " " $3 " " $4 " " $5}'
+fi
