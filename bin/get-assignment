@@ -108,41 +108,54 @@ fi
 
 # Find first package of build-list whose dependencies are all met
 
-while read -r package git_revision mod_git_revision repository; do
+for hand_out_broken in false true; do
 
-  if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
-    [ "${package}" = 'break_loops' ]; then
-    sed -i \
-      '/^break_loops$/d' \
-      "${work_dir}/build-list"
-    echo 'break_loops' >> \
-      "${work_dir}/build-list"
-    break
-  fi
+  while read -r package git_revision mod_git_revision repository; do
 
-  if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
-    continue
-  fi
+    if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
+      [ "${package}" = 'break_loops' ]; then
+      if ${hand_out_broken}; then
+        sed -i \
+          '/^break_loops$/d' \
+          "${work_dir}/build-list"
+        echo 'break_loops' >> \
+          "${work_dir}/build-list"
+        break
+      else
+        continue
+      fi
+    fi
 
-  [ -z "$(
-    (
-      cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
-      grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        awk '{print $1 "." $2 "." $3}' | \
-        sed "
-          s|^|${work_dir}/package-infos/|
-          s|\$|\.builds|
-        " | \
-        xargs -r cat | \
-        sort -u
-    ) | \
-      sort | \
-      uniq -d
-    )" ] || continue
+    if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+      continue
+    fi
 
-  hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+    if ! ${hand_out_broken} && \
+      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ]; then
+      continue
+    fi
 
-done < "${work_dir}/build-list"
+    [ -z "$(
+      (
+        cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+        grep -vxF 'break_loops' "${work_dir}/build-list" | \
+          awk '{print $1 "." $2 "." $3}' | \
+          sed "
+            s|^|${work_dir}/package-infos/|
+            s|\$|\.builds|
+          " | \
+          xargs -r cat | \
+          sort -u
+      ) | \
+        sort | \
+        uniq -d
+      )" ] || continue
+
+    hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+
+  done < "${work_dir}/build-list"
+
+done
 
 # Find package (of all packages which are not locked and have been broken the least times)
 # which breaks the most unlocked loops
