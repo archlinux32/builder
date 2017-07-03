@@ -11,6 +11,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 ### build slave only
 * some ssh-client
 * `devtools32`
+* `mercurial`
 
 ## configuration
 The standard configuration in `conf/default.conf` can be locally overwritten by `conf/local.conf`.
