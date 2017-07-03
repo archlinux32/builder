@@ -65,6 +65,7 @@ case "${action}" in
                   '
               done | \
               sort -u
+            printf '\n'
 
             continue
           fi
@@ -125,11 +126,27 @@ case "${action}" in
       if [ -n "${dependent_still_on_build_list}" ]; then
         printf 'The following packages are dependent on "%s", but still on the build list:\n' "${pkg}"
         echo "${dependent_still_on_build_list}"
+        printf '\n'
         continue
       fi
 
-      printf 'No dependencies left on build list for "%s".\n' "${pkg}"
-      echo "${dependent_packages}"
+      dependent_still_in_staging="$(
+        echo "${dependent_packages}" | \
+          while read -r sf; do
+            if [ -f "${work_dir}/package-states/$sf."*".done" ]; then
+              echo "${sf}"
+            fi
+          done
+      )"
+
+      if [ -n "${dependent_still_in_staging}" ]; then
+        printf 'The following packages are dependent on "%s" and still in staging - maybe they cannot be unstaged:\n' "${pkg}"
+        echo "${dependent_still_in_staging}"
+        printf '\n'
+        continue
+      fi
+
+      printf 'Package "%s" can be unstaged.\n' "${pkg}"
 
     done
 
