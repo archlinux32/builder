@@ -224,6 +224,11 @@ done < \
   awk '{print "append " $1 " " $2 " " $3 " " $4 " " $1}' > \
   "${tmp_dir}/build-list.append"
 
+# Create a lock file for build list.
+
+exec 9> "${build_list_lock_file}"
+flock 9
+
 # ignore packages already on the build list
 awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.old"
@@ -232,5 +237,9 @@ cat "${tmp_dir}/build-list.append" "${tmp_dir}/build-list.old" | \
   sort -k6,6 | \
   uniq -uf5 | \
   grep '^append ' | \
-  awk '{print $2 " " $3 " " $4 " " $5}' > \
-  "${work_dir}/build-list.new"
+  awk '{print $2 " " $3 " " $4 " " $5}' >> \
+  "${work_dir}/build-list"
+
+# Remove the lock file
+
+rm -f "${build_list_lock_file}"
