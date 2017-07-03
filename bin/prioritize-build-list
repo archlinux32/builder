@@ -1,0 +1,27 @@
+#!/bin/sh
+
+. "${0%/*}/../conf/default.conf"
+
+if [ $# -ne 1 ]; then
+  echo 'Usage: prioritize-build-list pkg-regex'
+  echo ' moves packages matching pkg-regex to front of build list'
+  exit 2
+fi
+
+# Create a lock file for build list.
+
+exec 9> "${build_list_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'come back (shortly) later - I cannot lock build list.'
+  exit 1
+fi
+
+(
+  sed -n "/^$1/p" "${work_dir}/build-list"
+  sed "/^$1/d" "${work_dir}/build-list"
+) | \
+  sponge "${work_dir}/build-list"
+
+# Remove the lock file
+
+rm -f "${build_list_lock_file}"
