@@ -149,13 +149,13 @@ while [ ${count} -ne 0 ]; do
       tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
 
       if [ -n "${PKGBUILD}" ]; then
-        eval "git -C \"$(printf '${repo_paths__%s}' "${git_repo}")/${PKGBUILD%/*}\" archive '${git_revision}'" | \
-          tar -x -C "${tmp_dir}"
+        eval 'git -C "'"$(printf '${repo_paths__%s}' "${git_repo}")"'"'" archive '${git_revision}' -- '${PKGBUILD%/*}'" | \
+          tar -x --strip-components=3 -C "${tmp_dir}"
       fi
       if [ -n "${PKGBUILD_mod}" ]; then
-        git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" | \
-          tar -x --overwrite --exclude 'PKGBUILD' -C "${tmp_dir}"
-        git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" | \
+        git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod%/*}" | \
+          tar -x --overwrite --exclude 'PKGBUILD' --strip-components=2 -C "${tmp_dir}"
+        git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
           tar -Ox 'PKGBUILD' >> \
           "${tmp_dir}/PKGBUILD"
       fi
