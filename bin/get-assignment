@@ -199,15 +199,15 @@ for package in $(
       "${work_dir}/build-list.sorted-by-package" | \
     while read -r count package git_revision git_mod_revision repository; do
       if [ -f "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken" ]; then
-        versuche="$(
+        trials="$(
           wc -l < \
             "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken"
         )"
       else
-        versuche='0'
+        trials='0'
       fi
       printf '%s %s %s.%s.%s.%s\n' \
-        "${versuche}" \
+        "${trials}" \
         "${count}" \
         "${package}" \
         "${git_revision}" \
