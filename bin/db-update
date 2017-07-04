@@ -396,7 +396,7 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
-tmp_dir="$(mktemp -d)"
+tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
 
 clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"

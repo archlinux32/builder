@@ -364,7 +364,7 @@ make_source_info() {
     exit ${err}
   }
 
-  overlays_dir="$(mktemp -d)"
+  overlays_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
 
   sudo mount -t tmpfs none "${overlays_dir}" || \
     bail_out
