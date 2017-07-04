@@ -121,7 +121,7 @@ while [ $# -gt 0 ]; do
       [ ${silence} -gt 0 ] || \
         >&2 printf 'sanity-check: checking repos on master mirror ...'
 
-      repos='community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
+      repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
       errors="$(
         (
