@@ -70,22 +70,24 @@ find_repository_with_commit() {
 find_git_repository_to_package_repository() {
 
   local repository
+  local package_repository
+
+  package_repository="$1"
+
+  if [ "$1" = 'build-support' ]; then
+    echo 'packages'
+    return 0
+  fi
 
   for repository in ${repo_names}; do
     if [ "${repository}" = "archlinux32" ]; then
       continue
     fi
-    if [ -n "$(
-      (
-        eval ls "$(printf '"${repo_paths__%s}"' "${repository}")/"*"/repos" | \
-          grep -v ':$' | \
-          sed 's|-[^-]\+$||' | \
-          sort -u
-        echo "$1"
-      ) | \
-        sort | \
-        uniq -d
-      )" ]; then
+    if eval ls "$(printf '"${repo_paths__%s}"' "${repository}")/"*"/repos" | \
+      grep -v ':$' | \
+      sed 's|-[^-]\+$||' | \
+      sort -u | \
+      grep -qxF "${package_repository}"; then
       echo "${repository}"
       return 0
     fi
