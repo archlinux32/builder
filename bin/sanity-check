@@ -93,6 +93,24 @@ while [ $# -gt 0 ]; do
         exit 1
       fi
 
+      errors="$(
+        (
+          grep -vxF 'break_loops' "${work_dir}/build-list" | \
+            awk '{print $1}'
+          cat "${work_dir}/deletion-list"
+        ) | \
+          sort | \
+          uniq -d
+      )"
+      if [ -n "${errors}" ]; then
+        if [ ${silence} -le 1 ]; then
+          echo
+          echo "The following packages appear on the build- and deletion-list:"
+          echo "${errors}"
+        fi
+        exit 1
+      fi
+
       [ ${silence} -gt 0 ] || \
         >&2 echo ' passed.'
 
