@@ -9,19 +9,26 @@ usage() {
   >&2 echo 'build-master-status: report about status of build master'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--broken $output:   Write broken packages to $output.'
-  >&2 echo '  -h|--help:             Show this help and exit.'
-  >&2 echo '  -n|--nice:             Write html output.'
-  >&2 echo '  -o|--output $output:   Write to $output instead of stdout.'
+  >&2 echo '  -b|--broken $output:'
+  >&2 echo '    Write broken packages to $output.'
+  >&2 echo '  -h|--help:'
+  >&2 echo '    Show this help and exit.'
+  >&2 echo '  -n|--nice:'
+  >&2 echo '    Write html output.'
+  >&2 echo '  -o|--output $output:'
+  >&2 echo '    Write to $output instead of stdout.'
+  >&2 echo '  -s|--statistics $output:'
+  >&2 echo '    Write statistics to $output.'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
 eval set -- "$(
-  getopt -o b:hno: \
+  getopt -o b:hno:s: \
     --long broken: \
     --long help \
     --long nice \
     --long output: \
+    --long statistics: \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -37,6 +44,7 @@ make_nice() {
 nice=false
 broken_output=''
 output_file=''
+statistics_output=''
 
 while true
 do
@@ -60,6 +68,10 @@ do
       output() {
         cat >> "${output_file}"
       }
+    ;;
+    -s|--statistics)
+      shift
+      statistics_output="$1"
     ;;
     --)
       shift
@@ -179,6 +191,26 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
     )" | \
     make_nice | \
     output
+fi
+
+if [ -n "${statistics_output}" ]; then
+  (
+    [ -f "${statistics_output}" ] && \
+      cat "${statistics_output}"
+    printf '%s ' \
+      "$(date +%s)" \
+      "${stable}" \
+      "${tasks}" \
+      "${pending_packages}" \
+      "${staging}" \
+      "${testing}" \
+      "${broken}" \
+      "${loops}" \
+      "${looped_packages}" | \
+      sed 's| $|\n|'
+  ) | \
+  tail -n 10080 | \
+  sponge "${statistics_output}"
 fi
 
 if [ -n "${broken_output}" ]; then
