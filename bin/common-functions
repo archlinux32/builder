@@ -424,3 +424,39 @@ recursively_umount_and_rm() {
     -exec 'sudo' 'umount' '-l' '{}' ';'
   rm -rf --one-file-system "${dir}"
 }
+
+# insert_break_loops_orders $file
+# inserts the correct number of 'break_loops' order into $file
+
+insert_break_loops_orders() {
+  local file="$1"
+  local looped_packages
+  local line
+
+  looped_packages="$(
+    ls "${work_dir}/build-list.loops" | \
+      grep '^loop_[0-9]\+$' | \
+      sed "s|^|${work_dir}/build-list.loops/|" | \
+      xargs -r cat | \
+      sort -u | \
+      wc -l
+  )"
+
+  (
+    while read -r line; do
+      if [ "${line}" = 'break_loops' ]; then
+        if [ ${looped_packages} -eq 0 ]; then
+          continue
+        fi
+        looped_packages=$((${looped_packages}-1))
+      fi
+      printf '%s\n' "${line}"
+    done < \
+      "${file}"
+    while [ ${looped_packages} -gt 0 ]; do
+      looped_packages=$((${looped_packages}-1))
+      echo 'break_loops'
+    done
+  ) | \
+    sponge "${file}"
+}

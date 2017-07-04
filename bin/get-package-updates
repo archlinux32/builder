@@ -360,9 +360,8 @@ if [ -s "${work_dir}/tsort.error" ]; then
         "${work_dir}/build-list.loops.new/${loop}"
     done
 
-  # add order to break loops to build list
-  echo 'break_loops' >> \
-    "${work_dir}/build-list.new.new"
+  # add orders to break loops to build list
+  insert_break_loops_orders "${work_dir}/build-list.new.new"
 
 else
   rm "${work_dir}/tsort.error"

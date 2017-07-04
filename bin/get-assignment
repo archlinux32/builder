@@ -115,11 +115,18 @@ for hand_out_broken in false true; do
     if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
       [ "${package}" = 'break_loops' ]; then
       if ${hand_out_broken}; then
-        sed -i \
-          '/^break_loops$/d' \
-          "${work_dir}/build-list"
-        echo 'break_loops' >> \
-          "${work_dir}/build-list"
+        first=true
+        while read -r s; do
+          if [ "${s}" = 'break_loops' ] && \
+            ${first}; then
+            first=false
+            continue
+          fi
+          printf '%s\n' "${s}"
+        done < \
+          "${work_dir}/build-list" | \
+          sponge "${work_dir}/build-list"
+        insert_break_loops_orders "${work_dir}/build-list"
         break
       else
         continue
