@@ -16,6 +16,25 @@ if ! "${base_dir}/bin/sanity-check" -r; then
   exit 1
 fi
 
+# remove broken/locked markes of packages not on the buildlist anymore
+
+(
+  ls "${work_dir}/package-states" | \
+    grep '\.broken$\|\.locked$' | \
+    sed '
+      s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|state \0 \1 \2 \3 \4|
+    '
+  awk '{
+    print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4
+  }' "${work_dir}/build-list"
+) | \
+  sort -k3 | \
+  uniq -uf2 | \
+  grep '^state ' | \
+  awk '{print $2}' | \
+  sed "s|^|${work_dir}/package-states/|" | \
+  xargs -rn1 rm
+
 # remove logs where package is not broken/locked anymore
 
 (
