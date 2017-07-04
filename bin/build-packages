@@ -156,7 +156,7 @@ while [ ${count} -ne 0 ]; do
         git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod%/*}" | \
           tar -x --overwrite --exclude 'PKGBUILD' --strip-components=2 -C "${tmp_dir}"
         git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
-          tar -Ox 'PKGBUILD' >> \
+          tar -Ox "${PKGBUILD_mod}" >> \
           "${tmp_dir}/PKGBUILD"
       fi
 
