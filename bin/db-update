@@ -558,7 +558,10 @@ move_packages $(
       continue
     fi
 
-    printf '%s/%s/%s\n' "${package}" "$(official_or_community ${package})testing" "$(repository_of_package "${package}")"
+    printf '%s/%s/%s\n' \
+      "${package}" \
+      "$(official_or_community "${package}" 'testing')" \
+      "$(repository_of_package "${package}")"
 
   done
 
@@ -574,9 +577,10 @@ move_packages $(
       continue
     fi
 
-    is_community="$(official_or_community "${package}")"
-
-    printf '%s/%s/%s\n' "${package}" "${is_community}staging" "${is_community}testing"
+    printf '%s/%s/%s\n' \
+      "${package}" \
+      "$(official_or_community "${package}" 'staging')" \
+      "$(official_or_community "${package}" 'testing')"
 
   done
 

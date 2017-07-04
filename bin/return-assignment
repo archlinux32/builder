@@ -179,7 +179,7 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move packages
-destination="$(official_or_community "$1.$2.$3.$4")staging"
+destination="$(official_or_community "$1.$2.$3.$4" 'staging')"
 
 ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
@@ -223,8 +223,10 @@ fi
 sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 
 # remove package lock file
-printf '%s\n' ${packages} > \
-  "${work_dir}/package-states/$1.$2.$3.$4.done"
+if ! [ "${destination}" = 'build-support' ]; then
+  printf '%s\n' ${packages} > \
+    "${work_dir}/package-states/$1.$2.$3.$4.done"
+fi
 rm -f \
   "${work_dir}/package-states/$1.$2.$3.$4.locked" \
   "${work_dir}/package-states/$1.$2.$3.$4.broken"
