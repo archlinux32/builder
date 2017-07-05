@@ -98,7 +98,7 @@ for repo in ${repo_names}; do
     tar -t | \
     grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
     grep -v -- '-i686/PKGBUILD$' | \
-    grep -v '\(staging\|testing\)$' | \
+    grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
     sed '
       s|^\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1 \2|
     '

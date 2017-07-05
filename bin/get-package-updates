@@ -178,10 +178,9 @@ for repo in ${repo_names}; do
     grep '^\S\+ .\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
     # ignore i686
     grep -v -- '-i686/PKGBUILD$' | \
-    sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|' | \
     # ignore staging and testing
-    grep -v '\(staging\|testing\)$' | \
-    cat
+    grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+    sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|'
 done | \
   sort -u | \
   while read -r mode package git_revision repository; do
