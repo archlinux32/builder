@@ -131,6 +131,14 @@ broken="$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.broken$'
   )" || true
+blocked="$(
+  ls "${work_dir}/package-states/" | \
+    grep -c '\.blocked$'
+  )" || true
+locked="$(
+  ls "${work_dir}/package-states/" | \
+    grep -c '\.locked$'
+  )" || true
 loops="$(
   ls "${work_dir}/build-list.loops" | \
     grep -c '^loop_[0-9]\+$'
@@ -206,7 +214,9 @@ if [ -n "${statistics_output}" ]; then
       "${testing}" \
       "${broken}" \
       "${loops}" \
-      "${looped_packages}" | \
+      "${looped_packages}" \
+      "${locked}" \
+      "${blocked}" | \
       sed 's| $|\n|'
   ) | \
   tail -n 10080 | \
