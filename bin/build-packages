@@ -192,7 +192,7 @@ while [ ${count} -ne 0 ]; do
             # we can't improve anything
             break
           fi
-          tar -xzkf "${source_name}" --exclude PKGBUILD --strip-components=1 || true
+          tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
         fi
 
         for parameters in '' '-c'; do
