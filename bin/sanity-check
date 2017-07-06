@@ -64,7 +64,7 @@ while [ $# -gt 0 ]; do
     build-list)
 
       [ ${silence} -gt 0 ] || \
-        >&2 printf 'sanity-check: checking build-list ...'
+        >&2 printf 'checking build-list ...'
 
       errors="$(
         grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$\|^break_loops$' "${work_dir}/build-list"
@@ -119,7 +119,7 @@ while [ $# -gt 0 ]; do
     repos)
 
       [ ${silence} -gt 0 ] || \
-        >&2 printf 'sanity-check: checking repos on master mirror ...'
+        >&2 printf 'checking repos on master mirror ...'
 
       repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
@@ -295,7 +295,7 @@ while [ $# -gt 0 ]; do
     *)
 
       [ ${silence} -gt 1 ] || \
-        >&2 printf 'sanity-check: unknown check "%s".\n' "$1"
+        >&2 printf 'unknown sanity-check "%s".\n' "$1"
       exit 2
 
     ;;
