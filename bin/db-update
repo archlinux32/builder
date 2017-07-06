@@ -367,7 +367,11 @@ do
   shift
 done
 
-packages_to_stabilize=${packages_to_stabilize} ${@}
+packages_to_stabilize="$(
+  printf '%s\n' \
+    ${packages_to_stabilize} \
+    ${@}
+)"
 
 if ! "${base_dir}/bin/sanity-check" -r; then
   >&2 echo 'Build master is not sane.'
