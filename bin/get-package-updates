@@ -207,12 +207,8 @@ done | \
     esac
   done
 
-sort -u "${work_dir}/deletion-list.new" > \
-  "${work_dir}/deletion-list.new.new"
-
-mv \
-  "${work_dir}/deletion-list.new.new" \
-  "${work_dir}/deletion-list.new"
+sort -u "${work_dir}/deletion-list.new" | \
+  sponge "${work_dir}/deletion-list.new"
 
 echo 'Extract dependencies of packages.'
 
