@@ -232,7 +232,8 @@ if [ -n "${broken_output}" ]; then
         'git revision' \
         'modification git revision' \
         'package repository' \
-        'compilations'
+        'compilations' \
+        'blocked'
       printf '</tr>\n'
     fi
     ls "${work_dir}/package-states" | \
@@ -247,17 +248,23 @@ if [ -n "${broken_output}" ]; then
               "${mod_rev}" \
               "${repo}" \
               "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
+            if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
+              tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked"
+            else
+              printf '&nbsp;'
+            fi
             printf '\n'
           done | \
           sort -k5n,5 | \
-          while read -r pkg rev mod_rev repo count; do
+          while read -r pkg rev mod_rev repo count reason; do
             printf '<tr>'
             printf '<td>%s</td>' \
               "${pkg}" \
               "${rev}" \
               "${mod_rev}" \
               "${repo}" \
-              "${count}"
+              "${count}" \
+              "${reason}"
             printf '</tr>\n'
           done
       else
