@@ -195,67 +195,72 @@ while [ ${count} -ne 0 ]; do
           tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
         fi
 
-        for parameters in '' '-c'; do
-          rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
+        for build_command in 'staging-i686-build' 'staging-with-build-support-i686-build'; do
+          for parameters in '' '-c'; do
+            rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
 
-          >&2 printf 'building package "%s" ...' "${package}"
-          # by piping the log, we don't see anything in the terminal,
-          # but all ways to duplicate the logs seem pretty elaborate
-          if staging-i686-build ${parameters} > \
-            "$(
-              date -u --iso-8601=seconds | \
-                cut -d+ -f1
-            ).build-log" 2>&1; then
-            # build successful
-            >&2 printf ' ok.\n'
-            ls -1 *.pkg.tar.xz | \
-              xargs -rn1 gpg --local-user="${package_key}" --detach-sign || \
-              bail_out
-            tar -cf 'package.tar' $(
-                ls -1 | \
-                  grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
-                  grep -v -- '-debug-'
-              ) || \
-              bail_out
-            while true; do
-              err=0
-              ssh \
-                -i "${master_build_server_identity}" \
-                -p "${master_build_server_port}" \
-                "${master_build_server_user}@${master_build_server}" \
-                'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
-                < 'package.tar' || \
-                err=$?
-              case ${err} in
-                0)
-                  # upload successful
-                  break
-                ;;
-                1)
-                  >&2 echo '"return-assignment" was running already.'
-                  wait_some_time 15
-                ;;
-                2)
-                  >&2 echo 'I was too slow, the package is outdated. I will continue ...'
-                  break
-                ;;
-                3)
-                  >&2 echo "'return-assignment' reports a signature error."
-                  bail_out 1
-                ;;
-                4)
-                  >&2 echo "'return-assignment' reports too many or missing packages."
-                  bail_out 1
-                ;;
-                *)
-                  >&2 echo "unknown return code ${err} from 'return-assignment'"
-                  bail_out 1
-              esac
-            done
-            success=true
+            >&2 printf 'building package "%s" ...' "${package}"
+            # by piping the log, we don't see anything in the terminal,
+            # but all ways to duplicate the logs seem pretty elaborate
+            if "${build_command}" ${parameters} > \
+              "$(
+                date -u --iso-8601=seconds | \
+                  cut -d+ -f1
+              ).build-log" 2>&1; then
+              # build successful
+              >&2 printf ' ok.\n'
+              ls -1 *.pkg.tar.xz | \
+                xargs -rn1 gpg --local-user="${package_key}" --detach-sign || \
+                bail_out
+              tar -cf 'package.tar' $(
+                  ls -1 | \
+                    grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
+                    grep -v -- '-debug-'
+                ) || \
+                bail_out
+              while true; do
+                err=0
+                ssh \
+                  -i "${master_build_server_identity}" \
+                  -p "${master_build_server_port}" \
+                  "${master_build_server_user}@${master_build_server}" \
+                  'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+                  < 'package.tar' || \
+                  err=$?
+                case ${err} in
+                  0)
+                    # upload successful
+                    break
+                  ;;
+                  1)
+                    >&2 echo '"return-assignment" was running already.'
+                    wait_some_time 15
+                  ;;
+                  2)
+                    >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                    break
+                  ;;
+                  3)
+                    >&2 echo "'return-assignment' reports a signature error."
+                    bail_out 1
+                  ;;
+                  4)
+                    >&2 echo "'return-assignment' reports too many or missing packages."
+                    bail_out 1
+                  ;;
+                  *)
+                    >&2 echo "unknown return code ${err} from 'return-assignment'"
+                    bail_out 1
+                esac
+              done
+              success=true
+              break
+            fi
+            >&2 printf ' failed.\n'
+          done
+          if ${success}; then
             break
           fi
-          >&2 printf ' failed.\n'
         done
         if ${success}; then
           break
