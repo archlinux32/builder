@@ -12,6 +12,7 @@
     printf 'pkgbase = %s\n' "${pkgbase}"
   fi
   printf '\tarch = %s\n' "${arch[@]}"
+  printf '\tgroups = %s\n' "${groups[@]}"
   for print in 'makedepends' 'checkdepends' 'depends' 'provides'; do
     eval printf "'\t${print} = %s\n'" '"${'"${print}"'[@]}"'
     for a in 'i686'; do

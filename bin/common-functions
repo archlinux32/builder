@@ -152,7 +152,7 @@ generate_package_metadata() {
   sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
 
   # extract "builds" = provides \cup pkgname
-  grep "$(printf '^\\(\tprovides\\|pkgname\\) = ')" "${file_prefix}.SRCINFO" | \
+  grep "$(printf '^\\(\tprovides\\|pkgname\\) = \\|^\tgroups = base')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \

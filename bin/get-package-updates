@@ -287,6 +287,8 @@ while read -r package git_revision mod_git_revision repository; do
   sed "s|^|${package} |" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.builds"
   # add "$dependency -> $pkgname" to build-order list
   sed "s|\$| ${package}|" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+  # add "base/base-devel -> $pkgname" to build-order list
+  printf "%s ${package}\n" 'base' 'base-devel'
 done \
   < "${work_dir}/build-list.new" \
   > "${work_dir}/build-order"
