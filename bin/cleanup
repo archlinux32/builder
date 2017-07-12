@@ -76,3 +76,6 @@ ls "${build_log_directory}" | \
     done
   ) | \
   xargs -rn1 rm
+
+# remove old package meta data
+delete_old_metadata
