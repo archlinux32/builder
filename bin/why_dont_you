@@ -156,6 +156,132 @@ case "${action}" in
 
   ;;
 
+  'keep')
+
+    tmp_file="$(mktemp)"
+    trap 'rm -f "${tmp_file}"' EXIT
+
+    while read -r pkg; do
+
+      if builds_file="$(
+        ls "${work_dir}/package-infos" | \
+          grep -m1 "^$(str_to_regex "${pkg}")\.[^.]\+\.[^.]\+\.builds\$"
+        )"; then
+
+        builds_file="${builds_file%.*}"
+        mod_rev="${builds_file##*.}"
+        builds_file="${builds_file%.*}"
+        rev="${builds_file##*.}"
+
+      else
+
+        found_PKGBUILD=false
+        mod_rev="$(cat "${work_dir}/archlinux32.revision")"
+        for repo in ${repo_names}; do
+          eval 'repo_path="${repo_paths__'"${repo}"'}"'
+          rev="$(cat "${work_dir}/${repo}.revision")"
+          if [ "${repo}" = 'archlinux32' ]; then
+            if git -C "${repo_path}" archive "${mod_rev}" | \
+              grep -q "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$"; then
+              prepo="$(
+                git -C "${repo_path}" archive "${mod_rev}" | \
+                  grep "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$" | \
+                  cut -d/ -f1
+              )"
+              found_PKGBUILD=true
+              break
+            fi
+          else
+            prepo="$(
+              git -C "${repo_path}" archive "${rev}" -- "${pkg}/repos" 2>/dev/null | \
+                tar -t 2> /dev/null | \
+                grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+                grep -v -- '-i686/PKGBUILD$' | \
+                grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+                sed '
+                  s|^[^/]\+/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1|
+                ' | \
+                head -n1
+            )"
+            if [ -n "${prepo}" ]; then
+              found_PKGBUILD=true
+              break
+            fi
+          fi
+        done
+        if ! ${found_PKGBUILD}; then
+          continue
+        fi
+
+        generate_package_metadata "${pkg}" "${rev}" "${mod_rev}" "${prepo}"
+
+      fi
+
+      sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.builds" >> \
+        "${tmp_file}"
+
+    done < \
+      "${work_dir}/deletion-list"
+
+    sort -k3,3 "${tmp_file}" | \
+      sponge "${tmp_file}"
+
+    for pkg in "$@"; do
+
+      if ! grep -qxF "${pkg}" "${work_dir}/deletion-list"; then
+        printf 'Package "%s" is not on the deletion list.\n' "${pkg}"
+        continue
+      fi
+
+      if git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
+        tar -Ox 'blacklist' | \
+        grep -qxF "${pkg}"; then
+        printf 'Package "%s" is explicitely blacklisted.\n' "${pkg}"
+        continue
+      fi
+
+      if [ "lib32-${pkg#lib32-}" = "${pkg}" ]; then
+        printf 'Package "%s" is a library from multilib.\n' "${pkg}"
+        continue
+      fi
+
+      if ! needs="$(
+          ls "${work_dir}/package-infos" | \
+            grep "^$(str_to_regex "${pkg}")\..*\.needs\$"
+        )"; then
+        printf 'Package "%s" was deleted in the git repositories.\n' "${pkg}"
+        continue
+      fi
+
+      needs="$(
+        printf "${work_dir}/package-infos/%s\n" ${needs} | \
+          xargs -r cat | \
+          sort -u
+      )"
+
+      errors="$(
+        (
+          printf '%s\n' ${needs}
+          awk '{print $3}' "${tmp_file}" | \
+            sort -u
+        ) | \
+          sort | \
+          uniq -d | \
+          join -1 1 -2 3 -o 2.1,2.2,2.3 - "${tmp_file}"
+      )"
+      if [ -n "${errors}" ]; then
+        printf 'Package "%s" has dependencies on the deletion list:\n' "${pkg}"
+        printf '%s %s %s\n' ${errors}
+        printf '\n'
+        continue
+      fi
+
+      printf 'It seems, package "%s" should not be deleted.\n' "${pkg}"
+
+    done
+
+  ;;
+
   *)
     >&2 printf 'unknown action "%s"\n' "${action}"
     exit 1
