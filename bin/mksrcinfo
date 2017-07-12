@@ -4,6 +4,8 @@
 #  bleh - this should really be handled by makepkg!
 
 (
+  CARCH='i686'
+
   . ./PKGBUILD
 
   if [ -z "${pkgbase}" ]; then
