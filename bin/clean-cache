@@ -1,0 +1,57 @@
+#!/bin/sh
+
+. "${0%/*}/../conf/default.conf"
+
+if [ $# -eq 0 ]; then
+  dummynator='sudo'
+elif [ $# -eq 1 ] && [ "x$1" = 'x-n' ]; then
+  dummynator='echo'
+else
+  >&2 echo 'usage: clean-cache [-n]'
+  >&2 echo '  cleans /var/cache/archbuild32'
+  >&2 echo '  (or prints what would be cleaned)'
+  exit 1
+fi
+
+repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
+
+mirror="$(
+  grep -m1 '^Server = ' '/etc/pacman.d/mirrorlist32' | \
+    cut -d= -f2 | \
+    sed 's|^\s*||'
+)"
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+for repo in ${repos}; do
+  mkdir "${tmp_dir}/${repo}"
+  wget -qO - "$(
+    echo "${mirror}" | \
+      sed "$(
+        printf 's|%s|%s|\n' \
+          '\$repo' "${repo}" \
+          '\$arch' 'i686' \
+          '$' "/${repo}.db.tar.gz"
+      )"
+  )" | \
+    tar -xzC "${tmp_dir}/${repo}"
+done
+
+find "${tmp_dir}" -type f -name desc \
+  -printf '%h ' \
+  -exec grep -xFA1 '%SHA256SUM%' {} \; | \
+  sed '
+    N
+    s|^.\+/\([^/]\+\) %SHA256SUM%\n\(.\+\)$|\2  /var/cache/archbuild32/\1|
+  ' | \
+  sort -k2,2 | \
+  uniq -uf1 | \
+  while read -r s; do
+    printf '%s%s\n' \
+      "${s}" '-i686.pkg.tar.xz' \
+      "${s}" '-any.pkg.tar.xz'
+  done | \
+  sha256sum -c --ignore-missing --quiet 2> /dev/null | \
+  sed 's|: FAILED$||' | \
+  xargs -r ${dummynator} rm
