@@ -194,23 +194,32 @@ generate_package_metadata() {
 delete_old_metadata() {
 
   (
-    ls -1 "${work_dir}/package-infos" | \
-      sed '
-        s|\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2|
-      ' | \
-      sort -u
-    ls -1 "${work_dir}/package-states" | \
-      sed '
-        s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\{2\}$| \1 \2|
-      ' | \
-      sort -u | \
-      sed 'p'
-    cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
-      sed 'p'
+    (
+      ls -1 "${work_dir}/package-infos" | \
+        sed '
+          s|\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2|
+        ' | \
+        sort -u
+      ls -1 "${work_dir}/package-states" | \
+        sed '
+          s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\{2\}$| \1 \2|
+        ' | \
+        sort -u | \
+        sed 'p'
+      cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
+        sed 'p'
+    ) | \
+      sort | \
+      uniq -u | \
+      awk '{print $2 " " $3 " " $1}'
+    sed '
+      s|^|whatever whatever |
+      p
+    ' "${work_dir}/deletion-list"
   ) | \
-    sort | \
-    uniq -u | \
-    while read -r pkg rev mod_rev; do
+    sort -k3,3 | \
+    uniq -uf2 | \
+    while read -r rev mod_rev pkg; do
       rm -f "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}".*
     done
 }
