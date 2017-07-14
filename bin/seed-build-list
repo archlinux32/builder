@@ -249,7 +249,8 @@ if ${update}; then
 fi
 
 # ignore packages already on the build list
-awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list" > \
+grep -vxF 'break_loops' "${work_dir}/build-list" | \
+  awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' > \
   "${tmp_dir}/build-list.old"
 
 # ignore packages on the deletion-list

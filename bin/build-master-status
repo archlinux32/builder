@@ -103,8 +103,8 @@ tasks="$(
     "${work_dir}/build-list"
   )" || true
 pending_packages="$(
-  tr ' ' '.' < \
-    "${work_dir}"/build-list | \
+  grep '^\S\+ \S\+ \S\+ \S\+$' "${work_dir}/build-list" | \
+    tr ' ' '.' | \
     while read -r package; do
       generate_package_metadata "${package}" &> /dev/null
       cat "${work_dir}/package-infos/${package%.*}.packages"
