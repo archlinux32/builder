@@ -143,13 +143,13 @@ generate_package_metadata() {
     echo "make_source_info failed."
     exit 1
   fi
-  if [ ! -f "${file_prefix}.SRCINFO" ]; then
+  if [ ! -s "${file_prefix}.SRCINFO" ]; then
     >&2 printf '"%s" not created by "make_source_info" - eh, what?' "${file_prefix}.SRCINFO"
     exit 1
   fi
 
   # otherwise this just calls for trouble
-  sed -i '/=\s*$/d' "${file_prefix}.SRCINFO"
+  sed -i '/^[^=]*=\s*$/d' "${file_prefix}.SRCINFO"
 
   # extract "builds" = provides \cup pkgname
   grep "$(printf '^\\(\tprovides\\|pkgname\\) = \\|^\tgroups = base')" "${file_prefix}.SRCINFO" | \
@@ -167,6 +167,7 @@ generate_package_metadata() {
 
   # extract "depends" = makedepends \cup checkdepends \cup depends
   (
+    printf 'all_depend = %s\n' 'base' 'base-devel'
     sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
     grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
   ) | \
@@ -179,6 +180,7 @@ generate_package_metadata() {
   (
     cat "${file_prefix}.depends"
     sed 'p' "${file_prefix}.builds"
+    printf '%s\n' 'base-devel' 'base-devel'
   ) | \
     sort | \
     uniq -u > \
