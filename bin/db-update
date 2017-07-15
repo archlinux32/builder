@@ -20,6 +20,9 @@
 
 #  separate locks for staging, testing (and stable)
 
+#  correctly handle if a package moved from community to official or
+#    vice versa
+
 . "${0%/*}/../conf/default.conf"
 
 usage() {
