@@ -249,7 +249,8 @@ if [ -n "${broken_output}" ]; then
               "${repo}" \
               "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
             if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
-              tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked"
+              tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
+                sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
             else
               printf '&nbsp;'
             fi
