@@ -2,10 +2,6 @@
 
 # contains functions used by more than one script
 
-# TODO:
-
-#  mangle $arch in PKBUILDs to contain i486, i586, i686
-
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision
 # find the PKGBUILD and modification of $package from $repository
 # sets $PKGBUILD and $PKGBUILD_mod
@@ -480,4 +476,12 @@ insert_break_loops_orders() {
     done
   ) | \
     sponge "${file}"
+}
+
+# append_architectures $PKGBUILD
+#  mangle $arch in PKBUILDs to contain i486, i586, i686
+
+append_architectures() {
+  local PKGBUILD="$1"
+  sed -i '/^arch=(/s/(/(i686 /'
 }

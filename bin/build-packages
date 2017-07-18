@@ -159,6 +159,7 @@ while [ ${count} -ne 0 ]; do
         git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
           tar -Ox "${PKGBUILD_mod}" >> \
           "${tmp_dir}/PKGBUILD"
+        append_architectures "${tmp_dir}/PKGBUILD"
       fi
 
       cd "${tmp_dir}"
