@@ -143,10 +143,11 @@ while [ ${count} -ne 0 ]; do
           err=$1
         fi
         cd "${base_dir}"
-        rm -rf --one-file-system "${tmp_dir}"
+        recursively_umount_and_rm "${tmp_dir}"
         exit ${err}
       }
       tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+      trap bail_out EXIT
 
       if [ -n "${PKGBUILD}" ]; then
         eval 'git -C "'"$(printf '${repo_paths__%s}' "${git_repo}")"'"'" archive '${git_revision}' -- '${PKGBUILD%/*}'" | \
@@ -162,9 +163,10 @@ while [ ${count} -ne 0 ]; do
 
       cd "${tmp_dir}"
       success=false
-      for mirrored_source in false true; do
+      for straw in ${straws_that_might_repair_failing_builds}; do
 
-        if ${mirrored_source}; then
+        if echo "${straw}" | \
+          grep -qF ':mirrored_source:'; then
           # maybe a missing source is/was the problem?
           # try to download them from sources.archlinux.org/sources/$repo/$source
           source_name="$(
@@ -190,88 +192,88 @@ while [ ${count} -ne 0 ]; do
           )"
           if ! wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
             # we can't improve anything
-            break
+            continue
           fi
           tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
         fi
 
-        for build_command in 'staging-i686-build' 'staging-with-build-support-i686-build'; do
-          for parameters in '' '-c'; do
-            rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
+        if echo "${straw}" | \
+          grep -qF ':with_build_support:'; then
+          build_command='staging-with-build-support-i686-build'
+        else
+          build_command='staging-i686-build'
+        fi
+        if echo "${straw}" | \
+          grep -qF ':clean_chroot:'; then
+          parameters='-c'
+        else
+          parameters=''
+        fi
 
-            >&2 printf 'building package "%s" ...' "${package}"
-            # by piping the log, we don't see anything in the terminal,
-            # but all ways to duplicate the logs seem pretty elaborate
-            if "${build_command}" ${parameters} > \
-              "$(
-                date -u --iso-8601=seconds | \
-                  cut -d+ -f1
-              ).build-log" 2>&1; then
-              # build successful
-              >&2 printf ' ok.\n'
-              ls -1 *.pkg.tar.xz | \
-                xargs -rn1 gpg --local-user="${package_key}" --detach-sign || \
-                bail_out
-              tar -cf 'package.tar' $(
-                  ls -1 | \
-                    grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
-                    grep -v -- '-debug-'
-                ) || \
-                bail_out
-              while true; do
-                err=0
-                ssh \
-                  -i "${master_build_server_identity}" \
-                  -p "${master_build_server_port}" \
-                  "${master_build_server_user}@${master_build_server}" \
-                  'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
-                  < 'package.tar' || \
-                  err=$?
-                case ${err} in
-                  0)
-                    # upload successful
-                    break
-                  ;;
-                  1)
-                    >&2 echo '"return-assignment" was running already.'
-                    wait_some_time 15
-                  ;;
-                  2)
-                    >&2 echo 'I was too slow, the package is outdated. I will continue ...'
-                    break
-                  ;;
-                  3)
-                    >&2 echo "'return-assignment' reports a signature error."
-                    bail_out 1
-                  ;;
-                  4)
-                    >&2 echo "'return-assignment' reports too many or missing packages."
-                    bail_out 1
-                  ;;
-                  *)
-                    >&2 echo "unknown return code ${err} from 'return-assignment'"
-                    bail_out 1
-                esac
-              done
-              success=true
-              break
-            fi
-            >&2 printf ' failed.\n'
+        rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
+
+        >&2 printf 'building package "%s" ...' "${package}"
+        # by piping the log, we don't see anything in the terminal,
+        # but all ways to duplicate the logs seem pretty elaborate
+        if "${build_command}" ${parameters} > \
+          "$(
+            date -u --iso-8601=seconds | \
+              cut -d+ -f1
+          ).build-log" 2>&1; then
+          # build successful
+          >&2 printf ' ok.\n'
+          ls -1 *.pkg.tar.xz | \
+            xargs -rn1 gpg --local-user="${package_key}" --detach-sign
+          tar -cf 'package.tar' $(
+            ls -1 | \
+              grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
+              grep -v -- '-debug-'
+            )
+          while true; do
+            err=0
+            ssh \
+              -i "${master_build_server_identity}" \
+              -p "${master_build_server_port}" \
+              "${master_build_server_user}@${master_build_server}" \
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+              < 'package.tar' || \
+              err=$?
+            case ${err} in
+              0)
+                # upload successful
+                break
+              ;;
+              1)
+                >&2 echo '"return-assignment" was running already.'
+                wait_some_time 15
+              ;;
+              2)
+                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                break
+              ;;
+              3)
+                >&2 echo "'return-assignment' reports a signature error."
+                bail_out 1
+              ;;
+              4)
+                >&2 echo "'return-assignment' reports too many or missing packages."
+                bail_out 1
+              ;;
+              *)
+                >&2 echo "unknown return code ${err} from 'return-assignment'"
+                bail_out 1
+            esac
           done
-          if ${success}; then
-            break
-          fi
-        done
-        if ${success}; then
+          success=true
           break
         fi
+        >&2 printf ' failed.\n'
       done
 
       if ! ${success}; then
         for log in *'.build-log'; do
           if [ -f "${log}" ]; then
-            gzip "${log}" || \
-              bail_out
+            gzip "${log}"
           fi
         done
         tar -cf 'build-logs.gz.tar' \
@@ -293,7 +295,8 @@ while [ ${count} -ne 0 ]; do
 
       # clean up tmp_dir
       cd "${base_dir}"
-      rm -rf --one-file-system "${tmp_dir}"
+      recursively_umount_and_rm "${tmp_dir}"
+      trap - EXIT
 
       continue
 
