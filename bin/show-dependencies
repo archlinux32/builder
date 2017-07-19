@@ -31,58 +31,25 @@ sort -u "${work_dir}/build-order" | \
   sort -u | \
   sponge "${tmp_dir}/original-build-order"
 
-for repo in ${repo_names}; do
-  eval 'repo_path="${repo_paths__'"${repo}"'}"'
-  repo_revision="$(cat "${work_dir}/${repo}.revision")"
+ls "${work_dir}/package-infos" | \
+  sed 's|\(\.[^.]\+\)\{3\}$||' | \
+  sort -u > \
+  "${tmp_dir}/known-packages"
 
-  git -C "${repo_path}" archive "${repo_revision}" | \
-    tar -t | \
-    sed 's|/$||' | \
-    grep -v '/' | \
-    sort -u >> \
-    "${tmp_dir}/known-packages"
-
-  git -C "${repo_path}" archive "${repo_revision}" | \
-    tar -Ox --wildcards --wildcards-match-slash '*/PKGBUILD' | \
-    sed -n '
-      s/#.*$//
-      /^\s*\(groups\|provides\)=/{
-        :loop
-        /)/{
-          s/).*$//
-          s/^.*(//
-          p
-          d
-        }
-        $!N
-        s/#.*$//
-        bloop
-      }
-    ' | \
-    tr "'\" " "\n" | \
-    cut -d= -f1 | \
-    grep -vxF '' | \
-    grep -vF '$' | \
-    sort -u >> \
-    "${tmp_dir}/known-groups"
-done
-
-sort -u "${tmp_dir}/known-groups" | \
-  sponge "${tmp_dir}/known-groups"
+ls "${work_dir}/package-infos" | \
+  grep '\.groups$' | \
+  sed "s|^|${work_dir}/package-infos/|" | \
+  xargs -r cat | \
+  sort -u > \
+  "${tmp_dir}/known-groups"
 
 ls "${work_dir}/package-infos" | \
   grep '\.packages$' | \
   while read -r pf; do
-    grep -xF "${pf%.*.*.*}" "${work_dir}/package-infos/${pf}" >> \
-      "${tmp_dir}/known-packages" || \
-      true
     grep -vxF "${pf%.*.*.*}" "${work_dir}/package-infos/${pf}" | \
       xargs -r printf "${pf%.*.*.*} %s\n" >> \
       "${tmp_dir}/known-split-packages"
   done
-
-sort -u "${tmp_dir}/known-packages" | \
-  sponge "${tmp_dir}/known-packages"
 
 for target_package in "$@"; do
 
