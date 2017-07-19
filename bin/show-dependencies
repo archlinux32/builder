@@ -2,6 +2,8 @@
 
 . "${0%/*}/../conf/default.conf"
 
+# Create a lock file.
+
 if [ $# -eq 0 ]; then
   broken="$(
     ls "${work_dir}/package-states" | \
@@ -11,7 +13,26 @@ if [ $# -eq 0 ]; then
     echo "${broken}" | \
       sed 's|\(\.[^.]\+\)\{4\}$||'
   )"
-  exec "$0" ${broken}
+  "$0" ${broken}
+  exit $?
+fi
+
+if ps ax | \
+  grep -v grep | \
+  grep -v "^\s*$$\s" | \
+  grep -wF "$0$(
+    printf ' %s' "$@"
+  )"; then
+
+  >&2 echo $$
+  >&2 echo 'I was running already.'
+  exit
+fi
+
+exec 9> "${work_dir}/${0##*/}.lock"
+if ! flock -n 9; then
+  echo 'Cannot get lock.'
+  exit
 fi
 
 tmp_dir="$(mktemp -d)"
@@ -197,3 +218,5 @@ for target_package in "$@"; do
   dot -Tpng -o "${output}" "${tmp_dir}/input" || continue
 
 done
+
+rm "${work_dir}/${0##*/}.lock"
