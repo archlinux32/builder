@@ -148,15 +148,15 @@ generate_package_metadata() {
   # otherwise this just calls for trouble
   sed -i '/^[^=]*=\s*$/d' "${file_prefix}.SRCINFO"
 
-  # extract "builds" = provides \cup pkgname
-  grep "$(printf '^\\(\tprovides\\|pkgname\\) = \\|^\tgroups = base')" "${file_prefix}.SRCINFO" | \
+  # extract "builds" = provides \cup pkgname \cup groups
+  grep "$(printf '^\\(\tprovides\\|\tgroups\\|pkgname\\) = ')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
     "${file_prefix}.builds"
 
-  # extract "groups" = groups
-  grep "$(printf '^\tgroups = ')" "${file_prefix}.SRCINFO" | \
+  # extract "groups" = groups \cup provides
+  grep "$(printf '^\t\\(groups\\|provides\\) = ')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
