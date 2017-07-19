@@ -493,3 +493,36 @@ append_architectures() {
   local PKGBUILD="$1"
   sed -i '/^arch=(/s/(/(i686 /'
 }
+
+# find_newest_of_git_revisions
+# find newest git revision of the ones provided at stdin
+# (assuming linear history)
+
+find_newest_of_git_revisions() {
+  local revisions
+  local repo
+  revisions="$(cat)"
+
+  repo="$(
+    find_repository_with_commit \
+      "$(
+        echo "${revisions}" | \
+          grep -xm1 '[0-9a-f]\{40\}'
+      )"
+  )"
+
+  eval 'repo="${repo_paths__'"${repo}"'}"'
+
+  echo "${revisions}" | \
+    xargs -rn1 git -C "${repo}" rev-parse | \
+    (
+      newest=''
+      while read -r current; do
+        if [ -z "${newest}" ] || \
+          git -C "${repo}" merge-base --is-ancestor "${newest}" "${current}"; then
+            newest="${current}"
+          fi
+      done
+      echo "${newest}"
+    )
+}
