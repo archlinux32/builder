@@ -1,0 +1,232 @@
+#!/bin/sh
+
+. "${0%/*}/../conf/default.conf"
+
+if [ $# -eq 0 ]; then
+  broken="$(
+    ls "${work_dir}/package-states" | \
+      grep '\.broken$'
+  )"
+  broken="$(
+    echo "${broken}" | \
+      sed 's|\(\.[^.]\+\)\{4\}$||'
+  )"
+  exec "$0" ${broken}
+fi
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+sort -u "${work_dir}/build-order" | \
+  grep -v '^\(\S\+\) \1$' | \
+  grep '^\S\+ \S\+$' > \
+  "${tmp_dir}/original-build-order"
+
+(
+  sort -k1,1 "${tmp_dir}/original-build-order" | \
+    join -1 1 -2 1 -o 1.1,1.2 - "${work_dir}/build-list.sorted-by-package"
+  sort -k2,2 "${tmp_dir}/original-build-order" | \
+    join -1 2 -2 1 -o 1.1,1.2 - "${work_dir}/build-list.sorted-by-package"
+) | \
+  sort -u | \
+  sponge "${tmp_dir}/original-build-order"
+
+for repo in ${repo_names}; do
+  eval 'repo_path="${repo_paths__'"${repo}"'}"'
+  repo_revision="$(cat "${work_dir}/${repo}.revision")"
+
+  git -C "${repo_path}" archive "${repo_revision}" | \
+    tar -t | \
+    sed 's|/$||' | \
+    grep -v '/' | \
+    sort -u >> \
+    "${tmp_dir}/known-packages"
+
+  git -C "${repo_path}" archive "${repo_revision}" | \
+    tar -Ox --wildcards --wildcards-match-slash '*/PKGBUILD' | \
+    sed -n '
+      s/#.*$//
+      /^\s*\(groups\|provides\)=/{
+        :loop
+        /)/{
+          s/).*$//
+          s/^.*(//
+          p
+          d
+        }
+        $!N
+        s/#.*$//
+        bloop
+      }
+    ' | \
+    tr "'\" " "\n" | \
+    cut -d= -f1 | \
+    grep -vxF '' | \
+    grep -vF '$' | \
+    sort -u >> \
+    "${tmp_dir}/known-groups"
+done
+
+sort -u "${tmp_dir}/known-groups" | \
+  sponge "${tmp_dir}/known-groups"
+
+ls "${work_dir}/package-infos" | \
+  grep '\.packages$' | \
+  while read -r pf; do
+    grep -xF "${pf%.*.*.*}" "${work_dir}/package-infos/${pf}" >> \
+      "${tmp_dir}/known-packages" || \
+      true
+    grep -vxF "${pf%.*.*.*}" "${work_dir}/package-infos/${pf}" | \
+      xargs -r printf "${pf%.*.*.*} %s\n" >> \
+      "${tmp_dir}/known-split-packages"
+  done
+
+sort -u "${tmp_dir}/known-packages" | \
+  sponge "${tmp_dir}/known-packages"
+
+for target_package in "$@"; do
+
+  rm -f \
+    "${tmp_dir}/knots" \
+    "${tmp_dir}/build-order"
+  touch "${tmp_dir}/knots"
+
+  output="/srv/http/graphs/${target_package}.png"
+
+  (
+    grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" || \
+      true
+    printf '0 target-package %s\n' "${target_package}" >> \
+      "${tmp_dir}/knots"
+  ) | \
+    sort -u > \
+    "${tmp_dir}/build-order"
+
+  last_sum=''
+  current_sum="$(sha512sum "${tmp_dir}/build-order")"
+  while ! [ "${last_sum}" = "${current_sum}" ]; do
+
+    last_sum="${current_sum}"
+
+    while read -r s t; do
+      printf '%s %s\n' "${s}" "${t}"
+      grep -h " $(str_to_regex "${s}")\$" \
+        "${tmp_dir}/original-build-order" \
+        "${tmp_dir}/known-split-packages" \
+        "${tmp_dir}/known-groups" || \
+        true
+    done < \
+      "${tmp_dir}/build-order" | \
+      sort -u | \
+      sponge "${tmp_dir}/build-order"
+
+    current_sum="$(sha512sum "${tmp_dir}/build-order")"
+
+  done
+
+  tr ' ' '\n' < \
+    "${tmp_dir}/build-order" | \
+    sort -u | \
+    join -j 1 - "${work_dir}/build-list.sorted-by-package" | \
+    while read pkg rev mod_rev repo; do
+      if [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.broken" ]; then
+        printf '1 broken-build-list-package %s\n' "${pkg}"
+      else
+        printf '2 build-list-package %s\n' "${pkg}"
+      fi
+    done >> \
+    "${tmp_dir}/knots"
+
+  (
+    awk '{print $2}' "${tmp_dir}/known-split-packages" | \
+      sort -u
+    tr ' ' '\n' < \
+      "${tmp_dir}/build-order" | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d | \
+    xargs -r printf '3 split-package %s\n' >> \
+    "${tmp_dir}/knots"
+
+  (
+    cat "${tmp_dir}/known-packages"
+    tr ' ' '\n' < \
+      "${tmp_dir}/build-order" | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d | \
+    xargs -r printf '4 package %s\n' >> \
+    "${tmp_dir}/knots"
+
+  (
+    cat "${tmp_dir}/known-groups"
+    tr ' ' '\n' < \
+      "${tmp_dir}/build-order" | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d | \
+    xargs -r printf '5 group %s\n' >> \
+    "${tmp_dir}/knots"
+
+  tr ' ' '\n' < \
+    "${tmp_dir}/build-order" | \
+    sort -u | \
+    xargs -r printf '100 unknown %s\n' >> \
+    "${tmp_dir}/knots"
+
+  printf '%s\n' \
+    'digraph dependencies {' \
+    '  fontname=dejavu;' > \
+    "${tmp_dir}/input"
+
+  sort -k3,3 -k1n,1 "${tmp_dir}/knots" | \
+    uniq -f2 | \
+    while read -r num what who; do
+      if [ "${what}" = 'broken-build-list-package' ]; then
+        color='#ff0000'
+      elif [ "${what}" = 'build-list-package' ]; then
+        color='#800000'
+      elif [ "${what}" = 'target-package' ]; then
+        color='#00ff00'
+      elif [ "${what}" = 'package' ]; then
+        color='#000000'
+      elif [ "${what}" = 'split-package' ]; then
+        color='#808080'
+      elif [ "${what}" = 'group' ]; then
+        color='#0000ff'
+      else
+        color='#ff80ff'
+      fi
+      printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
+    done >> \
+    "${tmp_dir}/input"
+
+  xargs -rn2 printf '  "%s" -> "%s";\n' < \
+    "${tmp_dir}/build-order" | \
+    sort -u >> \
+    "${tmp_dir}/input"
+
+  printf '%s\n' \
+    '}' >> \
+    "${tmp_dir}/input"
+
+  line_count="$(wc -l < "${tmp_dir}/input")"
+  if [ "${line_count}" -gt 500 ]; then
+    >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
+      "${target_package}" \
+      "${line_count}"
+    continue
+  fi
+  printf 'small enough (%s): %d\n' \
+    "${target_package}" \
+    "${line_count}"
+
+  touch "${output}"
+  chmod 644 "${output}"
+
+  dot -Tpng -o "${output}" "${tmp_dir}/input" || continue
+
+done
