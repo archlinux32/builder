@@ -260,7 +260,7 @@ if [ -n "${broken_output}" ]; then
           while read -r pkg rev mod_rev repo count reason; do
             printf '<tr>'
             printf '<td>%s</td>' \
-              "${pkg}" \
+              '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
               "${rev}" \
               "${mod_rev}" \
               "${repo}" \
