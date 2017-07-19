@@ -131,6 +131,7 @@ generate_package_metadata() {
   if [ -e "${file_prefix}.builds" ] && \
     [ -e "${file_prefix}.depends" ] && \
     [ -e "${file_prefix}.needs" ] && \
+    [ -e "${file_prefix}.groups" ] && \
     [ -e "${file_prefix}.packages" ]; then
     return 0
   fi
@@ -153,6 +154,13 @@ generate_package_metadata() {
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
     "${file_prefix}.builds"
+
+  # extract "groups" = groups
+  grep "$(printf '^\tgroups = ')" "${file_prefix}.SRCINFO" | \
+    cut -d= -f2 | \
+    sed 's|^\s\+||; s|[<>]$||' | \
+    sort -u > \
+    "${file_prefix}.groups"
 
   # extract "packages" = pkgname
   grep '^pkgname = ' "${file_prefix}.SRCINFO" | \
