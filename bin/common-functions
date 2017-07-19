@@ -199,33 +199,101 @@ generate_package_metadata() {
 
 delete_old_metadata() {
 
+  local current_metadata
+
+  current_metadata="$(
+    ls "${work_dir}/package-infos" | \
+      sed '
+        s|\.[^.]\+$||
+        s|\.\([^.]\+\)\.\([^.]\+\)$| \1 \2|
+      ' | \
+      sort -u
+  )"
+
   (
+    # what we have
+    echo "${current_metadata}"
+
+    # package-states should stay
+    ls -1 "${work_dir}/package-states" | \
+      sed '
+        s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\{2\}$| \1 \2|
+      ' | \
+      sort -u | \
+      sed 'p'
+
+    # build-list items should stay
+    cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
+      sed 'p'
+
+    current_metadata_file="$(mktemp)"
+    trap 'rm -f "${current_metadata_file}"' EXIT
+
+    echo "${current_metadata}" | \
+      sort -k1,1 > \
+      "${current_metadata_file}"
+
+    # the newest of the following should stay:
     (
-      ls -1 "${work_dir}/package-infos" | \
-        sed '
-          s|\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2|
-        ' | \
-        sort -u
-      ls -1 "${work_dir}/package-states" | \
-        sed '
-          s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\{2\}$| \1 \2|
-        ' | \
-        sort -u | \
-        sed 'p'
-      cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
-        sed 'p'
+      # deletion-list items
+      cat "${work_dir}/deletion-list"
+      # all packages in the repos
+      for repo in ${repo_names}; do
+        eval 'git -C "${repo_paths__'"${repo}"'}" archive '"$(cat "${work_dir}/${repo}.revision")" | \
+          tar -t | \
+          sed '
+            s|/$||
+            /\//d
+          '
+      done
     ) | \
-      sort | \
-      uniq -u | \
-      awk '{print $2 " " $3 " " $1}'
-    sed '
-      s|^|whatever whatever |
-      p
-    ' "${work_dir}/deletion-list"
+      sort -u | \
+      join -j 1 -o 2.2,2.3,2.1 - "${current_metadata_file}" | \
+      sort -k3,3 | \
+      uniq --group=append -f2 | \
+      (
+        revs=''
+        mod_revs=''
+        opkg=''
+        while read -r rev mod_rev pkg; do
+
+          if [ -z "${rev}" ] && \
+            [ -z "${mod_rev}" ] && \
+            [ -z "${pkg}" ]; then
+
+            printf '%s %s %s\n' \
+              "$(
+                printf '%s\n' ${revs} | \
+                  find_newest_of_git_revisions
+              )" \
+              "$(
+                printf '%s\n' ${mod_revs} | \
+                  find_newest_of_git_revisions
+              )" \
+              "${opkg}"
+
+            revs=''
+            mod_revs=''
+            opkg=''
+            continue
+          fi
+          revs="$(
+            printf '%s\n' ${revs} ${rev} | \
+              sort -u
+          )"
+          mod_revs="$(
+            printf '%s\n' ${mod_revs} ${mod_rev} | \
+              sort -u
+          )"
+          opkg="${pkg}"
+        done
+      ) | \
+      awk '{print $3 " " $1 " " $2}' | \
+      sed 'p'
   ) | \
-    sort -k3,3 | \
-    uniq -uf2 | \
-    while read -r rev mod_rev pkg; do
+    sort | \
+    uniq -u | \
+    while read -r pkg rev mod_rev; do
       rm -f "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}".*
     done
 }
