@@ -371,9 +371,9 @@ rm -rf --one-file-system "${work_dir}/build-list.loops"
     mv "${work_dir}/${file}.new" "${work_dir}/${file}"
   done
 
-# Delete old package meta data
-delete_old_metadata
-
 # Remove the lock file
 
 rm -f "${build_list_lock_file}"
+
+# Delete old package meta data
+delete_old_metadata
