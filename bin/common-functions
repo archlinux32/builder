@@ -503,6 +503,16 @@ find_newest_of_git_revisions() {
   local repo
   revisions="$(cat)"
 
+  if [ $(
+    echo "${revisions}" | \
+      wc -l
+    ) -eq 1 ]; then
+
+    echo "${revisions}"
+    return
+
+  fi
+
   repo="$(
     find_repository_with_commit \
       "$(
