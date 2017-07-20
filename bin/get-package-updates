@@ -374,6 +374,3 @@ rm -rf --one-file-system "${work_dir}/build-list.loops"
 # Remove the lock file
 
 rm -f "${build_list_lock_file}"
-
-# Delete old package meta data
-delete_old_metadata
