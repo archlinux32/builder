@@ -226,12 +226,12 @@ delete_old_metadata() {
     cut -d' ' -f1,2,3 "${work_dir}/build-list" | \
       sed 'p'
 
-    current_metadata_file="$(mktemp)"
-    trap 'rm -f "${current_metadata_file}"' EXIT
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     echo "${current_metadata}" | \
       sort -k1,1 > \
-      "${current_metadata_file}"
+      "${tmp_dir}/current-metadata"
 
     # the newest of the following should stay:
     (
@@ -248,8 +248,17 @@ delete_old_metadata() {
       done
     ) | \
       sort -u | \
-      join -j 1 -o 2.2,2.3,2.1 - "${current_metadata_file}" | \
-      sort -k3,3 | \
+      join -j 1 -o 2.2,2.3,2.1 - "${tmp_dir}/current-metadata" | \
+      sort -k3,3 > \
+      "${tmp_dir}/find-newest-revisions"
+
+    uniq -uf2 < \
+      "${tmp_dir}/find-newest-revisions" | \
+      awk '{print $3 " " $1 " " $2}' | \
+      sed 'p'
+
+    uniq -Df2 < \
+      "${tmp_dir}/find-newest-revisions" | \
       uniq --group=append -f2 | \
       (
         revs=''
