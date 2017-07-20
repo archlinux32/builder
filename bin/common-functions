@@ -604,3 +604,39 @@ find_newest_of_git_revisions() {
       echo "${newest}"
     )
 }
+
+# find_package_repository_to_package $package $git_repository
+# find the package repository a package from a given git repository
+# belongs to
+
+find_package_repository_to_package() {
+
+  local package="$1"
+  local git_repository="$2"
+  local repo_path
+  local repo
+
+  eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
+
+  repo="$(
+    ls "${repo_path}/${package}/repos" 2> /dev/null | \
+      grep -v 'staging\|testing' | \
+      grep -v -- '-i686$' | \
+      sed 's|-[^-]\+$||' | \
+      sort -u
+  )"
+
+  if [ -z "${repo}" ]; then
+    return 1
+  fi
+
+  if [ "$(
+    echo "${repo}" | \
+      wc -l
+    )" -ne 1 ]; then
+    return 1
+  fi
+
+  echo "${repo}"
+
+}
