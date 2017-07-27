@@ -213,7 +213,7 @@ while [ ${count} -ne 0 ]; do
 
         rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
 
-        >&2 printf 'building package "%s" ...' "${package}"
+        >&2 printf 'building package "%s" (straw: %s) ...' "${package}" "${straw}"
         # by piping the log, we don't see anything in the terminal,
         # but all ways to duplicate the logs seem pretty elaborate
         if "${build_command}" ${parameters} > \
@@ -277,17 +277,17 @@ while [ ${count} -ne 0 ]; do
             gzip "${log}"
           fi
         done
-        tar -cf 'build-logs.gz.tar' \
-          *'.build-log.gz' || \
-          continue # this might happen if we didn't create any logs
-        while ! ssh \
-          -i "${master_build_server_identity}" \
-          -p "${master_build_server_port}" \
-          "${master_build_server_user}@${master_build_server}" \
-          'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' < \
-          'build-logs.gz.tar'; do
-          wait_some_time 15
-        done
+        if tar -cf 'build-logs.gz.tar' \
+          *'.build-log.gz'; then
+          while ! ssh \
+            -i "${master_build_server_identity}" \
+            -p "${master_build_server_port}" \
+            "${master_build_server_user}@${master_build_server}" \
+            'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' < \
+            'build-logs.gz.tar'; do
+            wait_some_time 15
+          done
+        fi
         if ${exit_after_failure}; then
           >&2 echo 'Build failed, exiting now'
           bail_out 0
