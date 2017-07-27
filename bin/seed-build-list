@@ -94,7 +94,7 @@ for repo in ${repo_names}; do
     continue
   fi
   eval 'repo_path="${repo_paths__'"${repo}"'}"'
-  git -C "${repo_path}" archive origin/master | \
+  git -C "${repo_path}" archive "$(cat "${work_dir}/${repo}.revision")" | \
     tar -t | \
     grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
     grep -v -- '-i686/PKGBUILD$' | \
@@ -258,7 +258,7 @@ awk '{print "delete " $1 " X X X " $1}' "${work_dir}/deletion-list" >> \
   "${tmp_dir}/build-list.old"
 
 # ignore packages on the blacklist
-git -C "${repo_paths__archlinux32}" archive HEAD -- blacklist | \
+git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
   tar -Ox blacklist | \
   awk '{print "blacklist " $1 " X X X " $1}' >> \
   "${tmp_dir}/build-list.old"
