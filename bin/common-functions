@@ -67,6 +67,7 @@ find_git_repository_to_package_repository() {
 
   local repository
   local package_repository
+  local repo_path
 
   package_repository="$1"
 
@@ -79,8 +80,11 @@ find_git_repository_to_package_repository() {
     if [ "${repository}" = "archlinux32" ]; then
       continue
     fi
-    if eval ls "$(printf '"${repo_paths__%s}"' "${repository}")/"*"/repos" | \
-      grep -v ':$' | \
+    eval 'repo_path="${repo_paths__'"${repository}"'}"'
+    if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- | \
+      tar -t --wildcards '*/repos' | \
+      grep '^\([^/]\+/\)\{3\}PKGBUILD$' | \
+      cut -d/ -f3 | \
       sed 's|-[^-]\+$||' | \
       sort -u | \
       grep -qxF "${package_repository}"; then
