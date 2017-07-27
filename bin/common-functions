@@ -148,13 +148,6 @@ generate_package_metadata() {
   # otherwise this just calls for trouble
   sed -i '/^[^=]*=\s*$/d' "${file_prefix}.SRCINFO"
 
-  # extract "builds" = provides \cup pkgname \cup groups
-  grep "$(printf '^\\(\tprovides\\|\tgroups\\|pkgname\\) = ')" "${file_prefix}.SRCINFO" | \
-    cut -d= -f2 | \
-    sed 's|^\s\+||; s|[<>]$||' | \
-    sort -u > \
-    "${file_prefix}.builds"
-
   # extract "groups" = groups \cup provides
   grep "$(printf '^\t\\(groups\\|provides\\) = ')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
@@ -169,7 +162,12 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.packages"
 
-  # extract "depends" = makedepends \cup checkdepends \cup depends
+  # extract "builds" = provides \cup pkgname \cup groups
+  cat "${file_prefix}.groups" "${file_prefix}.packages" | \
+    sort -u > \
+    "${file_prefix}.builds"
+
+  # extract "depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \}
   (
     printf 'all_depend = %s\n' 'base' 'base-devel'
     sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
