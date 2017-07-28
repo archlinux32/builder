@@ -462,7 +462,7 @@ make_source_info() {
 
   (
     cd "${tmp_file%/*}"
-    makepkg --printsrcinfo
+    makepkg -p "${tmp_file}" --printsrcinfo
   ) > \
     "${output}"
 
