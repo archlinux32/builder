@@ -146,9 +146,9 @@ for hand_out_broken in false true; do
 
     [ -z "$(
       (
-        cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+        cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
         grep -vxF 'break_loops' "${work_dir}/build-list" | \
-          awk '{print $1 "." $2 "." $3}' | \
+          awk '{print $1 "." $2 "." $3 "." $4}' | \
           sed "
             s|^|${work_dir}/package-infos/|
             s|\$|\.builds|

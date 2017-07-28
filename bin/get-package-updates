@@ -228,37 +228,113 @@ echo 'apply blacklisting'
 
 black_listed=''
 black_listed_new="$(
-  cat "${repo_paths__archlinux32}/blacklist"
-  ls "${work_dir}/package-infos" | \
-    grep '\.depends$' | \
-    sed "s|^|${work_dir}/package-infos/|" | \
-    xargs -r grep -l '^lib32-' | \
-    sed '
-      s|^.*/||
-      s|\(\.[^.]\+\)\{3\}$||
-    '
+  (
+    git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
+      tar -Ox 'blacklist'
+    ls "${work_dir}/package-infos" | \
+      grep '^lib32-' | \
+      sed 's|\(\.[^.]\+\)\{4\}$||' | \
+      uniq
+  ) | \
+    sort -u
 )"
+
+ls "${work_dir}/package-infos/" | \
+  grep '\.builds$' | \
+  sed '
+    s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|\2 \3 \4 \1|
+  ' | \
+  sort -k4,4 | \
+  uniq -f3 --group=append | \
+  while read rev mod_rev repo pkg; do
+    if [ -z "${fs}" ] && \
+      [ -z "${rev}" ] && \
+      [ -z "${mod_rev}" ] && \
+      [ -z "${repo}" ] && \
+      [ -z "${pkg}" ]; then
+      printf '%s %s.%s.%s.%s\n' \
+        "${opkg}" \
+        "${opkg}" \
+        "$(
+          printf '%s\n' ${revs} | \
+            sort -u | \
+            find_newest_of_git_revisions
+        )" \
+        "$(
+          printf '%s\n' ${mod_revs} | \
+            sort -u | \
+            find_newest_of_git_revisions
+        )" \
+        "${orepo}"
+      revs=''
+      mod_revs=''
+      continue
+    fi
+    revs="$(
+      printf '%s\n' \
+        ${revs} \
+        "${rev}"
+    )"
+    mod_revs="$(
+      printf '%s\n' \
+        ${mod_revs} \
+        "${mod_rev}"
+    )"
+    opkg="${pkg}"
+    orepo="${repo}"
+  done | \
+  sort -k1,1 > \
+  "${work_dir}/newest-revisions"
+
+sed "
+  s|^\S\+ |${work_dir}/package-infos/|
+  s|\$|.builds|
+" "${work_dir}/newest-revisions" | \
+  xargs -r cat | \
+  sort | \
+  uniq -c > \
+  "${work_dir}/built-packages"
+
+sed "
+  s|^\S\+ |${work_dir}/package-infos/|
+  s|\$|.needs|
+" "${work_dir}/newest-revisions" | \
+  xargs -r grep -HF '' | \
+  sed '
+    s|\(\.[^.]\+\)\{4\}:\([^:]\+\)$| \2|
+    s|^.*/||
+  ' | \
+  sort -k2,2 > \
+  "${work_dir}/newest-dependencies"
 
 while [ -n "${black_listed_new}" ]; do
   black_listed="$(
-    printf '%s\n%s' "${black_listed}" "${black_listed_new}"
+    printf '%s\n' ${black_listed} ${black_listed_new} | \
+      sort -u
   )"
   black_listed_new="$(
-    echo "${black_listed_new}" | \
-      while read -r bl_package; do
-        ls "${work_dir}/package-infos" | \
-          grep '\.depends$' | \
-          sed "s|^|${work_dir}/package-infos/|" | \
-          xargs -r grep -lxF "${bl_package}" | \
-          sed '
-            s|^.*/||
-            s|\(\.[^.]\+\)\{3\}$||
-          '
-      done | \
+    (
+      printf '%s\n' ${black_listed} | \
+        sort -k1,1 | \
+        join -j1 -o 2.2 - "${work_dir}/newest-revisions" | \
+        sed "
+          s|^|${work_dir}/package-infos/|
+          s|\$|.builds|
+        " | \
+        xargs -r cat | \
+        sort | \
+        uniq -c
+      cat "${work_dir}/built-packages"
+    ) | \
+      sort | \
+      uniq -d | \
+      awk '{print $2}' | \
+      sort -k2,2 | \
+      join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
       while read -r pkg; do
         if [ "${pkg}" = 'python-pysocks' ] || \
           [ "${pkg}" = 'gens' ]; then
-          >&2 printf 'blacklisting: %s would be black listed, but is ignored.' "${pkg}"
+          >&2 printf 'blacklisting: %s would be black listed, but is ignored.\n' "${pkg}"
         else
           echo "${pkg}"
         fi
@@ -266,7 +342,7 @@ while [ -n "${black_listed_new}" ]; do
       sort -u
   )"
   black_listed_new="$(
-    printf '%s\n' "${black_listed}" "${black_listed}" "${black_listed_new}" | \
+    printf '%s\n' ${black_listed} ${black_listed} ${black_listed_new} | \
       sort | \
       uniq -u
   )"
@@ -284,9 +360,9 @@ sort -u "${work_dir}/deletion-list.new" | \
 
 while read -r package git_revision mod_git_revision repository; do
   # add "$pkgname -> $build-target" to build-order list
-  sed "s|^|${package} |" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.builds"
+  sed "s|^|${package} |" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.builds"
   # add "$dependency -> $pkgname" to build-order list
-  sed "s|\$| ${package}|" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+  sed "s|\$| ${package}|" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
   # add "base/base-devel -> $pkgname" to build-order list
   printf "%s ${package}\n" 'base' 'base-devel'
 done \

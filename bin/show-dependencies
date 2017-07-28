@@ -53,7 +53,7 @@ sort -u "${work_dir}/build-order" | \
   sponge "${tmp_dir}/original-build-order"
 
 ls "${work_dir}/package-infos" | \
-  sed 's|\(\.[^.]\+\)\{3\}$||' | \
+  sed 's|\(\.[^.]\+\)\{4\}$||' | \
   sort -u > \
   "${tmp_dir}/known-packages"
 
@@ -67,8 +67,8 @@ ls "${work_dir}/package-infos" | \
 ls "${work_dir}/package-infos" | \
   grep '\.packages$' | \
   while read -r pf; do
-    grep -vxF "${pf%.*.*.*}" "${work_dir}/package-infos/${pf}" | \
-      xargs -r printf "${pf%.*.*.*} %s\n" >> \
+    grep -vxF "${pf%.*.*.*.*}" "${work_dir}/package-infos/${pf}" | \
+      xargs -r printf "${pf%.*.*.*.*} %s\n" >> \
       "${tmp_dir}/known-split-packages"
   done
 

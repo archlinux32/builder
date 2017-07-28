@@ -26,11 +26,11 @@ case "${action}" in
             continue
           fi
 
-          if [ -n "$(
+          unmet_dependencies="$(
             (
-              cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
+              cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
               grep -vxF 'break_loops' "${work_dir}/build-list" | \
-                awk '{print $1 "." $2 "." $3}' | \
+                awk '{print $1 "." $2 "." $3 "." $4}' | \
                 sed "
                   s|^|${work_dir}/package-infos/|
                   s|\$|\.builds|
@@ -40,26 +40,15 @@ case "${action}" in
             ) | \
               sort | \
               uniq -d
-            )" ]; then
+          )"
+          if [ -n "${unmet_dependencies}" ]; then
             printf '"%s" has unmet dependencies:\n' "${package}"
-            (
-              cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.needs"
-              grep -vxF 'break_loops' "${work_dir}/build-list" | \
-                awk '{print $1 "." $2 "." $3}' | \
-                sed "
-                  s|^|${work_dir}/package-infos/|
-                  s|\$|\.builds|
-                " | \
-                xargs -r cat | \
-                sort -u
-            ) | \
-              sort | \
-              uniq -d | \
+            echo "${unmet_dependencies}" | \
               while read -r dep; do
                 grep -lxF "${dep}" "${work_dir}/package-infos/"*".builds" | \
                   sed '
                     s|^.*/||
-                    s|\(\.[^.]\+\)\{3\}||
+                    s|\(\.[^.]\+\)\{4\}||
                   '
               done | \
               sort -u
@@ -103,7 +92,7 @@ case "${action}" in
       dependent_packages_file="$(mktemp)"
 
       grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        awk '{print $1 "." $2 "." $3 " " $4}' | \
+        awk '{print $1 "." $2 "." $3 "." $4}' | \
         sort -u > \
         "${build_list_items_file}"
 
@@ -112,7 +101,7 @@ case "${action}" in
         "${dependent_packages_file}"
 
       dependent_still_on_build_list="$(
-        join -1 1 -2 1 -o 1.1,1.2 \
+        join -1 1 -2 1 -o 1.1 \
           "${build_list_items_file}" \
           "${dependent_packages_file}"
       )"
@@ -131,7 +120,7 @@ case "${action}" in
       dependent_still_in_staging="$(
         echo "${dependent_packages}" | \
           while read -r sf; do
-            if [ -f "${work_dir}/package-states/$sf."*".done" ]; then
+            if [ -f "${work_dir}/package-states/${sf}.done" ]; then
               echo "${sf}"
             fi
           done
@@ -159,9 +148,11 @@ case "${action}" in
 
       if builds_file="$(
         ls "${work_dir}/package-infos" | \
-          grep -m1 "^$(str_to_regex "${pkg}")\.[^.]\+\.[^.]\+\.builds\$"
+          grep -m1 "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.builds\$"
         )"; then
 
+        builds_file="${builds_file%.*}"
+        prepo="${builds_file##*.}"
         builds_file="${builds_file%.*}"
         mod_rev="${builds_file##*.}"
         builds_file="${builds_file%.*}"
@@ -211,7 +202,7 @@ case "${action}" in
 
       fi
 
-      sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.builds" >> \
+      sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.${prepo}.builds" >> \
         "${tmp_file}"
 
     done < \

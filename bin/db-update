@@ -444,7 +444,7 @@ done
 grep -vxF 'break_loops' "${work_dir}/build-list" | \
   while read -r pkg pkg_rev mod_rev repo; do
     generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
-    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.depends"
+    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.${repo}.depends"
   done | \
   sort -u > \
   "${tmp_dir}/keep_packages"
@@ -491,7 +491,7 @@ while [ -s "${tmp_dir}/new_keep_packages" ]; do
 
   new_keep_packages="$(
     while read -r package; do
-      cat "${work_dir}/package-infos/${package%.*}.depends"
+      cat "${work_dir}/package-infos/${package}.depends"
     done < \
       "${tmp_dir}/new_keep_packages" | \
       sort -u

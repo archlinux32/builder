@@ -107,7 +107,7 @@ pending_packages="$(
     tr ' ' '.' | \
     while read -r package; do
       generate_package_metadata "${package}" &> /dev/null
-      cat "${work_dir}/package-infos/${package%.*}.packages"
+      cat "${work_dir}/package-infos/${package}.packages"
     done |
     wc -l
 )"

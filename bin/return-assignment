@@ -166,7 +166,7 @@ package_errors="$(
     sed '
       s|$| i686|
       s|^|expected: |
-    ' "${work_dir}/package-infos/$1.$2.$3.packages"
+    ' "${work_dir}/package-infos/$1.$2.$3.$4.packages"
   ) | \
     sort -k2 | \
     uniq -u -f1
