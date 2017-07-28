@@ -438,7 +438,6 @@ make_source_info() {
   local git_repo
   local PKGBUILD
   local PKGBUILD_mod
-  local tmp_file
 
   git_repo="$(find_repository_with_commit "${git_revision}")"
 
@@ -448,29 +447,20 @@ make_source_info() {
 
   find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
-  tmp_file="$(mktemp "${work_dir}/tmp.XXXXXX")"
-
-  if [ -n "${PKGBUILD}" ]; then
-    eval git -C "$(printf '"${repo_paths__%s}"' "${git_repo}")" 'archive "${git_revision}" -- "${PKGBUILD}"' | \
-      tar -Ox >> \
-      "${tmp_file}"
-  fi
-
-  if [ -n "${PKGBUILD_mod}" ]; then
-    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
-      tar -Ox >> \
-      "${tmp_file}"
-  fi
-
-  sed -i '/^\$Id\$$/d' "${tmp_file}"
-
   (
-    cd "${tmp_file%/*}"
-    makepkg -p "${tmp_file}" --printsrcinfo
-  ) > \
-    "${output}"
 
-  rm -f "${tmp_file}"
+    tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+    trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+    extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
+
+    (
+      cd "${tmp_dir}"
+      makepkg --printsrcinfo
+    ) > \
+      "${output}"
+
+  )
 
 }
 
@@ -617,5 +607,35 @@ find_package_repository_to_package() {
   fi
 
   echo "${repo}"
+
+}
+
+# extract_source_directory $git_repo $rev $mod_rev $output
+# extract files found in the svn/git source directories
+# $PKGBUILD and $PKGBUILD_mod are expected to be set correctly
+
+extract_source_directory() {
+
+  local git_repo="$1"
+  local rev="$2"
+  local mod_rev="$3"
+  local output="$4"
+
+  if [ -n "${PKGBUILD}" ]; then
+    eval 'git -C "${repo_paths__'"${git_repo}"'}" archive "${rev}" -- "${PKGBUILD%/*}"' | \
+      tar -x --strip-components=3 -C "${output}"
+  fi
+
+  if [ -n "${PKGBUILD_mod}" ]; then
+    git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${PKGBUILD_mod%/*}" | \
+      tar -x --overwrite --exclude 'PKGBUILD' --strip-components=2 -C "${output}" 2> /dev/null || \
+      true
+    git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${PKGBUILD_mod}" | \
+      tar -Ox "${PKGBUILD_mod}" >> \
+      "${output}/PKGBUILD"
+    append_architectures "${output}/PKGBUILD"
+  fi
+
+  sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
 }

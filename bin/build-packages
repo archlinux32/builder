@@ -149,18 +149,7 @@ while [ ${count} -ne 0 ]; do
       tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
       trap bail_out EXIT
 
-      if [ -n "${PKGBUILD}" ]; then
-        eval 'git -C "'"$(printf '${repo_paths__%s}' "${git_repo}")"'"'" archive '${git_revision}' -- '${PKGBUILD%/*}'" | \
-          tar -x --strip-components=3 -C "${tmp_dir}"
-      fi
-      if [ -n "${PKGBUILD_mod}" ]; then
-        git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod%/*}" | \
-          tar -x --overwrite --exclude 'PKGBUILD' --strip-components=2 -C "${tmp_dir}"
-        git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${PKGBUILD_mod}" | \
-          tar -Ox "${PKGBUILD_mod}" >> \
-          "${tmp_dir}/PKGBUILD"
-        append_architectures "${tmp_dir}/PKGBUILD"
-      fi
+      extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
 
       cd "${tmp_dir}"
       success=false
