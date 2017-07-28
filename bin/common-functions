@@ -591,7 +591,7 @@ find_package_repository_to_package() {
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
   repo="$(
-    git -C "${repo_path}" archive "$(cat "${work_dir}/${repo}.revision")" -- "${package}/repos" 2> /dev/null | \
+    git -C "${repo_path}" archive "$(cat "${work_dir}/${git_repository}.revision")" -- "${package}/repos" 2> /dev/null | \
       tar -t | \
       cut -d/ -f3 | \
       grep -vxF '' | \
