@@ -106,7 +106,7 @@ pending_packages="$(
   grep '^\S\+ \S\+ \S\+ \S\+$' "${work_dir}/build-list" | \
     tr ' ' '.' | \
     while read -r package; do
-      generate_package_metadata "${package}" &> /dev/null
+      generate_package_metadata "${package}" 2>&1 > /dev/null
       cat "${work_dir}/package-infos/${package}.packages"
     done |
     wc -l
