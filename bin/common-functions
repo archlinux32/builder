@@ -150,10 +150,13 @@ generate_package_metadata() {
   fi
 
   # otherwise this just calls for trouble
-  sed -i '/^[^=]*=\s*$/d' "${file_prefix}.SRCINFO"
+  sed -i '
+    /^[^=]*=\s*$/d
+    s/_i686\(\s*=\)/\1/
+  ' "${file_prefix}.SRCINFO"
 
   # extract "groups" = groups \cup provides
-  grep "$(printf '^\t\\(groups\\|provides\\(_i686\\)\\?\\) = ')" "${file_prefix}.SRCINFO" | \
+  grep "$(printf '^\t\\(groups\\|provides\\) = ')" "${file_prefix}.SRCINFO" | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
     sort -u > \
@@ -174,8 +177,8 @@ generate_package_metadata() {
   # extract "depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \}
   (
     printf 'all_depend = %s\n' 'base' 'base-devel'
-    sed -n "$(printf '/^pkgname = /q;/^\tdepends\\(_i686\\)\\? = /p')" "${file_prefix}.SRCINFO"
-    grep "$(printf '^\t\\(makedepends\\|checkdepends\\)\\(_i686\\)\\? = ')" "${file_prefix}.SRCINFO"
+    sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
+    grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
   ) | \
     cut -d= -f2 | \
     sed 's|^\s\+||; s|[<>]$||' | \
@@ -525,7 +528,7 @@ insert_break_loops_orders() {
 
 append_architectures() {
   local PKGBUILD="$1"
-  sed -i '/^arch=(/s/(/(i686 /'
+  sed -i '/^arch=(/s/(/(i686 /' "${PKGBUILD}"
 }
 
 # find_newest_of_git_revisions
