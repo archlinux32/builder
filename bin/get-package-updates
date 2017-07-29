@@ -15,7 +15,7 @@
 #  dependencies declared inside a PKGBUILD's package function do not
 #   correctly take into account CARCH (see package "gens" from community)
 
-#  remove extra case for "python-pysocks" and "gens"
+#  remove extra whitelist cases
 
 . "${0%/*}/../conf/default.conf"
 
@@ -240,15 +240,14 @@ black_listed_new="$(
 )"
 
 ls "${work_dir}/package-infos/" | \
-  grep '\.builds$' | \
+  grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+\.builds$' | \
   sed '
     s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|\2 \3 \4 \1|
   ' | \
   sort -k4,4 | \
   uniq -f3 --group=append | \
-  while read rev mod_rev repo pkg; do
-    if [ -z "${fs}" ] && \
-      [ -z "${rev}" ] && \
+  while read -r rev mod_rev repo pkg; do
+    if [ -z "${rev}" ] && \
       [ -z "${mod_rev}" ] && \
       [ -z "${repo}" ] && \
       [ -z "${pkg}" ]; then
@@ -265,7 +264,8 @@ ls "${work_dir}/package-infos/" | \
             sort -u | \
             find_newest_of_git_revisions
         )" \
-        "${orepo}"
+        "${orepo}" | \
+        grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+$'
       revs=''
       mod_revs=''
       continue
@@ -333,7 +333,21 @@ while [ -n "${black_listed_new}" ]; do
       join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
       while read -r pkg; do
         if [ "${pkg}" = 'python-pysocks' ] || \
-          [ "${pkg}" = 'gens' ]; then
+          [ "${pkg}" = 'dev86' ] || \
+          [ "${pkg}" = 'gens' ] || \
+          [ "${pkg}" = 'luxblend25' ] || \
+          [ "${pkg}" = 'nspluginwrapper' ] || \
+          [ "${pkg}" = 'pcsxr' ] || \
+          [ "${pkg}" = 'python-pifpaf' ] || \
+          [ "${pkg}" = 'python-pymongo' ] || \
+          [ "${pkg}" = 'q4wine' ] || \
+          [ "${pkg}" = 'sopcast' ] || \
+          [ "${pkg}" = 'syslinux' ] || \
+          [ "${pkg}" = 'unifi' ] || \
+          [ "${pkg}" = 'wine' ] || \
+          [ "${pkg}" = 'wine-staging' ] || \
+          [ "${pkg}" = 'wine-staging-nine' ] || \
+          [ "${pkg}" = 'zsnes' ]; then
           >&2 printf 'blacklisting: %s would be black listed, but is ignored.\n' "${pkg}"
         else
           echo "${pkg}"
