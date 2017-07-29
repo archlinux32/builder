@@ -179,7 +179,7 @@ for repo in ${repo_names}; do
     # ignore i686
     grep -v -- '-i686/PKGBUILD$' | \
     # ignore staging and testing
-    grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+    grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
     sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|'
 done | \
   sort -u | \
