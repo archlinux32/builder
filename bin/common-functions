@@ -19,7 +19,7 @@ find_pkgbuilds() {
       tar -t 2> /dev/null | \
       grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
       grep -v -- '-i686/PKGBUILD$' | \
-      grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+      grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
       sort | \
       tail -n1
   )"
@@ -592,7 +592,7 @@ find_package_repository_to_package() {
       tar -t | \
       cut -d/ -f3 | \
       grep -vxF '' | \
-      grep -v 'staging\|testing' | \
+      grep -v 'staging\|testing\|-unstable' | \
       grep -v -- '-i686$' | \
       sed 's|-[^-]\+$||' | \
       sort -u

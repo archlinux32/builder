@@ -182,7 +182,7 @@ case "${action}" in
                 tar -t 2> /dev/null | \
                 grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
                 grep -v -- '-i686/PKGBUILD$' | \
-                grep -v -- '[-/]\(staging\|testing\)-[^/]\+/PKGBUILD$' | \
+                grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
                 sed '
                   s|^[^/]\+/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1|
                 ' | \

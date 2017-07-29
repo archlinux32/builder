@@ -92,7 +92,7 @@ fi
 
 stable="$(
   ls_master_mirror 'i686' | \
-    grep -v 'testing$\|staging$' | \
+    grep -v 'testing$\|staging$\|-unstable$' | \
     while read -r dir; do
       ls_master_mirror "i686/${dir}"
     done | \
