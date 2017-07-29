@@ -144,21 +144,9 @@ for hand_out_broken in false true; do
       continue
     fi
 
-    [ -z "$(
-      (
-        cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
-        grep -vxF 'break_loops' "${work_dir}/build-list" | \
-          awk '{print $1 "." $2 "." $3 "." $4}' | \
-          sed "
-            s|^|${work_dir}/package-infos/|
-            s|\$|\.builds|
-          " | \
-          xargs -r cat | \
-          sort -u
-      ) | \
-        sort | \
-        uniq -d
-      )" ] || continue
+    if [ -n "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
+      continue
+    fi
 
     hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 

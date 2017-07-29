@@ -642,3 +642,31 @@ extract_source_directory() {
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
 }
+
+# find_dependencies_on_build_list $package $git_revision $mod_git_revision $repository
+# return a list of packages on the build list which are dependencies of the given package
+
+find_dependencies_on_build_list() {
+
+  local package="$1"
+  local git_revision="$2"
+  local mod_git_revision="$3"
+  local repository="$4"
+
+  generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+
+  (
+    cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
+    grep -vxF 'break_loops' "${work_dir}/build-list" | \
+      awk '{print $1 "." $2 "." $3 "." $4}' | \
+      sed "
+        s|^|${work_dir}/package-infos/|
+        s|\$|\.builds|
+      " | \
+      xargs -r cat | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d
+
+}

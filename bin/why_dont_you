@@ -26,21 +26,7 @@ case "${action}" in
             continue
           fi
 
-          unmet_dependencies="$(
-            (
-              cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
-              grep -vxF 'break_loops' "${work_dir}/build-list" | \
-                awk '{print $1 "." $2 "." $3 "." $4}' | \
-                sed "
-                  s|^|${work_dir}/package-infos/|
-                  s|\$|\.builds|
-                " | \
-                xargs -r cat | \
-                sort -u
-            ) | \
-              sort | \
-              uniq -d
-          )"
+          unmet_dependencies="$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")"
           if [ -n "${unmet_dependencies}" ]; then
             printf '"%s" has unmet dependencies:\n' "${package}"
             echo "${unmet_dependencies}" | \
