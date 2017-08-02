@@ -157,6 +157,7 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
 fi
 
 if ${web}; then
+  sed -i 's|$|<br>|' "${tmp_dir}/build-master-status.html"
   (
     [ -f "${webserver_directory}/statistics" ] && \
       cat "${webserver_directory}/statistics"
