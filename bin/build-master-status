@@ -9,69 +9,31 @@ usage() {
   >&2 echo 'build-master-status: report about status of build master'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--broken $output:'
-  >&2 echo '    Write broken packages to $output.'
+  >&2 echo '  -w|--web:'
+  >&2 echo '    Output to webserver instead of stdout.'
   >&2 echo '  -h|--help:'
   >&2 echo '    Show this help and exit.'
-  >&2 echo '  -n|--nice:'
-  >&2 echo '    Write html output.'
-  >&2 echo '  -o|--output $output:'
-  >&2 echo '    Write to $output instead of stdout.'
-  >&2 echo '  -s|--statistics $output:'
-  >&2 echo '    Write statistics to $output.'
   [ -z "$1" ] && exit 1 || exit $1
 }
 
 eval set -- "$(
-  getopt -o b:hno:s: \
-    --long broken: \
+  getopt -o hw \
     --long help \
-    --long nice \
-    --long output: \
-    --long statistics: \
+    --long web \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
-output() {
-  cat
-}
-
-make_nice() {
-  cat
-}
-
-nice=false
-broken_output=''
-output_file=''
-statistics_output=''
+web=false
 
 while true
 do
   case "$1" in
-    -b|--broken)
-      shift
-      broken_output="$1"
-    ;;
     -h|--help)
       usage 0
     ;;
-    -n|--nice)
-      nice=true
-      make_nice() {
-        sed 's|$|<br>|'
-      }
-    ;;
-    -o|--output)
-      shift
-      output_file="$1"
-      output() {
-        cat >> "${output_file}"
-      }
-    ;;
-    -s|--statistics)
-      shift
-      statistics_output="$1"
+    -w|--web)
+      web=true
     ;;
     --)
       shift
@@ -152,59 +114,52 @@ looped_packages="$(
     wc -l
   )"
 
-if [ -n "${output_file}" ]; then
-  : > "${output_file}"
-fi
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
-  "$((${staging}+${testing}+${pending_packages}))" | \
-  make_nice | \
-  output
+  "$((${staging}+${testing}+${pending_packages}))" >> \
+  "${tmp_dir}/build-master-status.html"
 printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
   "$((${tasks}-${broken}))" \
   "${tasks}" \
-  "${pending_packages}" | \
-  make_nice | \
-  output
+  "${pending_packages}" >> \
+  "${tmp_dir}/build-master-status.html"
 printf 'There are %d testing and %d staging packages.\n' \
   "${testing}" \
-  "${staging}" | \
-  output
+  "${staging}" >> \
+  "${tmp_dir}/build-master-status.html"
 printf 'There are %d broken package builds.\n' \
-  "${broken}" | \
-  make_nice | \
-  output
+  "${broken}" >> \
+  "${tmp_dir}/build-master-status.html"
 if [ "${loops}" -ne 0 ]; then
   printf 'There are %d loops containing %d package builds.\n' \
     "${loops}" \
-    "${looped_packages}" | \
-    make_nice | \
-    output
+    "${looped_packages}" >> \
+    "${tmp_dir}/build-master-status.html"
 fi
 if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
   printf '%.1f%% of all packages are broken.\n' \
     "$(
       echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
         bc
-    )" | \
-    make_nice | \
-    output
+    )" >> \
+    "${tmp_dir}/build-master-status.html"
 fi
 if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
   printf '%.1f%% of the planned work has been done.\n' \
     "$(
       echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
         bc
-    )" | \
-    make_nice | \
-    output
+    )" >> \
+    "${tmp_dir}/build-master-status.html"
 fi
 
-if [ -n "${statistics_output}" ]; then
+if ${web}; then
   (
-    [ -f "${statistics_output}" ] && \
-      cat "${statistics_output}"
+    [ -f "${webserver_directory}/statistics" ] && \
+      cat "${webserver_directory}/statistics"
     printf '%s ' \
       "$(date +%s)" \
       "${stable}" \
@@ -219,61 +174,62 @@ if [ -n "${statistics_output}" ]; then
       "${blocked}" | \
       sed 's| $|\n|'
   ) | \
-  tail -n 10080 | \
-  sponge "${statistics_output}"
-fi
+    tail -n 10080 > \
+    "${tmp_dir}/statistics"
 
-if [ -n "${broken_output}" ]; then
-  (
-    if ${nice}; then
-      printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>'
-      printf '<th>%s</th>' \
-        'package' \
-        'git revision' \
-        'modification git revision' \
-        'package repository' \
-        'compilations' \
-        'blocked'
-      printf '</tr>\n'
-    fi
-    ls "${work_dir}/package-states" | \
-      grep '\.broken$' | \
-      sed 's|\.broken$||' | \
-      if ${nice}; then
-        sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
-          while read -r sf pkg rev mod_rev repo; do
-            printf '%s ' \
-              "${pkg}" \
-              "${rev}" \
-              "${mod_rev}" \
-              "${repo}" \
-              "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
-            if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
-              tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
-                sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
-            else
-              printf '&nbsp;'
-            fi
-            printf '\n'
-          done | \
-          sort -k5n,5 | \
-          while read -r pkg rev mod_rev repo count reason; do
-            printf '<tr>'
-            printf '<td>%s</td>' \
-              '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
-              "${rev}" \
-              "${mod_rev}" \
-              "${repo}" \
-              "${count}" \
-              "${reason}"
-            printf '</tr>\n'
-          done
+  printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>' >> \
+    "${tmp_dir}/broken-packages.html"
+  printf '<th>%s</th>' \
+    'package' \
+    'git revision' \
+    'modification git revision' \
+    'package repository' \
+    'compilations' \
+    'blocked' >> \
+    "${tmp_dir}/broken-packages.html"
+  printf '</tr>\n' >> \
+    "${tmp_dir}/broken-packages.html"
+  ls "${work_dir}/package-states" | \
+    grep '\.broken$' | \
+    sed 's|\.broken$||' | \
+    sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
+    while read -r sf pkg rev mod_rev repo; do
+      printf '%s ' \
+        "${pkg}" \
+        "${rev}" \
+        "${mod_rev}" \
+        "${repo}" \
+        "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
+      if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
+        tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
+          sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
       else
-        cat
+        printf '&nbsp;'
       fi
-    if ${nice}; then
-      printf '</table>\n</body>\n</html>\n'
-    fi
-  ) | \
-    sponge "${broken_output}"
+      printf '\n'
+    done | \
+    sort -k5n,5 | \
+    while read -r pkg rev mod_rev repo count reason; do
+      printf '<tr>'
+      printf '<td>%s</td>' \
+        '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
+        "${rev}" \
+        "${mod_rev}" \
+        "${repo}" \
+        "${count}" \
+        "${reason}"
+      printf '</tr>\n'
+    done >> \
+    "${tmp_dir}/broken-packages.html"
+  printf '</table>\n</body>\n</html>\n' >> \
+    "${tmp_dir}/broken-packages.html"
+
+  ls "${tmp_dir}" | \
+    while read -r file; do
+      cat "${tmp_dir}/${file}" > \
+        "${webserver_directory}/${file}"
+    done
+
+else
+  cat "${tmp_dir}/build-master-status.html"
 fi
