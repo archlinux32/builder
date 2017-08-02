@@ -157,11 +157,11 @@ done
 # Find package (of all packages which are not locked and have been broken the least times)
 # which breaks the most unlocked loops
 
-locked_packages="$(
+locked_packages=$(
   ls "${work_dir}/package-states/" | \
     grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$' | \
     sed 's|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||'
-)"
+)
 
 grep -vxF 'break_loops' "${work_dir}/build-list" | \
   sort -k1,1 > \
@@ -189,10 +189,10 @@ for package in $(
       "${work_dir}/build-list.sorted-by-package" | \
     while read -r count package git_revision git_mod_revision repository; do
       if [ -f "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken" ]; then
-        trials="$(
+        trials=$(
           wc -l < \
             "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken"
-        )"
+        )
       else
         trials='0'
       fi

@@ -52,19 +52,19 @@ if [ $# -ne 0 ]; then
   usage
 fi
 
-stable="$(
+stable=$(
   ls_master_mirror 'i686' | \
     grep -v 'testing$\|staging$\|-unstable$' | \
     while read -r dir; do
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-  )"
-tasks="$(
+)
+tasks=$(
   grep -c '^\S\+ \S\+ \S\+ \S\+$' \
     "${work_dir}/build-list"
-  )" || true
-pending_packages="$(
+) || true
+pending_packages=$(
   grep '^\S\+ \S\+ \S\+ \S\+$' "${work_dir}/build-list" | \
     tr ' ' '.' | \
     while read -r package; do
@@ -72,49 +72,49 @@ pending_packages="$(
       cat "${work_dir}/package-infos/${package}.packages"
     done |
     wc -l
-)"
-staging="$(
+)
+staging=$(
   ls_master_mirror 'i686' | \
     grep 'staging$' | \
     while read -r dir; do
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-  )"
-testing="$(
+  )
+testing=$(
   ls_master_mirror 'i686' | \
     grep 'testing$' | \
     while read -r dir; do
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-  )"
-broken="$(
+  )
+broken=$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.broken$'
-  )" || true
-blocked="$(
+  ) || true
+blocked=$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.blocked$'
-  )" || true
-locked="$(
+  ) || true
+locked=$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.locked$'
-  )" || true
-loops="$(
+  ) || true
+loops=$(
   ls "${work_dir}/build-list.loops" | \
     grep -c '^loop_[0-9]\+$'
-  )" || true
-looped_packages="$(
+  ) || true
+looped_packages=$(
   ls "${work_dir}/build-list.loops" | \
     grep '^loop_[0-9]\+$' | \
     sed "s|^|${work_dir}/build-list.loops/|" | \
     xargs -r cat | \
     sort -u | \
     wc -l
-  )"
+  )
 
-tmp_dir="$(mktemp -d)"
+tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \

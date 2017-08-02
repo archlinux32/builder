@@ -160,10 +160,10 @@ move_packages() {
     mkdir -p "${tmp_dir}/${from_repo}"
     mkdir -p "${tmp_dir}/${to_repo}"
 
-    repos="$(
+    repos=$(
       printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/repos") | \
       sort -u
-    )"
+    )
     echo "${repos}" > \
       "${tmp_dir}/repos"
 
@@ -289,12 +289,12 @@ move_packages() {
 
     # and update the state files
 
-    from_ending="$(
+    from_ending=$(
       cat "${tmp_dir}/${package}.from_ending"
-    )"
-    to_ending="$(
+    )
+    to_ending=$(
       cat "${tmp_dir}/${package}.to_ending"
-    )"
+    )
 
     if [ -z "${to_ending}" ]; then
       ${dummynator} rm \
@@ -370,11 +370,11 @@ do
   shift
 done
 
-packages_to_stabilize="$(
+packages_to_stabilize=$(
   printf '%s\n' \
     ${packages_to_stabilize} \
     ${@}
-)"
+)
 
 if ! "${base_dir}/bin/sanity-check" -r; then
   >&2 echo 'Build master is not sane.'
@@ -403,7 +403,7 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
-tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
 
 clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
@@ -459,11 +459,11 @@ ls "${work_dir}/package-states" | \
 
 # remove packages not yet done from keep-packages list
 
-keep_packages="$(
+keep_packages=$(
   join -1 1 -2 1 -o 2.2 \
     "${tmp_dir}/keep_packages" \
     "${tmp_dir}/done_packages"
-)"
+)
 printf '%s\n' "${keep_packages}" | \
   grep -vxF '' > \
   "${tmp_dir}/keep_packages" || \
@@ -481,29 +481,29 @@ while [ -s "${tmp_dir}/new_keep_packages" ]; do
     generate_package_metadata "${package}"
   done < "${tmp_dir}/new_keep_packages"
 
-  keep_packages="$(
+  keep_packages=$(
     (
       printf '%s\n' "${keep_packages}"
       cat "${tmp_dir}/new_keep_packages"
     ) | \
       sort -u
-  )"
+  )
 
-  new_keep_packages="$(
+  new_keep_packages=$(
     while read -r package; do
       cat "${work_dir}/package-infos/${package}.depends"
     done < \
       "${tmp_dir}/new_keep_packages" | \
       sort -u
-  )"
+  )
   printf '%s\n' "${new_keep_packages}" > \
     "${tmp_dir}/new_keep_packages"
 
-  new_keep_packages="$(
+  new_keep_packages=$(
     join -1 1 -2 1 -o 2.2 \
       "${tmp_dir}/new_keep_packages" \
       "${tmp_dir}/done_packages"
-  )"
+  )
 
   # "new" is only what has not been there before
   printf '%s\n' "${keep_packages}" "${keep_packages}" "${new_keep_packages}" | \
@@ -513,15 +513,15 @@ while [ -s "${tmp_dir}/new_keep_packages" ]; do
 
 done
 
-done_packages="$(cat "${tmp_dir}/done_packages")"
+done_packages=$(cat "${tmp_dir}/done_packages")
 
 # if build list is empty, remember all entries of 'deletion-list'
 if grep -qvxF 'break_loops' "${work_dir}/build-list"; then
   delete_packages=''
 else
-  delete_packages="$(
+  delete_packages=$(
     cat "${work_dir}/deletion-list"
-  )"
+  )
 fi
 
 if [ -z "${delete_packages}" ]; then
@@ -540,18 +540,18 @@ fi
 
 # calculate unstageable packages from keep_packages and done_packages
 
-done_packages="$(
+done_packages=$(
   echo "${done_packages}" | \
     cut -d' ' -f2
-)"
+)
 
-done_packages="$(
+done_packages=$(
   (
     printf '%s\n' "${done_packages}" "${keep_packages}"
   ) | \
     sort | \
     uniq -u
-)"
+)
 
 unset keep_packages
 

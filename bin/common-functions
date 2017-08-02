@@ -14,7 +14,7 @@ find_pkgbuilds() {
   local git_revision="$4"
   local mod_git_revision="$5"
 
-  PKGBUILD="$(
+  PKGBUILD=$(
     eval git -C "$(printf '"${repo_paths__%s}"' "${git_repository}")" 'archive "${git_revision}" -- "${package}/repos/"' 2> /dev/null | \
       tar -t 2> /dev/null | \
       grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
@@ -22,12 +22,12 @@ find_pkgbuilds() {
       grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
       sort | \
       tail -n1
-  )"
+  )
 
-  PKGBUILD_mod="$(
+  PKGBUILD_mod=$(
     git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" 2> /dev/null | \
       tar -t "${repository}/${package}/PKGBUILD" 2> /dev/null
-  )" || true
+  ) || true
 
   if [ -z "${PKGBUILD}" ] && \
     [ -z "${PKGBUILD_mod}" ]; then
@@ -206,14 +206,14 @@ delete_old_metadata() {
 
   local current_metadata
 
-  current_metadata="$(
+  current_metadata=$(
     ls "${work_dir}/package-infos" | \
       sed '
         s|\.[^.]\+$||
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
       ' | \
       sort -u
-  )"
+  )
 
   (
     # what we have
@@ -230,7 +230,7 @@ delete_old_metadata() {
     # build-list items should stay
     sed 'p' "${work_dir}/build-list"
 
-    tmp_dir="$(mktemp -d)"
+    tmp_dir=$(mktemp -d)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     echo "${current_metadata}" | \
@@ -294,14 +294,14 @@ delete_old_metadata() {
             opkg=''
             continue
           fi
-          revs="$(
+          revs=$(
             printf '%s\n' ${revs} ${rev} | \
               sort -u
-          )"
-          mod_revs="$(
+          )
+          mod_revs=$(
             printf '%s\n' ${mod_revs} ${mod_rev} | \
               sort -u
-          )"
+          )
           orepo="${repo}"
           opkg="${pkg}"
         done
@@ -348,7 +348,7 @@ repository_of_package() {
 
 official_or_community() {
   local prepo
-  prepo="$(repository_of_package "$1")"
+  prepo=$(repository_of_package "$1")
 
   if [ "${prepo}" = 'community' ]; then
     echo 'community-'"$2"
@@ -410,11 +410,11 @@ wait_some_time() {
     diff=30
   fi
 
-  random="$(
+  random=$(
     dd if='/dev/urandom' count=1 2> /dev/null | \
       cksum | \
       cut -d' ' -f1
-  )"
+  )
 
   sleep $((${minimum} + ${random} % ${diff}))
 }
@@ -442,7 +442,7 @@ make_source_info() {
   local PKGBUILD
   local PKGBUILD_mod
 
-  git_repo="$(find_repository_with_commit "${git_revision}")"
+  git_repo=$(find_repository_with_commit "${git_revision}")
 
   if [ -z "${git_repo}" ]; then
     return 1
@@ -452,7 +452,7 @@ make_source_info() {
 
   (
 
-    tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+    tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
@@ -495,14 +495,14 @@ insert_break_loops_orders() {
   local looped_packages
   local line
 
-  looped_packages="$(
+  looped_packages=$(
     ls "${work_dir}/build-list.loops" | \
       grep '^loop_[0-9]\+$' | \
       sed "s|^|${work_dir}/build-list.loops/|" | \
       xargs -r cat | \
       sort -u | \
       wc -l
-  )"
+  )
 
   (
     while read -r line; do
@@ -538,7 +538,7 @@ append_architectures() {
 find_newest_of_git_revisions() {
   local revisions
   local repo
-  revisions="$(cat)"
+  revisions=$(cat)
 
   if [ $(
     echo "${revisions}" | \
@@ -550,13 +550,13 @@ find_newest_of_git_revisions() {
 
   fi
 
-  repo="$(
+  repo=$(
     find_repository_with_commit \
       "$(
         echo "${revisions}" | \
           grep -xm1 '[0-9a-f]\{40\}'
       )"
-  )"
+  )
 
   eval 'repo="${repo_paths__'"${repo}"'}"'
 
@@ -587,7 +587,7 @@ find_package_repository_to_package() {
 
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
-  repo="$(
+  repo=$(
     git -C "${repo_path}" archive "$(cat "${work_dir}/${git_repository}.revision")" -- "${package}/repos" 2> /dev/null | \
       tar -t | \
       cut -d/ -f3 | \
@@ -596,7 +596,7 @@ find_package_repository_to_package() {
       grep -v -- '-i686$' | \
       sed 's|-[^-]\+$||' | \
       sort -u
-  )"
+  )
 
   if [ -z "${repo}" ]; then
     return 1

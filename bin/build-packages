@@ -105,13 +105,13 @@ while [ ${count} -ne 0 ]; do
   fi
 
   err=0
-  package="$(
+  package=$(
     ssh \
       -i "${master_build_server_identity}" \
       -p "${master_build_server_port}" \
       "${master_build_server_user}@${master_build_server}" \
       'get-assignment'
-  )" || err=$?
+  ) || err=$?
 
   case ${err} in
 
@@ -133,7 +133,7 @@ while [ ${count} -ne 0 ]; do
         git -C "${repo_path}" fetch
       done
 
-      git_repo="$(find_repository_with_commit "${git_revision}")"
+      git_repo=$(find_repository_with_commit "${git_revision}")
 
       find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
@@ -146,7 +146,7 @@ while [ ${count} -ne 0 ]; do
         recursively_umount_and_rm "${tmp_dir}"
         exit ${err}
       }
-      tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+      tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
       trap bail_out EXIT
 
       extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
@@ -159,7 +159,7 @@ while [ ${count} -ne 0 ]; do
           grep -qF ':mirrored_source:'; then
           # maybe a missing source is/was the problem?
           # try to download them from sources.archlinux.org/sources/$repo/$source
-          source_name="$(
+          source_name=$(
             makepkg --printsrcinfo | \
               sed -n '
                 /^\s*\(epoch\|pkg\(base\|ver\|rel\)\) = /{s|^\s\+||;p}
@@ -179,7 +179,7 @@ while [ ${count} -ne 0 ]; do
                   s|\n[0-9] ||
                 ta
               '
-          )"
+          )
           if ! wget -nc -nd "https://sources.archlinux.org/sources/${git_repo}/${source_name}"; then
             # we can't improve anything
             continue

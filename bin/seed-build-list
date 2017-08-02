@@ -25,7 +25,7 @@ usage() {
   [ -z "$1" ] && exit 1 || exit $1
 }
 
-tmp_dir="$(mktemp -d)"
+tmp_dir=$(mktemp -d)
 trap "rm -rf --one-file-system '${tmp_dir}'" EXIT
 
 eval set -- "$(
@@ -175,7 +175,7 @@ while read -r pkg; do
   fi
   success=false
   for arch in x86_64 any; do
-    pkgbase="$(
+    pkgbase=$(
       curl -sS "https://www.archlinux.org/packages/community/x86_64/${pkg}/" | \
         sed -n '
           /Base Package:/{
@@ -194,7 +194,7 @@ while read -r pkg; do
           s|/$||
           s|^.*/||
         '
-    )"
+    )
     if [ -n "${pkgbase}" ]; then
       echo "${pkgbase}" >> \
         "${tmp_dir}/delta_pkgbases"
@@ -230,7 +230,7 @@ rm "${tmp_dir}/delta_packages"
 # convert append_packages to build-list.new (add git hashes)
 
 while read -r pkg repo; do
-  git_repo="$(find_git_repository_to_package_repository "${repo}")"
+  git_repo=$(find_git_repository_to_package_repository "${repo}")
   printf '%s %s %s %s\n' \
     "${pkg}" \
     "$(cat "${work_dir}/${git_repo}.revision")" \

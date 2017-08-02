@@ -26,7 +26,7 @@ case "${action}" in
             continue
           fi
 
-          unmet_dependencies="$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")"
+          unmet_dependencies=$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")
           if [ -n "${unmet_dependencies}" ]; then
             printf '"%s" has unmet dependencies:\n' "${package}"
             echo "${unmet_dependencies}" | \
@@ -66,16 +66,16 @@ case "${action}" in
         continue
       fi
 
-      dependent_packages="$(
+      dependent_packages=$(
         grep -lxF "${pkg}" "${work_dir}/package-infos/"*".depends" | \
           sed '
             s|^.*/||
             s|\.depends$||
           '
-      )"
+      )
 
-      build_list_items_file="$(mktemp)"
-      dependent_packages_file="$(mktemp)"
+      build_list_items_file=$(mktemp)
+      dependent_packages_file=$(mktemp)
 
       grep -vxF 'break_loops' "${work_dir}/build-list" | \
         awk '{print $1 "." $2 "." $3 "." $4}' | \
@@ -86,11 +86,11 @@ case "${action}" in
         sort -u > \
         "${dependent_packages_file}"
 
-      dependent_still_on_build_list="$(
+      dependent_still_on_build_list=$(
         join -1 1 -2 1 -o 1.1 \
           "${build_list_items_file}" \
           "${dependent_packages_file}"
-      )"
+      )
 
       rm -f \
         "${build_list_items_file}" \
@@ -103,14 +103,14 @@ case "${action}" in
         continue
       fi
 
-      dependent_still_in_staging="$(
+      dependent_still_in_staging=$(
         echo "${dependent_packages}" | \
           while read -r sf; do
             if [ -f "${work_dir}/package-states/${sf}.done" ]; then
               echo "${sf}"
             fi
           done
-      )"
+      )
 
       if [ -n "${dependent_still_in_staging}" ]; then
         printf 'The following packages are dependent on "%s" and still in staging - maybe they cannot be unstaged:\n' "${pkg}"
@@ -127,15 +127,15 @@ case "${action}" in
 
   'keep')
 
-    tmp_file="$(mktemp)"
+    tmp_file=$(mktemp)
     trap 'rm -f "${tmp_file}"' EXIT
 
     while read -r pkg; do
 
-      if builds_file="$(
+      if builds_file=$(
         ls "${work_dir}/package-infos" | \
           grep -m1 "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.builds\$"
-        )"; then
+        ); then
 
         builds_file="${builds_file%.*}"
         prepo="${builds_file##*.}"
@@ -147,23 +147,23 @@ case "${action}" in
       else
 
         found_PKGBUILD=false
-        mod_rev="$(cat "${work_dir}/archlinux32.revision")"
+        mod_rev=$(cat "${work_dir}/archlinux32.revision")
         for repo in ${repo_names}; do
           eval 'repo_path="${repo_paths__'"${repo}"'}"'
-          rev="$(cat "${work_dir}/${repo}.revision")"
+          rev=$(cat "${work_dir}/${repo}.revision")
           if [ "${repo}" = 'archlinux32' ]; then
             if git -C "${repo_path}" archive "${mod_rev}" | \
               grep -q "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$"; then
-              prepo="$(
+              prepo=$(
                 git -C "${repo_path}" archive "${mod_rev}" | \
                   grep "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$" | \
                   cut -d/ -f1
-              )"
+              )
               found_PKGBUILD=true
               break
             fi
           else
-            prepo="$(
+            prepo=$(
               git -C "${repo_path}" archive "${rev}" -- "${pkg}/repos" 2>/dev/null | \
                 tar -t 2> /dev/null | \
                 grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
@@ -173,7 +173,7 @@ case "${action}" in
                   s|^[^/]\+/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\1|
                 ' | \
                 head -n1
-            )"
+            )
             if [ -n "${prepo}" ]; then
               found_PKGBUILD=true
               break
@@ -216,21 +216,21 @@ case "${action}" in
         continue
       fi
 
-      if ! needs="$(
+      if ! needs=$(
           ls "${work_dir}/package-infos" | \
             grep "^$(str_to_regex "${pkg}")\..*\.needs\$"
-        )"; then
+        ); then
         printf 'Package "%s" was deleted in the git repositories.\n' "${pkg}"
         continue
       fi
 
-      needs="$(
+      needs=$(
         printf "${work_dir}/package-infos/%s\n" ${needs} | \
           xargs -r cat | \
           sort -u
-      )"
+      )
 
-      errors="$(
+      errors=$(
         (
           printf '%s\n' ${needs}
           awk '{print $3}' "${tmp_file}" | \
@@ -239,7 +239,7 @@ case "${action}" in
           sort | \
           uniq -d | \
           join -1 1 -2 3 -o 2.1,2.2,2.3 - "${tmp_file}"
-      )"
+      )
       if [ -n "${errors}" ]; then
         printf 'Package "%s" has dependencies on the deletion list:\n' "${pkg}"
         printf '%s %s %s\n' ${errors}

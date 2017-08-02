@@ -5,15 +5,15 @@
 # Create a lock file.
 
 if [ $# -eq 0 ]; then
-  broken="$(
+  broken=$(
     ls "${work_dir}/package-states" | \
       grep '\.broken$'
-  )"
-  broken="$(
+  )
+  broken=$(
     echo "${broken}" | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort -u
-  )"
+  )
   "$0" ${broken} || \
     exit $?
   (
@@ -45,7 +45,7 @@ if ! flock -n 9; then
   exit
 fi
 
-tmp_dir="$(mktemp -d)"
+tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 sort -u "${work_dir}/build-order" | \
@@ -97,7 +97,7 @@ for target_package in "$@"; do
     "${tmp_dir}/knots"
 
   last_sum=''
-  current_sum="$(sha512sum "${tmp_dir}/build-order")"
+  current_sum=$(sha512sum "${tmp_dir}/build-order")
   while ! [ "${last_sum}" = "${current_sum}" ]; do
 
     last_sum="${current_sum}"
@@ -119,7 +119,7 @@ for target_package in "$@"; do
     sort -u "${tmp_dir}/build-order" | \
       sponge "${tmp_dir}/build-order"
 
-    current_sum="$(sha512sum "${tmp_dir}/build-order")"
+    current_sum=$(sha512sum "${tmp_dir}/build-order")
 
   done
 
@@ -226,10 +226,10 @@ for target_package in "$@"; do
     '}' >> \
     "${tmp_dir}/input"
 
-  line_count="$(wc -l < "${tmp_dir}/input")"
+  line_count=$(wc -l < "${tmp_dir}/input")
   if [ "${line_count}" -gt 500 ]; then
     sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
-    line_count="$(wc -l < "${tmp_dir}/input")"
+    line_count=$(wc -l < "${tmp_dir}/input")
     if [ "${line_count}" -gt 700 ]; then
       rm -f "${output}"
       >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \

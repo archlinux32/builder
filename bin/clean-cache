@@ -15,13 +15,13 @@ fi
 
 repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
-mirror="$(
+mirror"$(
   grep -m1 '^Server = ' '/etc/pacman.d/mirrorlist32' | \
     cut -d= -f2 | \
     sed 's|^\s*||'
-)"
+)
 
-tmp_dir="$(mktemp -d)"
+tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 for repo in ${repos}; do

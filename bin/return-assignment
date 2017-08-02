@@ -63,11 +63,11 @@ if [ "$5" = 'ERROR' ]; then
 
   # unlock every loop this package would have broken and which is not
   # broken by another locked package
-  locked_packages="$(
+  locked_packages=$(
     ls "${work_dir}/package-states/" | \
       grep '\.locked$' | \
       sed 's@^.*/\([^/]\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
-  )"
+  )
   grep -lxF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
     while read -r loop; do
       if [ -z "$(
@@ -121,7 +121,7 @@ clean_up_tmp_dir() {
   clean_up_lock_file
 }
 
-tmp_dir="$(mktemp -d "${work_dir}/tmp.XXXXXX")"
+tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
 cd "${tmp_dir}"
 trap clean_up_tmp_dir EXIT
 
@@ -133,14 +133,14 @@ tar -x \
   '*.pkg.tar.xz.sig'
 
 # check if all packages are signed and all signatures belong to a package
-signature_errors="$(
+signature_errors=$(
   ls -1 *.pkg.tar.xz{,.sig} | \
     sed 's|\.sig$||' | \
     sort | \
     uniq -c | \
     grep -v '^\s*2\s' | \
     awk '{print $2}'
-)"
+)
 
 if [ -n "${signature_errors}" ]; then
   >&2 echo 'The following packages lack a signature or vice versa:'
@@ -149,11 +149,11 @@ if [ -n "${signature_errors}" ]; then
 fi
 
 # check if the sent packages are the expected ones
-packages="$(
+packages=$(
   ls -1 | \
     grep '\.pkg\.tar\.xz$'
-)"
-package_errors="$(
+)
+package_errors=$(
   (
     printf '%s\n' ${packages} | \
       sed '
@@ -170,7 +170,7 @@ package_errors="$(
   ) | \
     sort -k2 | \
     uniq -u -f1
-)"
+)
 
 if [ -n "${package_errors}" ]; then
   >&2 echo 'The following packages should have been built but are missing or vice versa:'
@@ -179,7 +179,7 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move packages
-destination="$(official_or_community "$1.$2.$3.$4" 'staging')"
+destination=$(official_or_community "$1.$2.$3.$4" 'staging')
 
 ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \

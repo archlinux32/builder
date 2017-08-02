@@ -50,7 +50,7 @@ do
   shift
 done
 
-tmp_dir="$(mktemp -d)"
+tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 if [ $# -eq 0 ]; then
@@ -66,9 +66,9 @@ while [ $# -gt 0 ]; do
       [ ${silence} -gt 0 ] || \
         >&2 printf 'checking build-list ...'
 
-      errors="$(
+      errors=$(
         grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$\|^break_loops$' "${work_dir}/build-list"
-      )" || true
+      ) || true
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
           echo
@@ -78,12 +78,12 @@ while [ $# -gt 0 ]; do
         exit 1
       fi
 
-      errors="$(
+      errors=$(
         grep -vxF 'break_loops' "${work_dir}/build-list" | \
           awk '{print $1}' | \
           sort | \
           uniq -d
-      )"
+      )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
           echo
@@ -93,7 +93,7 @@ while [ $# -gt 0 ]; do
         exit 1
       fi
 
-      errors="$(
+      errors=$(
         (
           grep -vxF 'break_loops' "${work_dir}/build-list" | \
             awk '{print $1}'
@@ -101,7 +101,7 @@ while [ $# -gt 0 ]; do
         ) | \
           sort | \
           uniq -d
-      )"
+      )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
           echo
@@ -123,7 +123,7 @@ while [ $# -gt 0 ]; do
 
       repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
-      errors="$(
+      errors=$(
         (
           printf 'expected %s\n' ${repos}
           ls_master_mirror 'i686' | \
@@ -131,7 +131,7 @@ while [ $# -gt 0 ]; do
         ) | \
           sort -k2 | \
           uniq -uf1
-      )"
+      )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
           echo
@@ -153,12 +153,12 @@ while [ $# -gt 0 ]; do
         [ ${silence} -gt 0 ] || \
           >&2 printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}"
 
-        packages="$(
+        packages=$(
           ls_master_mirror "i686/${repo}" | \
             grep '\.pkg\.tar\.xz\(\.sig\)\?$'
-        )" || true
+        ) || true
 
-        errors="$(
+        errors=$(
           echo "${packages}" | \
             grep '\S' | \
             sed '
@@ -169,7 +169,7 @@ while [ $# -gt 0 ]; do
             uniq -cf1 | \
             grep -v '^\s*2\s' | \
             awk '{print $2 " " $3}'
-        )" || true
+        ) || true
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             echo
@@ -184,7 +184,7 @@ while [ $# -gt 0 ]; do
           "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files.tar.gz" \
           "${tmp_dir}/"
 
-        errors="$(
+        errors=$(
           (
             tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
               grep '/$' | \
@@ -202,7 +202,7 @@ while [ $# -gt 0 ]; do
           ) | \
             sort -k2 | \
             uniq -uf1
-        )"
+        )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             echo
@@ -212,7 +212,7 @@ while [ $# -gt 0 ]; do
           exit 1
         fi
 
-        errors="$(
+        errors=$(
           (
             tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
               grep '/$' | \
@@ -230,7 +230,7 @@ while [ $# -gt 0 ]; do
           ) | \
             sort -k2 | \
             uniq -uf1
-        )"
+        )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             echo
@@ -256,7 +256,7 @@ while [ $# -gt 0 ]; do
         [ ${silence} -gt 0 ] || \
           >&2 printf 'checking state-files of "%s" ...' "${status%:*}"
 
-        errors="$(
+        errors=$(
           (
             ls "${work_dir}/package-states" | \
               grep "\.${status#*:}\$" | \
@@ -275,7 +275,7 @@ while [ $# -gt 0 ]; do
             uniq -cf1 | \
             grep -v '^\s*2\s' | \
             awk '{print $2 " " $3}'
-        )"
+        )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             echo
