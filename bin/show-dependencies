@@ -17,12 +17,12 @@ if [ $# -eq 0 ]; then
   "$0" ${broken} || \
     exit $?
   (
-    ls "${graphs_directory}"
+    ls "${webserver_directory}/graphs"
     printf '%s.png\n' ${broken} ${broken}
   ) | \
     sort | \
     uniq -u | \
-    sed "s|^|${graphs_directory}/|" | \
+    sed "s|^|${webserver_directory}/graphs/|" | \
     xargs -r rm
   exit
 fi
@@ -85,7 +85,7 @@ ls "${work_dir}/package-infos" | \
 
 for target_package in "$@"; do
 
-  output="${graphs_directory}/${target_package}.png"
+  output="${webserver_directory}/graphs/${target_package}.png"
 
   grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" | \
     sort -u > \
@@ -227,7 +227,7 @@ for target_package in "$@"; do
   if [ "${line_count}" -gt 500 ]; then
     sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
     line_count="$(wc -l < "${tmp_dir}/input")"
-    if [ "${line_count}" -gt 600 ]; then
+    if [ "${line_count}" -gt 700 ]; then
       rm -f "${output}"
       >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
         "${target_package}" \
