@@ -11,10 +11,20 @@ if [ $# -eq 0 ]; then
   )"
   broken="$(
     echo "${broken}" | \
-      sed 's|\(\.[^.]\+\)\{4\}$||'
+      sed 's|\(\.[^.]\+\)\{4\}$||' | \
+      sort -u
   )"
-  "$0" ${broken}
-  exit $?
+  "$0" ${broken} || \
+    exit $?
+  (
+    ls "${graphs_directory}"
+    printf '%s.png\n' ${broken} ${broken}
+  ) | \
+    sort | \
+    uniq -u | \
+    sed "s|^|${graphs_directory}/|" | \
+    xargs -r rm
+  exit
 fi
 
 if ps ax | \
