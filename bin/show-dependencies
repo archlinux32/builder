@@ -53,11 +53,14 @@ sort -u "${work_dir}/build-order" | \
   grep '^\S\+ \S\+$' > \
   "${tmp_dir}/original-build-order"
 
+sort -k1,1 "${work_dir}/build-list" > \
+  "${tmp_dir}/build-list.sorted-by-package"
+
 (
   sort -k1,1 "${tmp_dir}/original-build-order" | \
-    join -1 1 -2 1 -o 1.1,1.2 - "${work_dir}/build-list.sorted-by-package"
+    join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
   sort -k2,2 "${tmp_dir}/original-build-order" | \
-    join -1 2 -2 1 -o 1.1,1.2 - "${work_dir}/build-list.sorted-by-package"
+    join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
 ) | \
   sort -u | \
   sponge "${tmp_dir}/original-build-order"
@@ -123,7 +126,7 @@ for target_package in "$@"; do
   tr ' ' '\n' < \
     "${tmp_dir}/build-order" | \
     sort -u | \
-    join -j 1 - "${work_dir}/build-list.sorted-by-package" | \
+    join -j 1 - "${tmp_dir}/build-list.sorted-by-package" | \
     while read pkg rev mod_rev repo; do
       if [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.broken" ]; then
         printf '1 broken-build-list-package %s\n' "${pkg}"
