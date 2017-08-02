@@ -134,6 +134,17 @@ for target_package in "$@"; do
     "${tmp_dir}/knots"
 
   (
+    sort -u "${work_dir}/deletion-list"
+    tr ' ' '\n' < \
+      "${tmp_dir}/build-order" | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d | \
+    xargs -r printf '3 deletion-list-package %s\n' >> \
+    "${tmp_dir}/knots"
+
+  (
     awk '{print $2}' "${tmp_dir}/known-split-packages" | \
       sort -u
     tr ' ' '\n' < \
@@ -142,7 +153,7 @@ for target_package in "$@"; do
   ) | \
     sort | \
     uniq -d | \
-    xargs -r printf '3 split-package %s\n' >> \
+    xargs -r printf '4 split-package %s\n' >> \
     "${tmp_dir}/knots"
 
   (
@@ -153,7 +164,7 @@ for target_package in "$@"; do
   ) | \
     sort | \
     uniq -d | \
-    xargs -r printf '4 package %s\n' >> \
+    xargs -r printf '5 package %s\n' >> \
     "${tmp_dir}/knots"
 
   (
@@ -165,7 +176,7 @@ for target_package in "$@"; do
   ) | \
     sort | \
     uniq -d | \
-    xargs -r printf '5 group %s\n' >> \
+    xargs -r printf '6 group %s\n' >> \
     "${tmp_dir}/knots"
 
   tr ' ' '\n' < \
@@ -191,9 +202,11 @@ for target_package in "$@"; do
       elif [ "${what}" = 'package' ]; then
         color='#000000'
       elif [ "${what}" = 'split-package' ]; then
-        color='#808080'
+        color='#8080ff'
       elif [ "${what}" = 'group' ]; then
         color='#0000ff'
+      elif [ "${what}" = 'deletion-list-package' ]; then
+        color='#808080'
       else
         color='#ff80ff'
       fi
