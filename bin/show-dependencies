@@ -79,7 +79,7 @@ for target_package in "$@"; do
     "${tmp_dir}/build-order"
   touch "${tmp_dir}/knots"
 
-  output="/srv/http/graphs/${target_package}.png"
+  output="${graphs_directory}/${target_package}.png"
 
   (
     grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" || \
