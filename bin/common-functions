@@ -14,10 +14,13 @@ find_pkgbuilds() {
   local git_revision="$4"
   local mod_git_revision="$5"
 
+  local repo_path
+  eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
+
   PKGBUILD=$(
-    eval git -C "$(printf '"${repo_paths__%s}"' "${git_repository}")" 'archive "${git_revision}" -- "${package}/repos/"' 2> /dev/null | \
+    git -C "${repo_path}" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
       tar -t 2> /dev/null | \
-      grep "^$(str_to_regex "${package}/repos/${repository}")"'-.*/PKGBUILD$' | \
+      grep "$(printf '^%s-.*/PKGBUILD' "$(str_to_regex "${package}/repos/${repository}")")" | \
       grep -v -- '-i686/PKGBUILD$' | \
       grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
       sort | \
