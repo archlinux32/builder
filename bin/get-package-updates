@@ -113,9 +113,9 @@ for repo in ${repo_names}; do
     git -C "${repo_path}" rev-parse HEAD | \
       tee "${work_dir}/${repo}.revision.new"
   )'"
-  eval 'if ! [ "${new_repo_revisions__'"${repo}"'}" = "${old_repo_revisions__'"${repo}"'}" ]; then
+  if ! eval '[ "${new_repo_revisions__'"${repo}"'}" = "${old_repo_revisions__'"${repo}"'}" ]'; then
     something_new=true
-  fi'
+  fi
 done
 
 if ${pull} && \
