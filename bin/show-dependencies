@@ -69,10 +69,11 @@ ls "${work_dir}/package-infos" | \
 
 ls "${work_dir}/package-infos" | \
   grep '\.groups$' | \
-  sed "s|^|${work_dir}/package-infos/|" | \
-  xargs -r cat | \
-  sort -u > \
-  "${tmp_dir}/known-groups"
+  while read -r pf; do
+    cat "${work_dir}/package-infos/${pf}" | \
+      xargs -r printf "${pf%.*.*.*.*} %s\n" >> \
+      "${tmp_dir}/known-groups"
+  done
 
 ls "${work_dir}/package-infos" | \
   grep '\.packages$' | \
@@ -84,21 +85,13 @@ ls "${work_dir}/package-infos" | \
 
 for target_package in "$@"; do
 
-  rm -f \
-    "${tmp_dir}/knots" \
-    "${tmp_dir}/build-order"
-  touch "${tmp_dir}/knots"
-
   output="${graphs_directory}/${target_package}.png"
 
-  (
-    grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" || \
-      true
-    printf '0 target-package %s\n' "${target_package}" >> \
-      "${tmp_dir}/knots"
-  ) | \
+  grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" | \
     sort -u > \
     "${tmp_dir}/build-order"
+  printf '0 target-package %s\n' "${target_package}" > \
+    "${tmp_dir}/knots"
 
   last_sum=''
   current_sum="$(sha512sum "${tmp_dir}/build-order")"
@@ -106,16 +99,21 @@ for target_package in "$@"; do
 
     last_sum="${current_sum}"
 
-    while read -r s t; do
-      printf '%s %s\n' "${s}" "${t}"
-      grep -h " $(str_to_regex "${s}")\$" \
+    awk '{print $1}' "${tmp_dir}/build-order" | \
+      sort -u > \
+      "${tmp_dir}/new"
+    (
+      cat \
         "${tmp_dir}/original-build-order" \
-        "${tmp_dir}/known-split-packages" \
-        "${tmp_dir}/known-groups" || \
+        "${tmp_dir}/known-split-packages"
+      grep -v ' base\(-devel\)\?$' "${tmp_dir}/known-groups" || \
         true
-    done < \
-      "${tmp_dir}/build-order" | \
-      sort -u | \
+    ) | \
+      sort -k2,2 | \
+      join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/new" | \
+      sponge -a "${tmp_dir}/build-order"
+
+    sort -u "${tmp_dir}/build-order" | \
       sponge "${tmp_dir}/build-order"
 
     current_sum="$(sha512sum "${tmp_dir}/build-order")"
@@ -159,7 +157,8 @@ for target_package in "$@"; do
     "${tmp_dir}/knots"
 
   (
-    cat "${tmp_dir}/known-groups"
+    awk '{print $2}' "${tmp_dir}/known-groups" | \
+      sort -u
     tr ' ' '\n' < \
       "${tmp_dir}/build-order" | \
       sort -u
@@ -213,6 +212,7 @@ for target_package in "$@"; do
 
   line_count="$(wc -l < "${tmp_dir}/input")"
   if [ "${line_count}" -gt 500 ]; then
+    rm -f "${output}"
     >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
       "${target_package}" \
       "${line_count}"
@@ -225,7 +225,10 @@ for target_package in "$@"; do
   touch "${output}"
   chmod 644 "${output}"
 
-  dot -Tpng -o "${output}" "${tmp_dir}/input" || continue
+  if ! dot -Tpng -o "${output}" "${tmp_dir}/input"; then
+    rm -f "${output}"
+    continue
+  fi
 
 done
 
