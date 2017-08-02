@@ -225,11 +225,15 @@ for target_package in "$@"; do
 
   line_count="$(wc -l < "${tmp_dir}/input")"
   if [ "${line_count}" -gt 500 ]; then
-    rm -f "${output}"
-    >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
-      "${target_package}" \
-      "${line_count}"
-    continue
+    sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
+    line_count="$(wc -l < "${tmp_dir}/input")"
+    if [ "${line_count}" -gt 600 ]; then
+      rm -f "${output}"
+      >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
+        "${target_package}" \
+        "${line_count}"
+      continue
+    fi
   fi
   printf 'small enough (%s): %d\n' \
     "${target_package}" \
