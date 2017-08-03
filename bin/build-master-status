@@ -231,7 +231,7 @@ if ${web}; then
     tac > \
     "${tmp_dir}/statistics"
 
-  printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>' >> \
+  printf '<html>\n<head>\n<title>List of broken package builds</title>\n</head>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>' >> \
     "${tmp_dir}/broken-packages.html"
   printf '<th>%s</th>' \
     'package' \
@@ -247,6 +247,8 @@ if ${web}; then
     grep '\.broken$' | \
     sed 's|\.broken$||' | \
     sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
+    sort -k1,1 | \
+    join -1 2 -2 1 -o 1.1,1.2,1.3,1.4,1.5 - "${tmp_dir}/broken-packages-names" | \
     while read -r sf pkg rev mod_rev repo; do
       printf '%s ' \
         "${pkg}" \
@@ -277,6 +279,8 @@ if ${web}; then
     "${tmp_dir}/broken-packages.html"
   printf '</table>\n</body>\n</html>\n' >> \
     "${tmp_dir}/broken-packages.html"
+
+  rm -f "${tmp_dir}/broken-packages-names"
 
   ls "${tmp_dir}" | \
     while read -r file; do
