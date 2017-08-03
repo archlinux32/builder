@@ -99,7 +99,7 @@ staging=$(
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-  )
+)
 testing=$(
   ls_master_mirror 'i686' | \
     grep 'testing$' | \
@@ -107,23 +107,46 @@ testing=$(
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-  )
+)
 broken=$(
-  ls "${work_dir}/package-states/" | \
-    grep -c '\.broken$'
-  ) || true
+  (
+    ls "${work_dir}/package-states/" | \
+      grep '\.broken$' | \
+      sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
+      while read -r pkg rev mod_rev repo; do
+        if [ -z "$(find_dependencies_on_build_list "${pkg}" "${rev}" "${mod_rev}" "${repo}")" ]; then
+          echo "${pkg}"
+        fi
+      done
+    (
+      ls "${work_dir}/build-list.loops" | \
+        grep '^loop_[0-9]\+$' | \
+        sed "s|^|${work_dir}/build-list.loops/|" | \
+        xargs -r cat | \
+        sort -u
+      ls "${work_dir}/package-states/" | \
+        grep '\.broken$' | \
+        sed 's|\(\.[^.]\+\)\{4\}||' | \
+        sort -u
+    ) | \
+      sort | \
+      uniq -d
+  ) | \
+    sort -u | \
+    wc -l
+)
 blocked=$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.blocked$'
-  ) || true
+) || true
 locked=$(
   ls "${work_dir}/package-states/" | \
     grep -c '\.locked$'
-  ) || true
+) || true
 loops=$(
   ls "${work_dir}/build-list.loops" | \
     grep -c '^loop_[0-9]\+$'
-  ) || true
+) || true
 looped_packages=$(
   ls "${work_dir}/build-list.loops" | \
     grep '^loop_[0-9]\+$' | \
@@ -131,7 +154,7 @@ looped_packages=$(
     xargs -r cat | \
     sort -u | \
     wc -l
-  )
+)
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
