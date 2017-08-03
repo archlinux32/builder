@@ -73,6 +73,25 @@ pending_packages=$(
     done |
     wc -l
 )
+next_tasks=$(
+  (
+    grep -vxF 'break_loops' "${work_dir}/build-list"
+    ls "${work_dir}/package-states" | \
+      grep '\.broken$' | \
+      sed '
+        s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
+        p
+      '
+  ) | \
+    sort | \
+    uniq -u | \
+    while read -r package git_revision mod_git_revision repository; do
+      if [ -z "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
+        echo "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+      fi
+    done | \
+    wc -l
+)
 staging=$(
   ls_master_mirror 'i686' | \
     grep 'staging$' | \
@@ -121,10 +140,11 @@ printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
   "$((${staging}+${testing}+${pending_packages}))" >> \
   "${tmp_dir}/build-master-status.html"
-printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages).\n' \
+printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages), of which %s can be built immediately.\n' \
   "$((${tasks}-${broken}))" \
   "${tasks}" \
-  "${pending_packages}" >> \
+  "${pending_packages}" \
+  "${next_tasks}" >> \
   "${tmp_dir}/build-master-status.html"
 printf 'There are %d testing and %d staging packages.\n' \
   "${testing}" \
@@ -173,7 +193,8 @@ if ${web}; then
       "${loops}" \
       "${looped_packages}" \
       "${locked}" \
-      "${blocked}" | \
+      "${blocked}" \
+      "${next_tasks}" | \
       sed 's| $|\n|'
     echo "${end}"
   ) | \
