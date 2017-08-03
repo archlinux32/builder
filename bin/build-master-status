@@ -158,6 +158,7 @@ fi
 
 if ${web}; then
   sed -i 's|$|<br>|' "${tmp_dir}/build-master-status.html"
+  end=$(($(date +%s)-7*24*60*60))
   (
     [ -f "${webserver_directory}/statistics" ] && \
       cat "${webserver_directory}/statistics"
@@ -174,8 +175,14 @@ if ${web}; then
       "${locked}" \
       "${blocked}" | \
       sed 's| $|\n|'
+    echo "${end}"
   ) | \
-    tail -n 10080 > \
+    sort -k1nr,1 | \
+    sed -n "
+      /^${end}\$/q
+      p
+    " | \
+    tac > \
     "${tmp_dir}/statistics"
 
   printf '<html>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>' >> \
