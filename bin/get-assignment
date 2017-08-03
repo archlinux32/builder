@@ -49,7 +49,7 @@ hand_out_assignment() {
 
 }
 
-if ! "${base_dir}/bin/sanity-check" -r; then
+if [ -s "${work_dir}/build-master-sanity" ]; then
   >&2 echo 'Build master is not sane.'
   exit 1
 fi
