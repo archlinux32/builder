@@ -255,7 +255,11 @@ if ${web}; then
         "${rev}" \
         "${mod_rev}" \
         "${repo}" \
-        "$(wc -l < "${work_dir}/package-states/${sf}.broken")"
+        "$(wc -l < "${work_dir}/package-states/${sf}.broken")" \
+        "$(
+          ls -t "${webserver_directory}/build-logs" | \
+            grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
+        )"
       if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
         tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
           sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
@@ -265,14 +269,14 @@ if ${web}; then
       printf '\n'
     done | \
     sort -k5n,5 | \
-    while read -r pkg rev mod_rev repo count reason; do
+    while read -r pkg rev mod_rev repo count log_file reason; do
       printf '<tr>'
       printf '<td>%s</td>' \
         '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
         "${rev}" \
         "${mod_rev}" \
         "${repo}" \
-        "${count}" \
+        '<a href="build-logs/'"${log_file}"'">'"${count}"'</a>' \
         "${reason}"
       printf '</tr>\n'
     done >> \
