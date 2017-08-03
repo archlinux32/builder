@@ -52,6 +52,9 @@ if [ $# -ne 0 ]; then
   usage
 fi
 
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
 stable=$(
   ls_master_mirror 'i686' | \
     grep -v 'testing$\|staging$\|-unstable$' | \
@@ -108,32 +111,34 @@ testing=$(
     done | \
     grep -c '\.pkg\.tar\.xz$'
 )
-broken=$(
+(
+  ls "${work_dir}/package-states/" | \
+    grep '\.broken$' | \
+    sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
+    while read -r pkg rev mod_rev repo; do
+      if [ -z "$(find_dependencies_on_build_list "${pkg}" "${rev}" "${mod_rev}" "${repo}")" ]; then
+        echo "${pkg}"
+      fi
+    done
   (
+    ls "${work_dir}/build-list.loops" | \
+      grep '^loop_[0-9]\+$' | \
+      sed "s|^|${work_dir}/build-list.loops/|" | \
+      xargs -r cat | \
+      sort -u
     ls "${work_dir}/package-states/" | \
       grep '\.broken$' | \
-      sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
-      while read -r pkg rev mod_rev repo; do
-        if [ -z "$(find_dependencies_on_build_list "${pkg}" "${rev}" "${mod_rev}" "${repo}")" ]; then
-          echo "${pkg}"
-        fi
-      done
-    (
-      ls "${work_dir}/build-list.loops" | \
-        grep '^loop_[0-9]\+$' | \
-        sed "s|^|${work_dir}/build-list.loops/|" | \
-        xargs -r cat | \
-        sort -u
-      ls "${work_dir}/package-states/" | \
-        grep '\.broken$' | \
-        sed 's|\(\.[^.]\+\)\{4\}||' | \
-        sort -u
-    ) | \
-      sort | \
-      uniq -d
+      sed 's|\(\.[^.]\+\)\{4\}||' | \
+      sort -u
   ) | \
-    sort -u | \
-    wc -l
+    sort | \
+    uniq -d
+) | \
+  sort -u > \
+  "${tmp_dir}/broken-packages-names"
+broken=$(
+  wc -l < \
+    "${tmp_dir}/broken-packages-names"
 )
 blocked=$(
   ls "${work_dir}/package-states/" | \
@@ -155,9 +160,6 @@ looped_packages=$(
     sort -u | \
     wc -l
 )
-
-tmp_dir=$(mktemp -d)
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
   "${stable}" \
