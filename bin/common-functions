@@ -639,8 +639,9 @@ extract_source_directory() {
     git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${PKGBUILD_mod}" | \
       tar -Ox "${PKGBUILD_mod}" >> \
       "${output}/PKGBUILD"
-    append_architectures "${output}/PKGBUILD"
   fi
+
+  append_architectures "${output}/PKGBUILD"
 
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
