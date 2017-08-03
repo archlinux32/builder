@@ -202,7 +202,12 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
 fi
 
 if ${web}; then
-  sed -i 's|$|<br>|' "${tmp_dir}/build-master-status.html"
+  (
+    printf '<html>\n<head>\n<title>Status of archlinux32 build master</title>\n</head>\n<body>\n'
+    sed 's|$|<br>|' "${tmp_dir}/build-master-status.html"
+    printf '</body>\n</html>'
+  ) | \
+    sponge "${tmp_dir}/build-master-status.html"
   end=$(($(date +%s)-7*24*60*60))
   (
     [ -f "${webserver_directory}/statistics" ] && \
