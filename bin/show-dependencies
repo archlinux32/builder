@@ -6,10 +6,67 @@
 
 if [ $# -eq 0 ]; then
   broken=$(
+    ls "${work_dir}/package-states" | \
+      grep '\.broken$' | \
+      sed 's|\(\.[^.]\+\)\{4\}$||' | \
+      sort -u
+  )
+  new_sum='x'
+  sum=''
+  tmp_dir=$(mktemp -d)
+  trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+  ls "${work_dir}/package-infos" | \
+    grep '\.builds$' | \
+    sed "s|^|${work_dir}/package-infos/|" | \
+    xargs grep -HF '' | \
+    sed '
+      s|^.*/||
+      s|\(\.[^.]\+\)\{4\}:| |
+    ' | \
+    sort -k2,2 > \
+    "${tmp_dir}/builds"
+  while ! [ "${new_sum}" = "${sum}" ]; do
+    sum="${new_sum}"
+    printf '%s\n' ${broken} | \
+      sort > \
+      "${tmp_dir}/broken"
+    broken=$(
+      (
+        ls "${work_dir}/package-infos" | \
+          grep '\.depends$' | \
+          sed 's|^\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
+          sort -k1,1 | \
+          join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \
+          sed "s|^|${work_dir}/package-infos/|" | \
+          xargs -r cat
+      ) | \
+        sort -u | \
+        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/builds"
+    )
+    broken=$(
+      (
+        (
+          printf '%s\n' ${broken}
+          cat "${tmp_dir}/broken"
+        ) | \
+          sort -u
+        awk '{print $1}' "${work_dir}/build-list" | \
+          sort -u
+      ) | \
+        sort | \
+        uniq -d
+    )
+    new_sum=$(
+      printf '%s\n' ${broken} | \
+        sha512sum
+    )
+  done
+
+  rm -rf --one-file-system "${tmp_dir}"
+  trap - EXIT
+  broken=$(
     (
-      ls "${work_dir}/package-states" | \
-        grep '\.broken$' | \
-        sed 's|\(\.[^.]\+\)\{4\}$||'
+      printf '%s\n' ${broken}
       (
         ls "${webserver_directory}/graphs" | \
           sed 's|\.png$||'
