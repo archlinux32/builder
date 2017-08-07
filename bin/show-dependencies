@@ -6,16 +6,29 @@
 
 if [ $# -eq 0 ]; then
   broken=$(
-    ls "${work_dir}/package-states" | \
-      grep '\.broken$'
-  )
-  broken=$(
-    echo "${broken}" | \
-      sed 's|\(\.[^.]\+\)\{4\}$||' | \
+    (
+      ls "${work_dir}/package-states" | \
+        grep '\.broken$' | \
+        sed 's|\(\.[^.]\+\)\{4\}$||'
+      (
+        ls "${webserver_directory}/graphs" | \
+          sed 's|\.png$||'
+        (
+          awk '{print $1}' < \
+            "${work_dir}/build-list"
+          cat "${work_dir}/deletion-list"
+        ) | \
+          sort -u
+      ) | \
+        sort | \
+        uniq -d
+    ) | \
       sort -u
   )
-  "$0" ${broken} || \
-    exit $?
+  if [ -n "${broken}" ]; then
+    "$0" ${broken} || \
+      exit $?
+  fi
   (
     ls "${webserver_directory}/graphs"
     printf '%s.png\n' ${broken} ${broken}
