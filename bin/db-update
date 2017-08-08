@@ -441,79 +441,87 @@ done
 # packages which can't be un-staged because they're still dependencies
 # of any job on the build-list
 
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  while read -r pkg pkg_rev mod_rev repo; do
-    generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
-    cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.${repo}.depends"
-  done | \
+ls "${work_dir}/package-infos" | \
+  grep '\.groups' | \
+  sed "s|^|${work_dir}/package-infos/|" | \
+  xargs -r grep -lx 'base\(-devel\)\?' | \
+  sed '
+    s|^.*/||
+    s|\(\.[^.]\+\)\{4\}$||
+  ' | \
   sort -u > \
-  "${tmp_dir}/keep_packages"
+  "${tmp_dir}/base-packages"
+
+(
+  grep -vxF 'break_loops' "${work_dir}/build-list" | \
+    while read -r pkg pkg_rev mod_rev repo; do
+      generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
+      cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.${repo}.depends"
+    done | \
+    sort -u
+  cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
+) | \
+  sort | \
+  uniq -u > \
+  "${tmp_dir}/keep-packages"
 
 # packages which are done
 
 ls "${work_dir}/package-states" | \
-  grep '\.done$' | \
-  sed 's|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|' | \
+  sed -n '
+    /\.done$/{
+      s|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|
+      p
+    }
+  ' | \
   sort > \
-  "${tmp_dir}/done_packages"
+  "${tmp_dir}/done-packages"
 
 # remove packages not yet done from keep-packages list
 
-keep_packages=$(
-  join -1 1 -2 1 -o 2.2 \
-    "${tmp_dir}/keep_packages" \
-    "${tmp_dir}/done_packages"
-)
-printf '%s\n' "${keep_packages}" | \
-  grep -vxF '' > \
-  "${tmp_dir}/keep_packages" || \
-  true
+join -1 1 -2 1 -o 2.2 \
+  "${tmp_dir}/keep-packages" \
+  "${tmp_dir}/done-packages" | \
+  sponge "${tmp_dir}/keep-packages"
 
 # find all dependencies of the unstageable packages
 mv \
-  "${tmp_dir}/keep_packages" \
-  "${tmp_dir}/new_keep_packages"
-keep_packages=''
+  "${tmp_dir}/keep-packages" \
+  "${tmp_dir}/new-keep-packages"
+touch "${tmp_dir}/keep-packages"
 
-while [ -s "${tmp_dir}/new_keep_packages" ]; do
+while [ -s "${tmp_dir}/new-keep-packages" ]; do
 
   while read -r package; do
     generate_package_metadata "${package}"
-  done < "${tmp_dir}/new_keep_packages"
+  done < "${tmp_dir}/new-keep-packages"
 
-  keep_packages=$(
-    (
-      printf '%s\n' "${keep_packages}"
-      cat "${tmp_dir}/new_keep_packages"
-    ) | \
-      sort -u
-  )
+  cat "${tmp_dir}/new-keep-packages" "${tmp_dir}/keep-packages" | \
+    sort -u | \
+    sponge "${tmp_dir}/keep-packages"
 
-  new_keep_packages=$(
+  (
     while read -r package; do
       cat "${work_dir}/package-infos/${package}.depends"
     done < \
-      "${tmp_dir}/new_keep_packages" | \
+      "${tmp_dir}/new-keep-packages" | \
       sort -u
-  )
-  printf '%s\n' "${new_keep_packages}" > \
-    "${tmp_dir}/new_keep_packages"
-
-  new_keep_packages=$(
+    cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
+  ) | \
+    sort | \
+    uniq -u | \
     join -1 1 -2 1 -o 2.2 \
-      "${tmp_dir}/new_keep_packages" \
-      "${tmp_dir}/done_packages"
-  )
+      - \
+      "${tmp_dir}/done-packages" | \
+    sponge "${tmp_dir}/new-keep-packages"
 
   # "new" is only what has not been there before
-  printf '%s\n' "${keep_packages}" "${keep_packages}" "${new_keep_packages}" | \
+  cat "${tmp_dir}/keep-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/new-keep-packages" | \
     sort | \
-    uniq -u > \
-    "${tmp_dir}/new_keep_packages"
+    uniq -u | \
+    sponge "${tmp_dir}/new-keep-packages"
 
 done
-
-done_packages=$(cat "${tmp_dir}/done_packages")
 
 # if build list is empty, remember all entries of 'deletion-list'
 if grep -qvxF 'break_loops' "${work_dir}/build-list"; then
@@ -541,19 +549,14 @@ fi
 # calculate unstageable packages from keep_packages and done_packages
 
 done_packages=$(
-  echo "${done_packages}" | \
-    cut -d' ' -f2
-)
-
-done_packages=$(
   (
-    printf '%s\n' "${done_packages}" "${keep_packages}"
+    cut -d' ' -f2 < \
+      "${tmp_dir}/done-packages"
+    cat "${tmp_dir}/keep-packages"
   ) | \
     sort | \
     uniq -u
 )
-
-unset keep_packages
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
 
