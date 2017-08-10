@@ -381,6 +381,37 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit 1
 fi
 
+tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+packages_to_stabilize=$(
+  (
+    printf '%s\n' ${packages_to_stabilize} | \
+      sort -u | \
+      sed '
+        /\.pkg\.tar\.xz$/{
+          w '"${tmp_dir}/packages-to-stabilize"'
+          d
+        }
+      ' > /dev/null
+    ls "${work_dir}/package-states" | \
+      sed -n '
+        /\.testing$/{
+          s|^|'"${work_dir}"'/package-states/|
+          p
+        }
+      ' | \
+      xargs -r grep -HF '' | \
+      sed '
+        s|^.*/||
+        s|^\([^:]\+\)\.testing:|\1 |
+      ' | \
+      sort -k2,2 | \
+      join -1 2 -2 1 -o 1.1 - "${tmp_dir}/packages-to-stabilize"
+  ) | \
+    sort -u
+)
+
 for package in ${packages_to_stabilize}; do
   # some sanity checks
   if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then
@@ -402,8 +433,6 @@ if ! flock ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - I cannot lock package database.'
   exit 1
 fi
-
-tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
 
 clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
