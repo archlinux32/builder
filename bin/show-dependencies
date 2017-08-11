@@ -82,13 +82,10 @@ if [ $# -eq 0 ]; then
     ) | \
       sort -u
   )
-  if [ -n "${broken}" ]; then
-    "$0" ${broken} || \
-      exit $?
-  fi
+  "$0" 'ALL' ${broken}
   (
     ls "${webserver_directory}/graphs"
-    printf '%s.png\n' ${broken} ${broken}
+    printf '%s.png\n' ${broken} ${broken} 'ALL' 'ALL'
   ) | \
     sort | \
     uniq -u | \
@@ -160,38 +157,72 @@ for target_package in "$@"; do
 
   output="${webserver_directory}/graphs/${target_package}.png"
 
-  grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" | \
-    sort -u > \
-    "${tmp_dir}/build-order"
-  printf '0 target-package %s\n' "${target_package}" > \
-    "${tmp_dir}/knots"
+  if [ "${target_package}" = 'ALL' ]; then
 
-  last_sum=''
-  current_sum=$(sha512sum "${tmp_dir}/build-order")
-  while ! [ "${last_sum}" = "${current_sum}" ]; do
-
-    last_sum="${current_sum}"
-
-    awk '{print $1}' "${tmp_dir}/build-order" | \
+    # groups and split packages built by jobs on the build list
+    cat "${tmp_dir}/known-groups" "${tmp_dir}/known-split-packages" | \
+      grep -v '^\(\S\+\) \1$' | \
+      sort -k1,1 | \
+      join -1 1 -2 1 -o 1.2 - "${tmp_dir}/build-list.sorted-by-package" | \
       sort -u > \
-      "${tmp_dir}/new"
+      "${tmp_dir}/relevant-stuff"
+
     (
-      cat \
-        "${tmp_dir}/original-build-order" \
-        "${tmp_dir}/known-split-packages"
-      grep -v ' base\(-devel\)\?$' "${tmp_dir}/known-groups" || \
-        true
+      # groups and split packages built by jobs on the build list - which are also dependencies of packages on the build-list
+      sort -k1,1 "${tmp_dir}/original-build-order" | \
+        join -1 1 -2 1 -o 2.1 - "${tmp_dir}/relevant-stuff"
+      # build list jobs themself
+      awk '{print $1}' "${work_dir}/build-list"
     ) | \
+      sort -u | \
+      sponge "${tmp_dir}/relevant-stuff"
+
+    sort -k1,1 "${tmp_dir}/original-build-order" | \
+      join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" | \
       sort -k2,2 | \
-      join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/new" | \
-      sponge -a "${tmp_dir}/build-order"
+      join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" > \
+      "${tmp_dir}/build-order"
 
-    sort -u "${tmp_dir}/build-order" | \
-      sponge "${tmp_dir}/build-order"
+    rm "${tmp_dir}/relevant-stuff"
 
+  else
+
+    grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" | \
+      sort -u > \
+      "${tmp_dir}/build-order"
+    printf '0 target-package %s\n' "${target_package}" > \
+      "${tmp_dir}/knots"
+
+    last_sum=''
     current_sum=$(sha512sum "${tmp_dir}/build-order")
+    while ! [ "${last_sum}" = "${current_sum}" ]; do
 
-  done
+      last_sum="${current_sum}"
+
+      awk '{print $1}' "${tmp_dir}/build-order" | \
+        sort -u > \
+        "${tmp_dir}/new"
+      (
+        cat \
+          "${tmp_dir}/original-build-order" \
+          "${tmp_dir}/known-split-packages"
+        grep -v ' base\(-devel\)\?$' "${tmp_dir}/known-groups" || \
+          true
+      ) | \
+        sort -k2,2 | \
+        join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/new" | \
+        sponge -a "${tmp_dir}/build-order"
+
+      rm "${tmp_dir}/new"
+
+      sort -u "${tmp_dir}/build-order" | \
+        sponge "${tmp_dir}/build-order"
+
+      current_sum=$(sha512sum "${tmp_dir}/build-order")
+
+    done
+
+  fi
 
   tr ' ' '\n' < \
     "${tmp_dir}/build-order" | \
@@ -297,7 +328,7 @@ for target_package in "$@"; do
     "${tmp_dir}/input"
 
   line_count=$(wc -l < "${tmp_dir}/input")
-  if [ "${line_count}" -gt 500 ]; then
+  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL' ]; then
     sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
     line_count=$(wc -l < "${tmp_dir}/input")
     if [ "${line_count}" -gt 700 ]; then
