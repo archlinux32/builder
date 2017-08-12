@@ -224,6 +224,9 @@ for target_package in "$@"; do
 
   fi
 
+  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
+    sponge "${tmp_dir}/build-order"
+
   tr ' ' '\n' < \
     "${tmp_dir}/build-order" | \
     sort -u | \
@@ -289,43 +292,104 @@ for target_package in "$@"; do
     xargs -r printf '100 unknown %s\n' >> \
     "${tmp_dir}/knots"
 
+  sort -k3,3 -k1n,1 "${tmp_dir}/knots" | \
+    uniq -f2 | \
+    awk '{print $3 " " $1 " " $2}' | \
+    sort -k2,3 | \
+    sponge "${tmp_dir}/knots"
+
+  if [ "${target_package}" != 'ALL' ]; then
+
+    mkdir "${tmp_dir}/neighbours"
+    cat "${tmp_dir}/knots" "${tmp_dir}/build-order" | \
+      awk '{
+        print $1 " " $2 > "'"${tmp_dir}/neighbours/"'"$1;
+       print $1 " " $2 > "'"${tmp_dir}/neighbours/"'"$2;
+      }'
+
+    ls "${tmp_dir}/neighbours" | \
+      while read file; do
+        sed "
+            s@\(^\| \)$(str_to_regex "${file}")\( \|\$\)@\1<knot>\2@
+          " "${tmp_dir}/neighbours/${file}" | \
+          sort -u | \
+          sponge "${tmp_dir}/neighbours/${file}"
+      done
+
+    ls "${tmp_dir}/neighbours" | \
+      sed "s|^|${tmp_dir}/neighbours/|" | \
+      xargs -r sha512sum | \
+      sed 's|^\(\S\+\)  .*/\([^/]\+\)$|\2 \1|' | \
+      sort -k2,2 | \
+      uniq -f1 -D | \
+      awk '{print $2 " " $1}' > \
+      "${tmp_dir}/sums"
+
+    rm -rf --one-file-system "${tmp_dir}/neighbours"
+
+    sed '
+      :a
+      $!N
+      s|^\(\S\+\) \([^\n]\+\)\n\1 |\1 \2<nl>|
+      ta
+      P
+      D
+    ' "${tmp_dir}/sums" | \
+    join -1 1 -2 1 -o 2.2,1.2 - "${tmp_dir}/sums" | \
+    while read -r original replacement; do
+      sed -i "
+        s@\( \|^\)$(str_to_regex "${original}")\( \|\$\)@\1${replacement}\2@
+      " "${tmp_dir}/build-order" "${tmp_dir}/knots"
+    done
+
+  fi
+
+  sort -u "${tmp_dir}/build-order" | \
+    sponge "${tmp_dir}/build-order"
+  sort -u "${tmp_dir}/knots" | \
+    sponge "${tmp_dir}/knots"
+
   printf '%s\n' \
     'digraph dependencies {' \
     '  fontname=dejavu;' > \
     "${tmp_dir}/input"
 
-  sort -k3,3 -k1n,1 "${tmp_dir}/knots" | \
-    uniq -f2 | \
-    while read -r num what who; do
-      if [ "${what}" = 'broken-build-list-package' ]; then
-        color='#ff0000'
-      elif [ "${what}" = 'build-list-package' ]; then
-        color='#800000'
-      elif [ "${what}" = 'target-package' ]; then
-        color='#00ff00'
-      elif [ "${what}" = 'package' ]; then
-        color='#000000'
-      elif [ "${what}" = 'split-package' ]; then
-        color='#8080ff'
-      elif [ "${what}" = 'group' ]; then
-        color='#0000ff'
-      elif [ "${what}" = 'deletion-list-package' ]; then
-        color='#808080'
-      else
-        color='#ff80ff'
-      fi
-      printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
-    done >> \
+  while read -r who num what; do
+    if [ "${what}" = 'broken-build-list-package' ]; then
+      color='#ff0000'
+    elif [ "${what}" = 'build-list-package' ]; then
+      color='#800000'
+    elif [ "${what}" = 'target-package' ]; then
+      color='#00ff00'
+    elif [ "${what}" = 'package' ]; then
+      color='#000000'
+    elif [ "${what}" = 'split-package' ]; then
+      color='#8080ff'
+    elif [ "${what}" = 'group' ]; then
+      color='#0000ff'
+    elif [ "${what}" = 'deletion-list-package' ]; then
+      color='#808080'
+    else
+      color='#ff80ff'
+    fi
+    printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
+  done < \
+    "${tmp_dir}/knots" >> \
     "${tmp_dir}/input"
 
-  xargs -rn2 printf '  "%s" -> "%s";\n' < \
-    "${tmp_dir}/build-order" | \
+  sed 's|\\|\\\\|g' "${tmp_dir}/build-order" | \
+    xargs -rn2 printf '  "%s" -> "%s";\n' | \
     sort -u >> \
     "${tmp_dir}/input"
 
   printf '%s\n' \
     '}' >> \
     "${tmp_dir}/input"
+
+  sed -i '
+    s|<nl>|,\\n|g
+    s|<sp>|, |g
+  ' "${tmp_dir}/input"
 
   line_count=$(wc -l < "${tmp_dir}/input")
   if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL' ]; then
