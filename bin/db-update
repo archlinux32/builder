@@ -393,7 +393,7 @@ packages_to_stabilize=$(
           w '"${tmp_dir}/packages-to-stabilize"'
           d
         }
-      ' > /dev/null
+      '
     ls "${work_dir}/package-states" | \
       sed -n '
         /\.testing$/{
