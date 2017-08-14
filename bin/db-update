@@ -447,7 +447,7 @@ for ending in 'done' 'testing'; do
   if [ "${ending}" = 'testing' ] && \
     [ -z "${packages_to_stabilize}" ]; then
     # if nothing is to be untested, we don't care about duplicate
-    # testing packages (and maybe a unstaging fixes this anyway)
+    # testing packages (and maybe an unstaging fixes this anyway)
     continue
   fi
   if [ -n "$(
@@ -470,17 +470,6 @@ done
 # packages which can't be un-staged because they're still dependencies
 # of any job on the build-list
 
-ls "${work_dir}/package-infos" | \
-  grep '\.groups' | \
-  sed "s|^|${work_dir}/package-infos/|" | \
-  xargs -r grep -lx 'base\(-devel\)\?' | \
-  sed '
-    s|^.*/||
-    s|\(\.[^.]\+\)\{4\}$||
-  ' | \
-  sort -u > \
-  "${tmp_dir}/base-packages"
-
 (
   grep -vxF 'break_loops' "${work_dir}/build-list" | \
     while read -r pkg pkg_rev mod_rev repo; do
@@ -488,7 +477,32 @@ ls "${work_dir}/package-infos" | \
       cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.${repo}.depends"
     done | \
     sort -u
-  cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
+
+  ls "${work_dir}/package-infos" | \
+    grep '\.groups' | \
+    sed "s|^|${work_dir}/package-infos/|" | \
+    xargs -r grep -lx 'base\(-devel\)\?' | \
+    sed '
+      s|^.*/||
+      s|\(\.[^.]\+\)\{4\}$||
+    ' | \
+    sort -u > \
+    "${tmp_dir}/base-packages"
+
+  # no base / base-devel packages on the build list?
+  if [ -z $(
+      (
+        grep -vxF 'break_loops' "${work_dir}/build-list" | \
+          awk '{print $1}' | \
+          sort -u
+        sort -u "${tmp_dir}/base-packages"
+      ) | \
+        sort | \
+        uniq -d
+    ) ]; then
+    # unstage all base / base-devel packages from staging
+    cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
+  fi
 ) | \
   sort | \
   uniq -u > \
