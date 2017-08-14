@@ -490,7 +490,7 @@ done
     "${tmp_dir}/base-packages"
 
   # no base / base-devel packages on the build list?
-  if [ -z $(
+  if [ -z "$(
       (
         grep -vxF 'break_loops' "${work_dir}/build-list" | \
           awk '{print $1}' | \
@@ -499,7 +499,7 @@ done
       ) | \
         sort | \
         uniq -d
-    ) ]; then
+    )" ]; then
     # unstage all base / base-devel packages from staging
     cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
   fi
