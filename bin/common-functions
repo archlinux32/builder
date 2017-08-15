@@ -17,13 +17,19 @@ find_pkgbuilds() {
   local repo_path
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
+  # TODO: remove, when FS#54696 closed
+  local _perl_list_moreutils_repair_flag
+  if [ "${package}" = 'perl-list-moreutils' ]; then
+    _perl_list_moreutils_repair_flag='-r'
+  fi
+
   PKGBUILD=$(
     git -C "${repo_path}" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
       tar -t 2> /dev/null | \
       grep "$(printf '^%s-.*/PKGBUILD' "$(str_to_regex "${package}/repos/${repository}")")" | \
       grep -v -- '-i686/PKGBUILD$' | \
       grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
-      sort | \
+      sort ${_perl_list_moreutils_repair_flag} | \
       tail -n1
   )
 
