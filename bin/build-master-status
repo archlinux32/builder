@@ -202,6 +202,7 @@ if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
 fi
 
 if ${web}; then
+  "${base_dir}/bin/calculate-dependent-packages"
   (
     printf '<html>\n<head>\n<title>Status of archlinux32 build master</title>\n</head>\n<body>\n'
     sed 's|$|<br>|' "${tmp_dir}/build-master-status.html"
@@ -244,6 +245,7 @@ if ${web}; then
     'modification git revision' \
     'package repository' \
     'compilations' \
+    'dependent' \
     'blocked' >> \
     "${tmp_dir}/broken-packages.html"
   printf '</tr>\n' >> \
@@ -264,6 +266,13 @@ if ${web}; then
         "$(
           ls -t "${webserver_directory}/build-logs" | \
             grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
+        )" \
+        "$(
+          (
+            grep -m1 "^$(str_to_regex "${sf}") " "${work_dir}/dependent-count" || \
+              echo 'x &nbsp;'
+          ) | \
+            cut -d' ' -f2
         )"
       if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
         tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
@@ -274,7 +283,7 @@ if ${web}; then
       printf '\n'
     done | \
     sort -k5n,5 | \
-    while read -r pkg rev mod_rev repo count log_file reason; do
+    while read -r pkg rev mod_rev repo count log_file dependent reason; do
       printf '<tr>'
       printf '<td>%s</td>' \
         '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
@@ -282,6 +291,7 @@ if ${web}; then
         "${mod_rev}" \
         "${repo}" \
         '<a href="build-logs/'"${log_file}"'">'"${count}"'</a>' \
+        "${dependent}" \
         "${reason}"
       printf '</tr>\n'
     done >> \
