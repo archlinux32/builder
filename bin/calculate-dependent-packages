@@ -1,0 +1,122 @@
+#!/bin/sh
+
+. "${0%/*}/../conf/default.conf"
+
+if [ -s "${work_dir}/build-master-sanity" ]; then
+  >&2 echo 'Build master is not sane.'
+  exit 1
+fi
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+grep -vxF 'break_loops' "${work_dir}/build-list" | \
+  sort -k1,1 -u > \
+  "${tmp_dir}/build-list"
+
+while read -r pkg rev mod_rev repo; do
+  generate_package_metadata "${pkg}" "${rev}" "${mod_rev}" "${repo}"
+done < \
+  "${tmp_dir}/build-list"
+
+ls "${work_dir}/build-list.loops" | \
+  grep '^loop_[0-9]\+$' | \
+  sed "s|^|${work_dir}/build-list.loops/|" | \
+  xargs -r cat | \
+  sort -u | \
+  join -j 1 - "${tmp_dir}/build-list" | \
+  tr ' ' '.' | \
+  sed 's|^|/ |' | \
+  sort -k2,2 > \
+  "${tmp_dir}/dependent-count"
+
+tr ' ' '.' < \
+  "${tmp_dir}/build-list" | \
+  sponge "${tmp_dir}/build-list"
+
+sums=''
+
+while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/dependent-count")" ]; do
+
+  sums=$(
+    sha512sum "${tmp_dir}/dependent-count"
+  )
+
+  (
+    sed 's|^|? |' "${tmp_dir}/build-list"
+    sed 'p' "${tmp_dir}/dependent-count"
+  ) | \
+    sort -k2,2 | \
+    uniq -uf1 | \
+    cut -d' ' -f2 | \
+    sponge "${tmp_dir}/build-list"
+
+  sed '
+    s|^|'"${work_dir}"'/package-infos/|
+    s|$|.needs|
+  ' "${tmp_dir}/build-list" | \
+    xargs -r cat | \
+    grep -vx 'base\|base-devel' | \
+    sort -u > \
+    "${tmp_dir}/build-list.needs"
+
+  sed '
+    s|^\S\+ |'"${work_dir}"'/package-infos/|
+    s|$|.needs|
+  ' "${tmp_dir}/dependent-count" | \
+    xargs -r grep -Hvx 'base\|base-devel' | \
+    sed '
+      s|^.*/||
+      s|\.needs:| |
+    ' | \
+    sort -k2,2 > \
+    "${tmp_dir}/dependent-count.needs"
+
+  rm -f "${tmp_dir}/dependent-count.new"
+  touch "${tmp_dir}/dependent-count.new"
+
+  while read -r sf; do
+    if [ -n "$(
+        (
+          sort -u "${work_dir}/package-infos/${sf}.builds"
+          cat "${tmp_dir}/build-list.needs"
+        ) | \
+          sort | \
+          uniq -d
+      )" ]; then
+      continue
+    fi
+
+    count="/$(
+      sort -u "${work_dir}/package-infos/${sf}.builds" | \
+        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.needs" | \
+        sort -u | \
+        join -1 1 -2 2 -o 2.1,2.2 - "${tmp_dir}/dependent-count" | \
+        tr '/ ' '\n' | \
+        grep -vxF '' | \
+        sort -u | \
+        tr '\n' '/'
+    )"
+    printf '%s %s\n' \
+      "${count}" \
+      "${sf}" >> \
+      "${tmp_dir}/dependent-count.new"
+  done < \
+    "${tmp_dir}/build-list"
+
+  cat "${tmp_dir}/dependent-count" "${tmp_dir}/dependent-count.new" | \
+    sort -k2,2 | \
+    sponge "${tmp_dir}/dependent-count"
+
+done
+
+while read -r count pkg; do
+  count=$(
+    echo "${count}" | \
+      tr '/' '\n' | \
+      grep -cvxF ''
+  ) || true
+  printf '%s %s\n' "${pkg}" "${count}"
+done < \
+  "${tmp_dir}/dependent-count" | \
+  sponge "${work_dir}/dependent-count"
