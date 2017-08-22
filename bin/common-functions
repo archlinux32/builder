@@ -680,3 +680,69 @@ find_dependencies_on_build_list() {
     uniq -d
 
 }
+
+# download_sources_by_hash $package $repository $git_revision $git_mod_revision
+# try to download all sources by their hash into the current directory
+# returns 0 if any source was downloaded and 1 otherwise
+
+download_sources_by_hash() {
+
+  local package="$1"
+  local repository="$2"
+  local git_revision="$3"
+  local git_mod_revision="$4"
+
+  local return_value=1
+  local tmp_dir=$(mktemp -d)
+  local sum_type
+  local arch_suffix
+
+  if ! make_source_info "${package}" "${repository}" "${git_revision}" "${git_mod_revision}" "${tmp_dir}/.SRCINFO"; then
+    >&2 echo 'download_sources_by_hash: make_source_info failed.'
+    rm -rf --one-file-system "${tmp_dir}"
+    return 1
+  fi
+
+  if ! [ -s "${tmp_dir}/.SRCINFO" ]; then
+    >&2 echo 'download_sources_by_hash: ".SRCINFO" has not been created by make_source_info.'
+    rm -rf --one-file-system "${tmp_dir}"
+    return 1
+  fi
+
+  for arch_suffix in '' '_i686'; do
+    for sum_type in 'sha256sum' 'sha512sum'; do
+      grep "^\s*${sum_type}s${arch_suffix} = " "${tmp_dir}/.SRCINFO" | \
+        sed 's|^.* = ||' | \
+        cat -n > \
+        "${tmp_dir}/sums"
+      grep "^\s*source${arch_suffix} = " "${tmp_dir}/.SRCINFO" | \
+        sed '
+          s|^.* = ||
+          s|::.*$||
+          s|.*/||
+        ' | \
+        cat -n > \
+        "${tmp_dir}/urls"
+      if [ $(wc -l < "${tmp_dir}/sums") -eq $(wc -l < "${tmp_dir}/urls") ]; then
+        join -1 1 -2 1 -o 1.2,2.2 "${tmp_dir}/sums" "${tmp_dir}/urls" > \
+          "${tmp_dir}/joined"
+        while read -r sum file; do
+          if echo "${sum}  ${file}" | \
+            ${sum_type} -c > /dev/null 2>&1; then
+            # the correct source is already there
+            continue
+          fi
+          if wget -O "${tmp_dir}/transfer" "${source_by_hash_mirror}${sum}"; then
+            mv "${tmp_dir}/transfer" "${file}"
+            return_value=0
+          fi
+        done < \
+          "${tmp_dir}/joined"
+      fi
+    done
+  done
+
+  rm -rf --one-file-system "${tmp_dir}"
+  return ${return_value}
+
+}

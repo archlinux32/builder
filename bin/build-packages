@@ -188,6 +188,16 @@ while [ ${count} -ne 0 ]; do
         fi
 
         if echo "${straw}" | \
+          grep -qF ':mirrored_source_by_hash:'; then
+          # maybe a missing source is/was the problem?
+          # download it from sources.archlinux32.org by its hash
+          if ! download_sources_by_hash "${package}" "${repository}" "${git_revision}" "${mod_git_revision}"; then
+            # we can't improve anything, if no source was downloadable
+            continue
+          fi
+        fi
+
+        if echo "${straw}" | \
           grep -qF ':with_build_support:'; then
           build_command='staging-with-build-support-i686-build'
         else
