@@ -23,6 +23,8 @@
 #  correctly handle if a package moved from community to official or
 #    vice versa
 
+# use "builds" instead of assuming package builds only it's name
+
 . "${0%/*}/../conf/default.conf"
 
 usage() {
