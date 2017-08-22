@@ -194,7 +194,7 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.depends"
 
-  # extract "needs" = "depends" \setminus "builds"
+  # extract "needs" = "depends" \setminus ( "builds" \cup \{ base-devel \} )
   (
     cat "${file_prefix}.depends"
     sed 'p' "${file_prefix}.builds"
