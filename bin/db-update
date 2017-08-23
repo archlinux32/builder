@@ -507,12 +507,9 @@ done
 
 # packages which are done
 
-ls "${work_dir}/package-states" | \
-  sed -n '
-    /\.done$/{
-      s|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|
-      p
-    }
+find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
+  sed '
+    s|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|
   ' | \
   sort > \
   "${tmp_dir}/done-packages"
