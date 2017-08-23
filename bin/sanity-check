@@ -2,6 +2,7 @@
 
 # do some basic sanity checks
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage() {
@@ -12,7 +13,7 @@ usage() {
   >&2 echo '  -h|--help:             Show this help and exit.'
   >&2 echo '  -q|--quiet:            Only print errors found.'
   >&2 echo '  -r|--really-quiet:     Do not print anything.'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 i_am_insane() {
@@ -130,6 +131,7 @@ while [ $# -gt 0 ]; do
 
       errors=$(
         (
+          # shellcheck disable=SC2086
           printf 'expected %s\n' ${repos}
           ls_master_mirror 'i686' | \
             sed 's|^|found |'
@@ -245,7 +247,7 @@ while [ $# -gt 0 ]; do
           i_am_insane
         fi
 
-        rm -rf --one-file-system "${tmp_dir}/"*
+        rm -rf --one-file-system "${tmp_dir:?}/"*
 
         [ ${silence} -gt 0 ] || \
           >&2 echo ' passed.'
@@ -263,10 +265,8 @@ while [ $# -gt 0 ]; do
 
         errors=$(
           (
-            ls "${work_dir}/package-states" | \
-              grep "\.${status#*:}\$" | \
-              sed "s|^|${work_dir}/package-states/|" | \
-              xargs -r cat | \
+            find "${work_dir}/package-states" -name "*.${status#*:}" -exec \
+              cat {} \; | \
               sed 's|^|package-state-file |'
             ls_master_mirror 'i686' | \
               grep "${status%:*}\$" | \

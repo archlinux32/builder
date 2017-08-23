@@ -2,6 +2,7 @@
 
 # clean up unnecessary data
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # we only clean if run interactive or if no one is logged in
@@ -19,8 +20,7 @@ fi
 # remove blocked/broken/locked markes of packages not on the buildlist anymore
 
 (
-  ls "${work_dir}/package-states" | \
-    grep '\.broken$\|\.b\?locked$' | \
+  find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' -o -name '*.blocked' \) -printf '%f\n' | \
     sed '
       s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$|state \0 \1 \2 \3 \4 \5|
     '
@@ -40,11 +40,10 @@ fi
 # remove logs where package is not broken/locked anymore
 
 (
-  ls "${build_log_directory}" | \
+  find "${build_log_directory}" -maxdepth 1 -printf '%f\n' | \
     sed 's|\.[^.]\+\.build-log\.gz$||' | \
     sort -u
-  ls "${work_dir}/package-states" | \
-    grep '\.broken$\|\.locked$' | \
+  find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' \) -printf '%f\n' | \
     sed '
       s|\.[^.]\+$||
       p
@@ -52,19 +51,21 @@ fi
 ) | \
   sort | \
   uniq -u | \
-  while read -r s t; do
+  cut -d' ' -f1 | \
+  while read -r s; do
     rm -f "${build_log_directory}/${s}."*
   done
 
 # only keep 10 newest logs per package
 
-ls "${build_log_directory}" | \
+find "${build_log_directory}" -maxdepth 1 -printf '%f\n' | \
   sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
   sort -k3,3 -k2r,2 | \
   uniq -f2 --group=prepend | \
+  cut -d' ' -f1 | \
   (
     count=0
-    while read -r a b c; do
+    while read -r a; do
       if [ -z "${a}" ]; then
         count=0
         continue
@@ -72,7 +73,7 @@ ls "${build_log_directory}" | \
       if [ ${count} -ge 10 ]; then
         echo "${build_log_directory}/${a}"
       fi
-      count=$((${count}+1))
+      count=$((count+1))
     done
   ) | \
   xargs -rn1 rm

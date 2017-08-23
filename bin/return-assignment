@@ -18,6 +18,7 @@
 
 #  fix signing of database
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 if [ -s "${work_dir}/build-master-sanity" ]; then
@@ -64,8 +65,7 @@ if [ "$5" = 'ERROR' ]; then
   # unlock every loop this package would have broken and which is not
   # broken by another locked package
   locked_packages=$(
-    ls "${work_dir}/package-states/" | \
-      grep '\.locked$' | \
+    find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' | \
       sed 's@^.*/\([^/]\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
   )
   grep -lxF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
@@ -134,7 +134,7 @@ tar -x \
 
 # check if all packages are signed and all signatures belong to a package
 signature_errors=$(
-  ls -1 *.pkg.tar.xz *.pkg.tar.xz.sig | \
+  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \
     sed 's|\.sig$||' | \
     sort | \
     uniq -c | \
@@ -150,11 +150,11 @@ fi
 
 # check if the sent packages are the expected ones
 packages=$(
-  ls -1 | \
-    grep '\.pkg\.tar\.xz$'
+  find . -maxdepth 1 -name '*.pkg.tar.xz' -printf '%f\n'
 )
 package_errors=$(
   (
+    # shellcheck disable=SC2086
     printf '%s\n' ${packages} | \
       sed '
         s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz$@ \2@
@@ -185,6 +185,7 @@ ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.files."* \
   .
+# shellcheck disable=SC2086
 repo-add "${destination}.db.tar.gz" ${packages}
 # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
 
@@ -201,11 +202,10 @@ done
 
 # remove old state files (these should be only "done" markers, but
 # actually we don't care what it is) - as long as it's not "testing"
-ls "${work_dir}/package-states" | \
-  grep "^$(str_to_regex "$1")\(\.[^.]\+\)\{4\}\$" | \
-  grep -v "^$(str_to_regex "$1.$2.$3.$4")\.[^.]\+\$" | \
+find "${work_dir}/package-states" -maxdepth 1 | \
+  grep "/$(str_to_regex "$1")\(\.[^.]\+\)\{4\}\$" | \
+  grep -v "/$(str_to_regex "$1.$2.$3.$4")\.[^.]\+\$" | \
   grep -v '\.testing$' | \
-  sed "s|^|${work_dir}/package-states/|" | \
   xargs -rn1 rm -f
 
 # remove all loops which are broken by this package
@@ -213,7 +213,7 @@ grep -lxF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
   sed 'p;s|$|.locked|' | \
   xargs -rn1 rm -f
 
-if ! ls "${work_dir}/build-list.loops" | \
+if ! find "${work_dir}/build-list.loops" -maxdepth 1 -printf '%f\n' | \
   grep -q '^loop_[0-9]\+$'; then
   # no loops left
   sed -i '/^break_loops$/d' "${work_dir}/build-list"
@@ -224,6 +224,7 @@ sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 
 # remove package lock file
 if ! [ "${destination}" = 'build-support' ]; then
+  # shellcheck disable=SC2086
   printf '%s\n' ${packages} > \
     "${work_dir}/package-states/$1.$2.$3.$4.done"
 fi

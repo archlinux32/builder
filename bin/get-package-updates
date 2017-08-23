@@ -17,6 +17,7 @@
 
 #  remove extra whitelist cases
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage() {
@@ -28,7 +29,7 @@ usage() {
   >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
   >&2 echo '  -h|--help:    Show this help and exit.'
   >&2 echo '  -n|--no-pull: Do not pull git repos, merely reorder build list.'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
@@ -153,6 +154,7 @@ for repo in ${repo_names}; do
   eval new_repo_revision='"${new_repo_revisions__'"${repo}"'}"'
   (
     # if old revision unknown, mimic "git diff"-output
+    # shellcheck disable=SC2154
     if [ "${old_repo_revision}" = "NONE" ]; then
       git -C "${repo_path}" archive --format=tar HEAD | \
         tar -t | \
@@ -166,6 +168,7 @@ for repo in ${repo_names}; do
     if [ "${repo}" = "archlinux32" ]; then
     # modify the directory structure from the modifiaction-repository
     # to the one of an original source repository
+      # shellcheck disable=SC2016
       sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
         while read -r pkg_repo rest; do
           eval "printf '%s %s\n'" \
@@ -189,6 +192,7 @@ done | \
       # new or modified PKGBUILD
       "A"|"M")
         sed -i "/^$(str_to_regex "${package}") /d" "${work_dir}/build-list.new"
+        # shellcheck disable=SC2154
         echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
           "${work_dir}/build-list.new"
         sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
@@ -231,15 +235,14 @@ black_listed_new=$(
   (
     git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
       tar -Ox 'blacklist'
-    ls "${work_dir}/package-infos" | \
-      grep '^lib32-' | \
+    find "${work_dir}/package-infos" -maxdepth 1 -name 'lib32-*' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       uniq
   ) | \
     sort -u
 )
 
-ls "${work_dir}/package-infos/" | \
+find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' -printf '%f\n' | \
   grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+\.builds$' | \
   sed '
     s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|\2 \3 \4 \1|
@@ -255,11 +258,13 @@ ls "${work_dir}/package-infos/" | \
         "${opkg}" \
         "${opkg}" \
         "$(
+          # shellcheck disable=SC2086
           printf '%s\n' ${revs} | \
             sort -u | \
             find_newest_of_git_revisions
         )" \
         "$(
+          # shellcheck disable=SC2086
           printf '%s\n' ${mod_revs} | \
             sort -u | \
             find_newest_of_git_revisions
@@ -309,11 +314,13 @@ sed "
 
 while [ -n "${black_listed_new}" ]; do
   black_listed=$(
+    # shellcheck disable=SC2086
     printf '%s\n' ${black_listed} ${black_listed_new} | \
       sort -u
   )
   black_listed_new=$(
     (
+      # shellcheck disable=SC2086
       printf '%s\n' ${black_listed} | \
         sort -k1,1 | \
         join -j1 -o 2.2 - "${work_dir}/newest-revisions" | \
@@ -356,6 +363,7 @@ while [ -n "${black_listed_new}" ]; do
       sort -u
   )
   black_listed_new=$(
+    # shellcheck disable=SC2086
     printf '%s\n' ${black_listed} ${black_listed} ${black_listed_new} | \
       sort | \
       uniq -u
@@ -427,7 +435,7 @@ if [ -s "${work_dir}/tsort.error" ]; then
     ' "${work_dir}/tsort.error"
 
   # remove lines from loop files which are no packages
-  ls "${work_dir}/build-list.loops.new" | \
+  find "${work_dir}/build-list.loops.new" -maxdepth 1 -printf '%f\n' | \
     grep '^loop_[0-9]\+$' | \
     while read -r loop; do
       (
@@ -455,6 +463,7 @@ fi
 rm -rf --one-file-system "${work_dir}/build-list.loops"
 (
   printf '%s\n' "build-list.loops" "build-list.new" "build-list" "deletion-list"
+  # shellcheck disable=SC2086
   printf '%s.revision\n' ${repo_names}
 ) | \
   while read -r file; do

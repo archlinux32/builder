@@ -22,6 +22,7 @@
 #  avoid any-packages from x86_64 mirrors in /var/cache/pacman/pkg of
 #   build slave
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage() {
@@ -35,7 +36,7 @@ usage() {
   >&2 echo '               The default is $count=1 or 0 iff -t or -x is given.'
   >&2 echo '  -t seconds:  Do not request new assignment(s) $seconds seconds after start.'
   >&2 echo '  -x:          If package build fails, do not request new assignment(s).'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
@@ -58,7 +59,7 @@ do
     -n)
       shift
       count="$1"
-      [ ${count} -eq 0 ] && \
+      [ "${count}" -eq 0 ] && \
         count=-1
     ;;
     -t)
@@ -86,18 +87,18 @@ if [ $# -ne 0 ]; then
 fi
 
 if [ -z "${count}" ]; then
-  if [ ${timeout} -ne 0 ] || ${exit_after_failure}; then
+  if [ "${timeout}" -ne 0 ] || ${exit_after_failure}; then
     count=-1
   else
     count=1
   fi
 fi
 
-if [ ${timeout} -ne 0 ]; then
-  timeout=$((${timeout}+$(date +%s)))
+if [ "${timeout}" -ne 0 ]; then
+  timeout=$((timeout+$(date +%s)))
 fi
 
-while [ ${count} -ne 0 ]; do
+while [ "${count}" -ne 0 ]; do
 
   if [ ${timeout} -ne 0 ] && [ ${timeout} -lt $(date +%s) ];
   then
@@ -118,7 +119,7 @@ while [ ${count} -ne 0 ]; do
     #  0: ok, I gave you an assignment
     0)
       [ ${count} -gt 0 ] && \
-        count=$((${count}-1))
+        count=$((count-1))
       repository="${package##* }"
       package="${package% *}"
       mod_git_revision="${package##* }"
@@ -139,12 +140,12 @@ while [ ${count} -ne 0 ]; do
 
       bail_out() {
         err=$?
-        if [ -n $1 ]; then
-          err=$1
+        if [ -n "$1" ]; then
+          err="$1"
         fi
         cd "${base_dir}"
         recursively_umount_and_rm "${tmp_dir}"
-        exit ${err}
+        exit "${err}"
       }
       tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
       trap bail_out EXIT
@@ -210,7 +211,8 @@ while [ ${count} -ne 0 ]; do
           parameters=''
         fi
 
-        rm -f *".pkg.tar.xz" *".pkg.tar.xz.sig"
+        find . -maxdepth 1 -type f \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -exec \
+          rm {} \;
 
         >&2 printf '%s: building package "%s" (straw: %s) ...' \
           "$(date +'%Y-%m-%d %T')" \
@@ -225,15 +227,15 @@ while [ ${count} -ne 0 ]; do
           ).build-log" 2>&1; then
           # build successful
           >&2 printf ' ok.\n'
-          ls -1 *.pkg.tar.xz | \
-            xargs -rn1 gpg --local-user="${package_key}" --detach-sign
-          tar -cf 'package.tar' $(
-            ls -1 | \
-              grep '\.pkg\.tar\.xz\(\.sig\)\?$' | \
-              grep -v -- '-debug-'
+          find . -maxdepth 1 -type f -name '*.pkg.tar.xz' -exec \
+            gpg --local-user="${package_key}" --detach-sign {} \;
+          # shellcheck disable=SC2046
+          tar -cf 'package.tar' -- $(
+            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -not -name '*-debug-*'
             )
           while true; do
             err=0
+            # shellcheck disable=SC2029
             ssh \
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \
@@ -280,7 +282,7 @@ while [ ${count} -ne 0 ]; do
           fi
         done
         if tar -cf 'build-logs.gz.tar' \
-          *'.build-log.gz'; then
+          ./*'.build-log.gz'; then
           while ! ssh \
             -i "${master_build_server_identity}" \
             -p "${master_build_server_port}" \

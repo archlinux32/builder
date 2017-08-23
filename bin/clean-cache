@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 if [ $# -eq 0 ]; then

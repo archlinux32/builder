@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 if [ -s "${work_dir}/build-master-sanity" ]; then
@@ -20,13 +21,13 @@ done < \
   "${tmp_dir}/build-list"
 
 mkdir "${tmp_dir}/loops"
-ls "${work_dir}/build-list.loops" | \
-  grep '^loop_[0-9]\+$' | \
+find "${work_dir}/build-list.loops" -maxdepth 1 | \
+  grep '/loop_[0-9]\+$' | \
   while read -r loop; do
-    sort -u "${work_dir}/build-list.loops/${loop}" | \
+    sort -u "${loop}" | \
       join -j 1 - "${tmp_dir}/build-list" | \
       tr ' ' '.' > \
-      "${tmp_dir}/loops/${loop}"
+      "${tmp_dir}/loops/${loop##*/}"
   done
 
 touch "${tmp_dir}/dependent-count"
@@ -102,18 +103,15 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
       "${count}" \
       "${sf}" >> \
       "${tmp_dir}/dependent-count.new"
-    ls "${tmp_dir}/loops" | \
-      sed '
-        s|^|'"${tmp_dir}"'/loops/|
-      ' | \
-      xargs -r grep -lxF "${sf}" | \
-      xargs -r rm -f
+    find "${tmp_dir}/loops" -maxdepth 1 \
+      -exec grep -qxF "${sf}" {} \; \
+      -exec rm {} \;
   done < \
     "${tmp_dir}/build-list"
 
-  ls "${tmp_dir}/loops" | \
+  find "${tmp_dir}/loops" -maxdepth 1 | \
     while read -r loop; do
-      if [ ! -f "${tmp_dir}/loops/${loop}" ]; then
+      if [ ! -f "${loop}" ]; then
         continue
       fi
       if [ -n "$(
@@ -121,11 +119,11 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
             sed '
               s|^|'"${work_dir}"'/package-infos/|
               s|$|.builds|
-            ' "${tmp_dir}/loops/${loop}" | \
+            ' "${loop}" | \
               xargs -r cat | \
               sort -u
             (
-              sed 'p' "${tmp_dir}/loops/${loop}"
+              sed 'p' "${loop}"
               cat "${tmp_dir}/build-list"
             ) | \
               sort | \
@@ -148,7 +146,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
         sed '
           s|^|'"${work_dir}"'/package-infos/|
           s|$|.builds|
-        ' "${tmp_dir}/loops/${loop}" | \
+        ' "${loop}" | \
           xargs -r cat | \
           sort -u | \
         join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.needs" | \
@@ -162,17 +160,13 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
       while read -r sf; do
         printf '%s %s\n' "${count}" "${sf}" >> \
           "${tmp_dir}/dependent-count.new"
-        ls "${tmp_dir}/loops" | \
-          grep -vxF "${loop}" | \
-          sed '
-            s|^|'"${tmp_dir}"'/loops/|
-          ' | \
-          xargs -r grep -lxF "${sf}" | \
-          xargs -r rm -f
+        find "${tmp_dir}/loops" -maxdepth 1 -not -name "${loop##*/}" \
+          -exec grep -qxF "${sf}" {} \; \
+          -exec rm {} \;
       done < \
-        "${tmp_dir}/loops/${loop}"
+        "${loop}"
 
-      rm "${tmp_dir}/loops/${loop}"
+      rm "${loop}"
     done
 
   cat "${tmp_dir}/dependent-count" "${tmp_dir}/dependent-count.new" | \

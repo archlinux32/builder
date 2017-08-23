@@ -21,8 +21,8 @@ if [ "$allownonascii" != "true" ] &&
   # Note that the use of brackets around a tr range is ok here, (it's
   # even required, for portability to Solaris 10's /usr/bin/tr), since
   # the square bracket bytes happen to fall in the designated range.
-  test $(git diff --cached --name-only --diff-filter=A -z $against |
-    LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+  test "$(git diff --cached --name-only --diff-filter=A -z $against |
+    LC_ALL=C tr -d '[ -~]\0' | wc -c)" != 0
 then
   cat <<\EOF
 Error: Attempt to add a non-ASCII file name.
@@ -50,7 +50,8 @@ git archive "${tree}" | \
   tar -C "${tmp_dir}" -x
 
 errors=$(
-  cd "${tmp_dir}"
+  cd "${tmp_dir}" || \
+    echo 'Cannot cd.'
   find "bin" "conf" -type f -not -executable -not -name '.gitignore'
 )
 
@@ -71,7 +72,8 @@ if [ -n "${errors}" ]; then
 fi
 
 errors=$(
-  cd "${tmp_dir}"
+  cd "${tmp_dir}" || \
+    echo 'Cannot cd.'
   checkbashisms bin/* conf/* 2>&1
 )
 

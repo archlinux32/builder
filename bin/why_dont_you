@@ -4,6 +4,7 @@
 
 # investigate, why a certain operation is not done with certain packages
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 action="$1"
@@ -59,7 +60,7 @@ case "${action}" in
 
     for pkg in "$@"; do
 
-      if ! ls -1 "${work_dir}/package-states" | \
+      if ! find "${work_dir}/package-states" -maxdepth 1 -printf '%f\n' | \
         grep -q "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done\$"; then
         printf '"%s" is not in staging!\n' "${pkg}"
         continue
@@ -132,7 +133,7 @@ case "${action}" in
     while read -r pkg; do
 
       if builds_file=$(
-        ls "${work_dir}/package-infos" | \
+        find "${work_dir}/package-infos" -maxdepth 1 -printf '%f\n' | \
           grep -m1 "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.builds\$"
         ); then
 
@@ -215,22 +216,21 @@ case "${action}" in
         continue
       fi
 
-      if ! needs=$(
-          ls "${work_dir}/package-infos" | \
-            grep "^$(str_to_regex "${pkg}")\..*\.needs\$"
-        ); then
+      needs=$(
+        find "${work_dir}/package-infos" -maxdepth 1 -name "${pkg}.*.needs"
+      )
+      if [ -z "${needs}" ]; then
         printf 'Package "%s" was deleted in the git repositories.\n' "${pkg}"
         continue
       fi
 
       needs=$(
-        printf "${work_dir}/package-infos/%s\n" ${needs} | \
-          xargs -r cat | \
-          sort -u
+        sort -u "${needs}"
       )
 
       errors=$(
         (
+          # shellcheck disable=SC2086
           printf '%s\n' ${needs}
           awk '{print $3}' "${tmp_file}" | \
             sort -u
@@ -241,6 +241,7 @@ case "${action}" in
       )
       if [ -n "${errors}" ]; then
         printf 'Package "%s" has dependencies on the deletion list:\n' "${pkg}"
+        # shellcheck disable=SC2086,SC2183
         printf '%s %s %s\n' ${errors}
         printf '\n'
         continue

@@ -2,8 +2,10 @@
 
 # seed the build list from differences between an x86_64 and our master mirror
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# shellcheck disable=SC2016
 usage() {
   >&2 echo ''
   >&2 echo 'seed-build-list [options]:'
@@ -22,11 +24,12 @@ usage() {
   >&2 echo '    Do not actually update build-list, just print it.'
   >&2 echo '  -p|--package $pkg_regex:'
   >&2 echo '    Update packages matching $pkg_regex.'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 tmp_dir=$(mktemp -d)
-trap "rm -rf --one-file-system '${tmp_dir}'" EXIT
+# shellcheck disable=SC2064
+trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 
 eval set -- "$(
   getopt -o hi:m:np: \
@@ -173,36 +176,30 @@ while read -r pkg; do
   if [ -z "${pkg}" ]; then
     continue
   fi
-  success=false
-  for arch in x86_64 any; do
-    pkgbase=$(
-      curl -sS "https://www.archlinux.org/packages/community/x86_64/${pkg}/" | \
-        sed -n '
-          /Base Package:/{
-            :a
-            N
-            s|</tr>.*$||
-            Ta
-            p
-          }
-        ' | \
-        tr '<>' '\n' | \
-        grep '^a href="' | \
-        sed '
-          s|^a href="||
-          s|".*||
-          s|/$||
-          s|^.*/||
-        '
-    )
-    if [ -n "${pkgbase}" ]; then
-      echo "${pkgbase}" >> \
-        "${tmp_dir}/delta_pkgbases"
-      success=true
-      break
-    fi
-  done
-  if ! ${sucess}; then
+  pkgbase=$(
+    curl -sS "https://www.archlinux.org/packages/community/x86_64/${pkg}/" | \
+      sed -n '
+        /Base Package:/{
+          :a
+          N
+          s|</tr>.*$||
+          Ta
+          p
+        }
+      ' | \
+      tr '<>' '\n' | \
+      grep '^a href="' | \
+      sed '
+        s|^a href="||
+        s|".*||
+        s|/$||
+        s|^.*/||
+      '
+  )
+  if [ -n "${pkgbase}" ]; then
+    echo "${pkgbase}" >> \
+      "${tmp_dir}/delta_pkgbases"
+  else
     echo "${pkg}"
   fi
 done < \
@@ -248,23 +245,22 @@ if ${update}; then
   flock 9
 fi
 
-# ignore packages already on the build list
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}' > \
-  "${tmp_dir}/build-list.old"
+{
+  # ignore packages already on the build list
+  grep -vxF 'break_loops' "${work_dir}/build-list" | \
+    awk '{print "old " $1 " " $2 " " $3 " " $4 " " $1}'
 
-# ignore packages on the deletion-list
-awk '{print "delete " $1 " X X X " $1}' "${work_dir}/deletion-list" >> \
-  "${tmp_dir}/build-list.old"
+  # ignore packages on the deletion-list
+  awk '{print "delete " $1 " X X X " $1}' "${work_dir}/deletion-list"
 
-# ignore packages on the blacklist
-git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
-  tar -Ox blacklist | \
-  awk '{print "blacklist " $1 " X X X " $1}' >> \
-  "${tmp_dir}/build-list.old"
+  # ignore packages on the blacklist
+  git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
+    tar -Ox blacklist | \
+    awk '{print "blacklist " $1 " X X X " $1}'
 
-# ignore explicitely ignored packages
-awk '{print "ignore " $1 " X X X " $1}' "${tmp_dir}/ignore_packages" >> \
+  # ignore explicitely ignored packages
+  awk '{print "ignore " $1 " X X X " $1}' "${tmp_dir}/ignore_packages"
+} > \
   "${tmp_dir}/build-list.old"
 
 if ${update}; then

@@ -25,8 +25,10 @@
 
 # use "builds" instead of assuming package builds only it's name
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# shellcheck disable=SC2016
 usage() {
   >&2 echo ''
   >&2 echo 'db-update [options] [packages]:'
@@ -39,7 +41,7 @@ usage() {
   >&2 echo '                    stable from $file (- is stdin).'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 # move_packages $package/$from_repository/$to_repository ...
@@ -62,7 +64,7 @@ move_packages() {
   local dummynator
   local file
 
-  rm -rf --one-file-system "${tmp_dir}/"*
+  rm -rf --one-file-system "${tmp_dir:?}/"*
 
   touch "${tmp_dir}/repos"
   touch "${tmp_dir}/packages"
@@ -82,7 +84,7 @@ move_packages() {
         "${tmp_dir}/master-mirror-listing"
     done
 
-  for package in $@; do
+  for package in "$@"; do
     if [ -z "${package}" ]; then
       continue
     fi
@@ -163,8 +165,9 @@ move_packages() {
     mkdir -p "${tmp_dir}/${to_repo}"
 
     repos=$(
+      # shellcheck disable=SC2046
       printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/repos") | \
-      sort -u
+        sort -u
     )
     echo "${repos}" > \
       "${tmp_dir}/repos"
@@ -179,8 +182,7 @@ move_packages() {
           echo "'${file}'"
         else
           echo "${file}:"
-          cat "${file}" | \
-            sed 's|^|<<|;s|$|>>|'
+          sed 's|^|<<|;s|$|>>|' "${file}"
         fi
         echo
       done
@@ -199,6 +201,7 @@ move_packages() {
 
     if grep -qxF "${repo}" "${tmp_dir}/"*".from_repo"; then
 
+      # shellcheck disable=SC2046
       repo-remove -q \
         "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
         $(
@@ -303,9 +306,8 @@ move_packages() {
         "${work_dir}/package-states/${package}.${from_ending}"
     else
       # remove old state files of $package with ending $to_ending
-      ls "${work_dir}/package-states" | \
-        grep "^$(str_to_regex "${package%.*.*.*}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
-        sed "s|^|${work_dir}/package-states/|" | \
+      find "${work_dir}/package-states" -maxdepth 1 | \
+        grep "/$(str_to_regex "${package%.*.*.*}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
         xargs -rn1 ${dummynator} rm
       ${dummynator} mv \
         "${work_dir}/package-states/${package}.${from_ending}" \
@@ -318,12 +320,13 @@ move_packages() {
   if ! ${no_action}; then
     date '+%s' > \
       "${tmp_dir}/lastupdate"
+    # shellcheck disable=SC2086
     ${dummynator} ${master_mirror_rsync_command} \
       "${tmp_dir}/lastupdate" \
       "${master_mirror_rsync_directory}/lastupdate"
   fi
 
-  rm -rf --one-file-system "${tmp_dir}/"*
+  rm -rf --one-file-system "${tmp_dir:?}/"*
 
 }
 
@@ -373,9 +376,10 @@ do
 done
 
 packages_to_stabilize=$(
+  # shellcheck disable=SC2086
   printf '%s\n' \
     ${packages_to_stabilize} \
-    ${@}
+    "${@}"
 )
 
 if [ -s "${work_dir}/build-master-sanity" ]; then
@@ -388,6 +392,7 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 packages_to_stabilize=$(
   (
+    # shellcheck disable=SC2086
     printf '%s\n' ${packages_to_stabilize} | \
       sort -u | \
       sed '
@@ -396,14 +401,8 @@ packages_to_stabilize=$(
           d
         }
       '
-    ls "${work_dir}/package-states" | \
-      sed -n '
-        /\.testing$/{
-          s|^|'"${work_dir}"'/package-states/|
-          p
-        }
-      ' | \
-      xargs -r grep -HF '' | \
+    find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' -exec \
+      grep -HF '' {} \; | \
       sed '
         s|^.*/||
         s|^\([^:]\+\)\.testing:|\1 |
@@ -453,15 +452,13 @@ for ending in 'done' 'testing'; do
     continue
   fi
   if [ -n "$(
-    ls "${work_dir}/package-states" | \
-      grep "\.${ending}\$" | \
+    find "${work_dir}/package-states" -name ".${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort | \
       uniq -d
     )" ]; then
     >&2 echo 'Removing duplicates not yet implemented:'
-    ls "${work_dir}/package-states" | \
-      grep "\.${ending}\$" | \
+    find "${work_dir}/package-states" -name ".${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort | \
       uniq -d
@@ -480,12 +477,10 @@ done
     done | \
     sort -u
 
-  ls "${work_dir}/package-infos" | \
-    grep '\.groups' | \
-    sed "s|^|${work_dir}/package-infos/|" | \
-    xargs -r grep -lx 'base\(-devel\)\?' | \
+  find "${work_dir}/package-infos" -name '*.groups' \
+    -exec grep -qx 'base\(-devel\)\?' {} \; \
+    -printf '%f\n' | \
     sed '
-      s|^.*/||
       s|\(\.[^.]\+\)\{4\}$||
     ' | \
     sort -u > \
@@ -605,6 +600,7 @@ done_packages=$(
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
 
+# shellcheck disable=SC2046
 move_packages $(
 
   for package in ${packages_to_stabilize}; do
@@ -624,6 +620,7 @@ move_packages $(
 
 # move packages from *staging to *testing
 
+# shellcheck disable=SC2046
 move_packages $(
 
   for package in ${done_packages}; do

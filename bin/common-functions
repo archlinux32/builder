@@ -2,6 +2,11 @@
 
 # contains functions used by more than one script
 
+if [ -z "${base_dir}" ]; then
+  # just to make shellcheck happy
+  . 'conf/default.conf'
+fi
+
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision
 # find the PKGBUILD and modification of $package from $repository
 # sets $PKGBUILD and $PKGBUILD_mod
@@ -304,10 +309,12 @@ delete_old_metadata() {
             continue
           fi
           revs=$(
+            # shellcheck disable=SC2086
             printf '%s\n' ${revs} ${rev} | \
               sort -u
           )
           mod_revs=$(
+            # shellcheck disable=SC2086
             printf '%s\n' ${mod_revs} ${mod_rev} | \
               sort -u
           )
@@ -425,7 +432,7 @@ wait_some_time() {
       cut -d' ' -f1
   )
 
-  sleep $((${minimum} + ${random} % ${diff}))
+  sleep $((minimum + random % diff))
 }
 
 # str_to_regex $string
@@ -505,9 +512,8 @@ insert_break_loops_orders() {
   local line
 
   looped_packages=$(
-    ls "${work_dir}/build-list.loops" | \
-      grep '^loop_[0-9]\+$' | \
-      sed "s|^|${work_dir}/build-list.loops/|" | \
+    find "${work_dir}/build-list.loops" -maxdepth 1 | \
+      grep '/loop_[0-9]\+$' | \
       xargs -r cat | \
       sort -u | \
       wc -l
@@ -516,16 +522,16 @@ insert_break_loops_orders() {
   (
     while read -r line; do
       if [ "${line}" = 'break_loops' ]; then
-        if [ ${looped_packages} -eq 0 ]; then
+        if [ "${looped_packages}" -eq 0 ]; then
           continue
         fi
-        looped_packages=$((${looped_packages}-1))
+        looped_packages=$((looped_packages-1))
       fi
       printf '%s\n' "${line}"
     done < \
       "${file}"
     while [ ${looped_packages} -gt 0 ]; do
-      looped_packages=$((${looped_packages}-1))
+      looped_packages=$((looped_packages-1))
       echo 'break_loops'
     done
   ) | \
@@ -549,10 +555,10 @@ find_newest_of_git_revisions() {
   local repo
   revisions=$(cat)
 
-  if [ $(
+  if [ "$(
     echo "${revisions}" | \
       wc -l
-    ) -eq 1 ]; then
+    )" -eq 1 ]; then
 
     echo "${revisions}"
     return
@@ -649,6 +655,7 @@ extract_source_directory() {
 
   append_architectures "${output}/PKGBUILD"
 
+  # shellcheck disable=SC2016
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
 }
@@ -693,9 +700,11 @@ download_sources_by_hash() {
   local git_mod_revision="$4"
 
   local return_value=1
-  local tmp_dir=$(mktemp -d)
+  local tmp_dir
   local sum_type
   local arch_suffix
+
+  tmp_dir=$(mktemp -d)
 
   if ! make_source_info "${package}" "${repository}" "${git_revision}" "${git_mod_revision}" "${tmp_dir}/.SRCINFO"; then
     >&2 echo 'download_sources_by_hash: make_source_info failed.'
@@ -723,7 +732,7 @@ download_sources_by_hash() {
         ' | \
         cat -n > \
         "${tmp_dir}/urls"
-      if [ $(wc -l < "${tmp_dir}/sums") -eq $(wc -l < "${tmp_dir}/urls") ]; then
+      if [ "$(wc -l < "${tmp_dir}/sums")" -eq "$(wc -l < "${tmp_dir}/urls")" ]; then
         join -1 1 -2 1 -o 1.2,2.2 "${tmp_dir}/sums" "${tmp_dir}/urls" > \
           "${tmp_dir}/joined"
         while read -r sum file; do

@@ -1,13 +1,13 @@
 #!/bin/sh
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # Create a lock file.
 
 if [ $# -eq 0 ]; then
   broken=$(
-    ls "${work_dir}/package-states" | \
-      grep '\.broken$' | \
+    find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort -u
   )
@@ -15,10 +15,8 @@ if [ $# -eq 0 ]; then
   sum=''
   tmp_dir=$(mktemp -d)
   trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-  ls "${work_dir}/package-infos" | \
-    grep '\.builds$' | \
-    sed "s|^|${work_dir}/package-infos/|" | \
-    xargs grep -HF '' | \
+  find "${work_dir}/package-infos" -name '*.builds' -exec \
+    grep -HF '' {} \; | \
     sed '
       s|^.*/||
       s|\(\.[^.]\+\)\{4\}:| |
@@ -27,17 +25,16 @@ if [ $# -eq 0 ]; then
     "${tmp_dir}/builds"
   while ! [ "${new_sum}" = "${sum}" ]; do
     sum="${new_sum}"
+    # shellcheck disable=SC2086
     printf '%s\n' ${broken} | \
       sort > \
       "${tmp_dir}/broken"
     broken=$(
       (
-        ls "${work_dir}/package-infos" | \
-          grep '\.depends$' | \
-          sed 's|^\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
+        find "${work_dir}/package-infos" -maxdepth 1 -name '*.depends' | \
+          sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
           sort -k1,1 | \
           join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \
-          sed "s|^|${work_dir}/package-infos/|" | \
           xargs -r cat
       ) | \
         sort -u | \
@@ -46,6 +43,7 @@ if [ $# -eq 0 ]; then
     broken=$(
       (
         (
+          # shellcheck disable=SC2086
           printf '%s\n' ${broken}
           cat "${tmp_dir}/broken"
         ) | \
@@ -57,6 +55,7 @@ if [ $# -eq 0 ]; then
         uniq -d
     )
     new_sum=$(
+      # shellcheck disable=SC2086
       printf '%s\n' ${broken} | \
         sha512sum
     )
@@ -66,6 +65,7 @@ if [ $# -eq 0 ]; then
   trap - EXIT
   broken=$(
     (
+      # shellcheck disable=SC2086
       printf '%s\n' ${broken}
       (
         ls "${webserver_directory}/graphs" | \
@@ -82,9 +82,11 @@ if [ $# -eq 0 ]; then
     ) | \
       sort -u
   )
+  # shellcheck disable=SC2086
   "$0" 'ALL' ${broken}
   (
     ls "${webserver_directory}/graphs"
+    # shellcheck disable=SC2086
     printf '%s.png\n' ${broken} ${broken} 'ALL' 'ALL'
   ) | \
     sort | \
@@ -94,6 +96,7 @@ if [ $# -eq 0 ]; then
   exit
 fi
 
+# shellcheck disable=SC2009
 if ps ax | \
   grep -v grep | \
   grep -v "^\s*$$\s" | \
@@ -137,21 +140,19 @@ ls "${work_dir}/package-infos" | \
   sort -u > \
   "${tmp_dir}/known-packages"
 
-ls "${work_dir}/package-infos" | \
-  grep '\.groups$' | \
-  while read -r pf; do
-    cat "${work_dir}/package-infos/${pf}" | \
-      xargs -r printf "${pf%.*.*.*.*} %s\n" >> \
-      "${tmp_dir}/known-groups"
-  done
+find "${work_dir}/package-infos" -maxdepth 1 -name '*.groups' -printf '%f %p\n' | \
+  while read -r name pf; do
+    xargs -r printf "${name%.*.*.*.*} %s\n" < \
+      "${pf}"
+  done > \
+  "${tmp_dir}/known-groups"
 
-ls "${work_dir}/package-infos" | \
-  grep '\.packages$' | \
-  while read -r pf; do
-    grep -vxF "${pf%.*.*.*.*}" "${work_dir}/package-infos/${pf}" | \
-      xargs -r printf "${pf%.*.*.*.*} %s\n" >> \
-      "${tmp_dir}/known-split-packages"
-  done
+find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f %p\n' | \
+  while read -r name pf; do
+    grep -vxF "${name%.*.*.*.*}" "${pf}" | \
+      xargs -r printf "${name%.*.*.*.*} %s\n"
+  done > \
+  "${tmp_dir}/known-split-packages"
 
 for target_package in "$@"; do
 
@@ -231,7 +232,7 @@ for target_package in "$@"; do
     "${tmp_dir}/build-order" | \
     sort -u | \
     join -j 1 - "${tmp_dir}/build-list.sorted-by-package" | \
-    while read pkg rev mod_rev repo; do
+    while read -r pkg rev mod_rev repo; do
       if [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.broken" ]; then
         printf '1 broken-build-list-package %s\n' "${pkg}"
       else
@@ -308,7 +309,7 @@ for target_package in "$@"; do
       }'
 
     ls "${tmp_dir}/neighbours" | \
-      while read file; do
+      while read -r file; do
         sed "
             s@\(^\| \)$(str_to_regex "${file}")\( \|\$\)@\1<knot>\2@
           " "${tmp_dir}/neighbours/${file}" | \
@@ -349,41 +350,42 @@ for target_package in "$@"; do
   sort -u "${tmp_dir}/knots" | \
     sponge "${tmp_dir}/knots"
 
-  printf '%s\n' \
-    'digraph dependencies {' \
-    '  fontname=dejavu;' > \
-    "${tmp_dir}/input"
+  {
+    printf '%s\n' \
+      'digraph dependencies {' \
+      '  fontname=dejavu;'
 
-  while read -r who num what; do
-    if [ "${what}" = 'broken-build-list-package' ]; then
-      color='#ff0000'
-    elif [ "${what}" = 'build-list-package' ]; then
-      color='#800000'
-    elif [ "${what}" = 'target-package' ]; then
-      color='#00ff00'
-    elif [ "${what}" = 'package' ]; then
-      color='#000000'
-    elif [ "${what}" = 'split-package' ]; then
-      color='#8080ff'
-    elif [ "${what}" = 'group' ]; then
-      color='#0000ff'
-    elif [ "${what}" = 'deletion-list-package' ]; then
-      color='#808080'
-    else
-      color='#ff80ff'
-    fi
-    printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
-  done < \
-    "${tmp_dir}/knots" >> \
-    "${tmp_dir}/input"
+    cut -d' ' -f1,3 < \
+      "${tmp_dir}/knots" | \
+      while read -r who what; do
+        if [ "${what}" = 'broken-build-list-package' ]; then
+          color='#ff0000'
+        elif [ "${what}" = 'build-list-package' ]; then
+          color='#800000'
+        elif [ "${what}" = 'target-package' ]; then
+          color='#00ff00'
+        elif [ "${what}" = 'package' ]; then
+          color='#000000'
+        elif [ "${what}" = 'split-package' ]; then
+          color='#8080ff'
+        elif [ "${what}" = 'group' ]; then
+          color='#0000ff'
+        elif [ "${what}" = 'deletion-list-package' ]; then
+          color='#808080'
+        else
+          color='#ff80ff'
+        fi
+        printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
+      done
 
-  sed 's|\\|\\\\|g' "${tmp_dir}/build-order" | \
-    xargs -rn2 printf '  "%s" -> "%s";\n' | \
-    sort -u >> \
-    "${tmp_dir}/input"
+    sed 's|\\|\\\\|g' "${tmp_dir}/build-order" | \
+      xargs -rn2 printf '  "%s" -> "%s";\n' | \
+      sort -u
 
-  printf '%s\n' \
-    '}' >> \
+    printf '%s\n' \
+      '}'
+
+  } > \
     "${tmp_dir}/input"
 
   sed -i '

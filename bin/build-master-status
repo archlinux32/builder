@@ -80,8 +80,7 @@ pending_packages=$(
 next_tasks=$(
   (
     grep -vxF 'break_loops' "${work_dir}/build-list"
-    ls "${work_dir}/package-states" | \
-      grep '\.broken$' | \
+    find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed '
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
         p
@@ -113,8 +112,7 @@ testing=$(
     grep -c '\.pkg\.tar\.xz$'
 )
 (
-  ls "${work_dir}/package-states/" | \
-    grep '\.broken$' | \
+  find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
     sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
     while read -r pkg rev mod_rev repo; do
       if [ -z "$(find_dependencies_on_build_list "${pkg}" "${rev}" "${mod_rev}" "${repo}")" ]; then
@@ -122,13 +120,11 @@ testing=$(
       fi
     done
   (
-    ls "${work_dir}/build-list.loops" | \
-      grep '^loop_[0-9]\+$' | \
-      sed "s|^|${work_dir}/build-list.loops/|" | \
+    find "${work_dir}/build-list.loops" -maxdepth 1 | \
+      grep '/loop_[0-9]\+$' | \
       xargs -r cat | \
       sort -u
-    ls "${work_dir}/package-states/" | \
-      grep '\.broken$' | \
+    find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}||' | \
       sort -u
   ) | \
@@ -142,21 +138,20 @@ broken=$(
     "${tmp_dir}/broken-packages-names"
 )
 blocked=$(
-  ls "${work_dir}/package-states/" | \
-    grep -c '\.blocked$'
-) || true
+  find "${work_dir}/package-states/" -maxdepth 1 -name '*.blocked' | \
+    wc -l
+)
 locked=$(
-  ls "${work_dir}/package-states/" | \
-    grep -c '\.locked$'
-) || true
+  find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' | \
+    wc -l
+)
 loops=$(
-  ls "${work_dir}/build-list.loops" | \
-    grep -c '^loop_[0-9]\+$'
+  find "${work_dir}/build-list.loops" -maxdepth 1 | \
+    grep -c '/loop_[0-9]\+$'
 ) || true
 looped_packages=$(
-  ls "${work_dir}/build-list.loops" | \
-    grep '^loop_[0-9]\+$' | \
-    sed "s|^|${work_dir}/build-list.loops/|" | \
+  find "${work_dir}/build-list.loops" -maxdepth 1 | \
+    grep '/loop_[0-9]\+$' | \
     xargs -r cat | \
     sort -u | \
     wc -l
@@ -245,8 +240,7 @@ if ${web}; then
       'dependent' \
       'blocked'
     printf '</tr>\n'
-    ls "${work_dir}/package-states" | \
-      grep '\.broken$' | \
+    find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\.broken$||' | \
       sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
       sort -k1,1 | \
