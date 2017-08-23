@@ -232,7 +232,7 @@ while [ "${count}" -ne 0 ]; do
             gpg --local-user="${package_key}" --detach-sign {} \;
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -- $(
-            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -not -name '*-debug-*'
+            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -not -name '*-debug-*' -printf '%f\n'
             )
           while true; do
             err=0
