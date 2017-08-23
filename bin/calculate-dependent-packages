@@ -19,16 +19,17 @@ while read -r pkg rev mod_rev repo; do
 done < \
   "${tmp_dir}/build-list"
 
+mkdir "${tmp_dir}/loops"
 ls "${work_dir}/build-list.loops" | \
   grep '^loop_[0-9]\+$' | \
-  sed "s|^|${work_dir}/build-list.loops/|" | \
-  xargs -r cat | \
-  sort -u | \
-  join -j 1 - "${tmp_dir}/build-list" | \
-  tr ' ' '.' | \
-  sed 's|^|/ |' | \
-  sort -k2,2 > \
-  "${tmp_dir}/dependent-count"
+  while read -r loop; do
+    sort -u "${work_dir}/build-list.loops/${loop}" | \
+      join -j 1 - "${tmp_dir}/build-list" | \
+      tr ' ' '.' > \
+      "${tmp_dir}/loops/${loop}"
+  done
+
+touch "${tmp_dir}/dependent-count"
 
 tr ' ' '.' < \
   "${tmp_dir}/build-list" | \
@@ -101,8 +102,78 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
       "${count}" \
       "${sf}" >> \
       "${tmp_dir}/dependent-count.new"
+    ls "${tmp_dir}/loops" | \
+      sed '
+        s|^|'"${tmp_dir}"'/loops/|
+      ' | \
+      xargs -r grep -lxF "${sf}" | \
+      xargs -r rm -f
   done < \
     "${tmp_dir}/build-list"
+
+  ls "${tmp_dir}/loops" | \
+    while read -r loop; do
+      if [ ! -f "${tmp_dir}/loops/${loop}" ]; then
+        continue
+      fi
+      if [ -n "$(
+          (
+            sed '
+              s|^|'"${work_dir}"'/package-infos/|
+              s|$|.builds|
+            ' "${tmp_dir}/loops/${loop}" | \
+              xargs -r cat | \
+              sort -u
+            (
+              sed 'p' "${tmp_dir}/loops/${loop}"
+              cat "${tmp_dir}/build-list"
+            ) | \
+              sort | \
+              uniq -u | \
+              sed '
+                s|^|'"${work_dir}"'/package-infos/|
+                s|$|.needs|
+              ' | \
+              xargs -r cat | \
+              grep -vx 'base\|base-devel' | \
+              sort -u
+          ) | \
+            sort | \
+            uniq -d
+        )" ]; then
+        continue
+      fi
+
+      count="/$(
+        sed '
+          s|^|'"${work_dir}"'/package-infos/|
+          s|$|.builds|
+        ' "${tmp_dir}/loops/${loop}" | \
+          xargs -r cat | \
+          sort -u | \
+        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.needs" | \
+        sort -u | \
+        join -1 1 -2 2 -o 2.1,2.2 - "${tmp_dir}/dependent-count" | \
+        tr '/ ' '\n' | \
+        grep -vxF '' | \
+        sort -u | \
+        tr '\n' '/'
+      )"
+      while read -r sf; do
+        printf '%s %s\n' "${count}" "${sf}" >> \
+          "${tmp_dir}/dependent-count.new"
+        ls "${tmp_dir}/loops" | \
+          grep -vxF "${loop}" | \
+          sed '
+            s|^|'"${tmp_dir}"'/loops/|
+          ' | \
+          xargs -r grep -lxF "${sf}" | \
+          xargs -r rm -f
+      done < \
+        "${tmp_dir}/loops/${loop}"
+
+      rm "${tmp_dir}/loops/${loop}"
+    done
 
   cat "${tmp_dir}/dependent-count" "${tmp_dir}/dependent-count.new" | \
     sort -k2,2 | \
