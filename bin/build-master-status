@@ -291,7 +291,7 @@ if ${web}; then
 
   rm -f "${tmp_dir}/broken-packages-names"
 
-  find "${tmp_dir}" -maxdepth 1 | \
+  find "${tmp_dir}" -maxdepth 1 -type f | \
     while read -r file; do
       cat "${file}" > \
         "${webserver_directory}/${file##*/}"
