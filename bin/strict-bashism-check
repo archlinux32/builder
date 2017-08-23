@@ -83,3 +83,15 @@ if [ -n "${errors}" ]; then
   >&2 echo "${errors}"
   exit 1
 fi
+
+errors=$(
+  cd "${tmp_dir}" || \
+    echo 'Cannot cd.'
+  shellcheck -x bin/* conf/* 2>&1
+)
+
+if [ -n "${errors}" ]; then
+  >&2 echo 'shellcheck complains about the following:'
+  >&2 echo "${errors}"
+  exit 1
+fi
