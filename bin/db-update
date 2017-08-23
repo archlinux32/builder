@@ -25,6 +25,7 @@
 
 # use "builds" instead of assuming package builds only it's name
 
+# shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
@@ -275,6 +276,7 @@ move_packages() {
 
   while read -r repo; do
 
+    # shellcheck disable=SC2086
     ${dummynator} ${master_mirror_rsync_command} \
       "${tmp_dir}/${repo}/${repo}.db."* \
       "${tmp_dir}/${repo}/${repo}.files."* \

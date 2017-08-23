@@ -254,6 +254,7 @@ find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' -printf '%f\n' | 
       [ -z "${mod_rev}" ] && \
       [ -z "${repo}" ] && \
       [ -z "${pkg}" ]; then
+      # shellcheck disable=SC2031
       printf '%s %s.%s.%s.%s\n' \
         "${opkg}" \
         "${opkg}" \

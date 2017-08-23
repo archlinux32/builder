@@ -62,6 +62,7 @@ if [ -n "${errors}" ]; then
 fi
 
 errors=$(
+# shellcheck disable=SC2016
   find bin conf -type f -executable -exec grep -H '="\$(' {} \;
 )
 

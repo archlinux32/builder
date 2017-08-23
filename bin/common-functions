@@ -2,6 +2,8 @@
 
 # contains functions used by more than one script
 
+# shellcheck disable=SC2039
+
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
   . 'conf/default.conf'
@@ -64,6 +66,7 @@ find_repository_with_commit() {
   local repository
 
   for repository in ${repo_names}; do
+    # shellcheck disable=SC2016
     if [ "$(eval git -C "$(printf '"${repo_paths__%s}"' "${repository}")" cat-file -t '"$1"' 2> /dev/null)" = "commit" ]; then
       echo "${repository}"
       return 0
@@ -399,6 +402,7 @@ remove_old_package_versions() {
 
   local pkgname="${package%-*-*-*.pkg.tar.xz}"
 
+  # shellcheck disable=SC2046
   ${master_mirror_rsync_command} \
     --recursive \
     --delete \

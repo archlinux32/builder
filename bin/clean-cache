@@ -28,6 +28,7 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 for repo in ${repos}; do
   mkdir "${tmp_dir}/${repo}"
   wget -qO - "$(
+    # shellcheck disable=SC2016
     echo "${mirror}" | \
       sed "$(
         printf 's|%s|%s|\n' \

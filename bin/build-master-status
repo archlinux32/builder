@@ -253,6 +253,7 @@ if ${web}; then
           "${repo}" \
           "$(wc -l < "${work_dir}/package-states/${sf}.broken")" \
           "$(
+            # shellcheck disable=SC2010
             ls -t "${webserver_directory}/build-logs" | \
               grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
           )" \

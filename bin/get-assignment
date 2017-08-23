@@ -37,6 +37,7 @@ hand_out_assignment() {
     xargs -rn1 rm -f
 
   echo "$1 $2 $3 $4"
+  # shellcheck disable=SC2154
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
@@ -112,6 +113,7 @@ fi
 
 for hand_out_broken in false true; do
 
+  # shellcheck disable=SC2094
   while read -r package git_revision mod_git_revision repository; do
 
     if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
