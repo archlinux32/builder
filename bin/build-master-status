@@ -2,6 +2,7 @@
 
 # report about status of build master
 
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage() {
@@ -13,7 +14,7 @@ usage() {
   >&2 echo '    Output to webserver instead of stdout.'
   >&2 echo '  -h|--help:'
   >&2 echo '    Show this help and exit.'
-  [ -z "$1" ] && exit 1 || exit $1
+  [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
@@ -161,45 +162,41 @@ looped_packages=$(
     wc -l
 )
 
-printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
-  "${stable}" \
-  "$((${staging}+${testing}+${pending_packages}))" >> \
+{
+  printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
+    "${stable}" \
+    "$((staging+testing+pending_packages))"
+  printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages), of which %s can be built immediately.\n' \
+    "$((tasks-broken))" \
+    "${tasks}" \
+    "${pending_packages}" \
+    "${next_tasks}"
+  printf 'There are %d testing and %d staging packages.\n' \
+    "${testing}" \
+    "${staging}"
+  printf 'There are %d broken package builds.\n' \
+    "${broken}"
+  if [ "${loops}" -ne 0 ]; then
+    printf 'There are %d loops containing %d package builds.\n' \
+      "${loops}" \
+      "${looped_packages}"
+  fi
+  if [ $((broken+testing+staging)) -ne 0 ]; then
+    printf '%.1f%% of all packages are broken.\n' \
+      "$(
+        echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
+          bc
+      )"
+  fi
+  if [ $((testing+staging+pending_packages-broken)) -ne 0 ]; then
+    printf '%.1f%% of the planned work has been done.\n' \
+      "$(
+        echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
+          bc
+      )"
+  fi
+} > \
   "${tmp_dir}/build-master-status.html"
-printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages), of which %s can be built immediately.\n' \
-  "$((${tasks}-${broken}))" \
-  "${tasks}" \
-  "${pending_packages}" \
-  "${next_tasks}" >> \
-  "${tmp_dir}/build-master-status.html"
-printf 'There are %d testing and %d staging packages.\n' \
-  "${testing}" \
-  "${staging}" >> \
-  "${tmp_dir}/build-master-status.html"
-printf 'There are %d broken package builds.\n' \
-  "${broken}" >> \
-  "${tmp_dir}/build-master-status.html"
-if [ "${loops}" -ne 0 ]; then
-  printf 'There are %d loops containing %d package builds.\n' \
-    "${loops}" \
-    "${looped_packages}" >> \
-    "${tmp_dir}/build-master-status.html"
-fi
-if [ $((${broken}+${testing}+${staging})) -ne 0 ]; then
-  printf '%.1f%% of all packages are broken.\n' \
-    "$(
-      echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
-        bc
-    )" >> \
-    "${tmp_dir}/build-master-status.html"
-fi
-if [ $((${testing}+${staging}+${pending_packages}-${broken})) -ne 0 ]; then
-  printf '%.1f%% of the planned work has been done.\n' \
-    "$(
-      echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
-        bc
-    )" >> \
-    "${tmp_dir}/build-master-status.html"
-fi
 
 if ${web}; then
   "${base_dir}/bin/calculate-dependent-packages"
@@ -237,74 +234,72 @@ if ${web}; then
     tac > \
     "${tmp_dir}/statistics"
 
-  printf '<html>\n<head>\n<title>List of broken package builds</title>\n</head>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>' >> \
-    "${tmp_dir}/broken-packages.html"
-  printf '<th>%s</th>' \
-    'package' \
-    'git revision' \
-    'modification git revision' \
-    'package repository' \
-    'compilations' \
-    'dependent' \
-    'blocked' >> \
-    "${tmp_dir}/broken-packages.html"
-  printf '</tr>\n' >> \
-    "${tmp_dir}/broken-packages.html"
-  ls "${work_dir}/package-states" | \
-    grep '\.broken$' | \
-    sed 's|\.broken$||' | \
-    sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
-    sort -k1,1 | \
-    join -1 2 -2 1 -o 1.1,1.2,1.3,1.4,1.5 - "${tmp_dir}/broken-packages-names" | \
-    while read -r sf pkg rev mod_rev repo; do
-      printf '%s ' \
-        "${pkg}" \
-        "${rev}" \
-        "${mod_rev}" \
-        "${repo}" \
-        "$(wc -l < "${work_dir}/package-states/${sf}.broken")" \
-        "$(
-          ls -t "${webserver_directory}/build-logs" | \
-            grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
-        )" \
-        "$(
-          (
-            grep -m1 "^$(str_to_regex "${sf}") " "${work_dir}/dependent-count" || \
-              echo 'x &nbsp;'
-          ) | \
-            cut -d' ' -f2
-        )"
-      if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
-        tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
-          sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
-      else
-        printf '&nbsp;'
-      fi
-      printf '\n'
-    done | \
-    sort -k5n,5 | \
-    while read -r pkg rev mod_rev repo count log_file dependent reason; do
-      printf '<tr>'
-      printf '<td>%s</td>' \
-        '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
-        "${rev}" \
-        "${mod_rev}" \
-        "${repo}" \
-        '<a href="build-logs/'"${log_file}"'">'"${count}"'</a>' \
-        "${dependent}" \
-        "${reason}"
-      printf '</tr>\n'
-    done >> \
-    "${tmp_dir}/broken-packages.html"
-  printf '</table>\n</body>\n</html>\n' >> \
+  {
+    printf '<html>\n<head>\n<title>List of broken package builds</title>\n</head>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>'
+    printf '<th>%s</th>' \
+      'package' \
+      'git revision' \
+      'modification git revision' \
+      'package repository' \
+      'compilations' \
+      'dependent' \
+      'blocked'
+    printf '</tr>\n'
+    ls "${work_dir}/package-states" | \
+      grep '\.broken$' | \
+      sed 's|\.broken$||' | \
+      sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
+      sort -k1,1 | \
+      join -1 2 -2 1 -o 1.1,1.2,1.3,1.4,1.5 - "${tmp_dir}/broken-packages-names" | \
+      while read -r sf pkg rev mod_rev repo; do
+        printf '%s ' \
+          "${pkg}" \
+          "${rev}" \
+          "${mod_rev}" \
+          "${repo}" \
+          "$(wc -l < "${work_dir}/package-states/${sf}.broken")" \
+          "$(
+            ls -t "${webserver_directory}/build-logs" | \
+              grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
+          )" \
+          "$(
+            (
+              grep -m1 "^$(str_to_regex "${sf}") " "${work_dir}/dependent-count" || \
+                echo 'x &nbsp;'
+            ) | \
+              cut -d' ' -f2
+          )"
+        if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
+          tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
+            sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
+        else
+          printf '&nbsp;'
+        fi
+        printf '\n'
+      done | \
+      sort -k5n,5 | \
+      while read -r pkg rev mod_rev repo count log_file dependent reason; do
+        printf '<tr>'
+        printf '<td>%s</td>' \
+          '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
+          "${rev}" \
+          "${mod_rev}" \
+          "${repo}" \
+          '<a href="build-logs/'"${log_file}"'">'"${count}"'</a>' \
+          "${dependent}" \
+          "${reason}"
+        printf '</tr>\n'
+      done
+    printf '</table>\n</body>\n</html>\n'
+  } > \
     "${tmp_dir}/broken-packages.html"
 
   rm -f "${tmp_dir}/broken-packages-names"
 
-  ls "${tmp_dir}" | \
+  find "${tmp_dir}" -maxdepth 1 | \
     while read -r file; do
-      cat "${tmp_dir}/${file}" > \
-        "${webserver_directory}/${file}"
+      cat "${file}" > \
+        "${webserver_directory}/${file##*/}"
     done
 
 else
