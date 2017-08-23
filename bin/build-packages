@@ -283,7 +283,7 @@ while [ "${count}" -ne 0 ]; do
           fi
         done
         if tar -cf 'build-logs.gz.tar' \
-          ./*'.build-log.gz'; then
+          -- *'.build-log.gz'; then
           while ! ssh \
             -i "${master_build_server_identity}" \
             -p "${master_build_server_port}" \
