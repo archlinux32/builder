@@ -134,7 +134,7 @@ tar -x \
 
 # check if all packages are signed and all signatures belong to a package
 signature_errors=$(
-  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \
+  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' | \
     sed 's|\.sig$||' | \
     sort | \
     uniq -c | \
