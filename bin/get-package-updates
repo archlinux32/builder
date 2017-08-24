@@ -12,9 +12,6 @@
 #  (might be connected to above): find out who deletes loop-files which
 #   should not be deleted
 
-#  dependencies declared inside a PKGBUILD's package function do not
-#   correctly take into account CARCH (see package "gens" from community)
-
 #  remove extra whitelist cases
 
 # shellcheck source=conf/default.conf
@@ -340,22 +337,12 @@ while [ -n "${black_listed_new}" ]; do
       sort -k2,2 | \
       join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
       while read -r pkg; do
-        if [ "${pkg}" = 'python-pysocks' ] || \
-          [ "${pkg}" = 'dev86' ] || \
-          [ "${pkg}" = 'gens' ] || \
+        if [ "${pkg}" = 'dev86' ] || \
           [ "${pkg}" = 'luxblend25' ] || \
-          [ "${pkg}" = 'nspluginwrapper' ] || \
-          [ "${pkg}" = 'pcsxr' ] || \
-          [ "${pkg}" = 'python-pifpaf' ] || \
-          [ "${pkg}" = 'python-pymongo' ] || \
-          [ "${pkg}" = 'q4wine' ] || \
-          [ "${pkg}" = 'sopcast' ] || \
-          [ "${pkg}" = 'syslinux' ] || \
-          [ "${pkg}" = 'unifi' ] || \
+          [ "${pkg}" = 'python-pysocks' ] || \
           [ "${pkg}" = 'wine' ] || \
           [ "${pkg}" = 'wine-staging' ] || \
-          [ "${pkg}" = 'wine-staging-nine' ] || \
-          [ "${pkg}" = 'zsnes' ]; then
+          [ "${pkg}" = 'wine-staging-nine' ]; then
           >&2 printf 'blacklisting: %s would be black listed, but is ignored.\n' "${pkg}"
         else
           echo "${pkg}"
