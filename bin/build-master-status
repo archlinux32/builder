@@ -266,7 +266,10 @@ if ${web}; then
           )"
         if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
           tr '\n' ' ' < "${work_dir}/package-states/${sf}.blocked" | \
-            sed 's|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|'
+            sed '
+              s|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|
+              /FS#[0-9]\+/!s|^\(wait for \)\(\S\+\) $|\1<a href="graphs/\2.png">\2</a> |
+            '
         else
           printf '&nbsp;'
         fi
