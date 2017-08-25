@@ -23,8 +23,6 @@
 #  correctly handle if a package moved from community to official or
 #    vice versa
 
-# use "builds" instead of assuming package builds only it's name
-
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
@@ -468,60 +466,43 @@ for ending in 'done' 'testing'; do
   fi
 done
 
-# packages which can't be un-staged because they're still dependencies
-# of any job on the build-list
-
-(
-  grep -vxF 'break_loops' "${work_dir}/build-list" | \
-    while read -r pkg pkg_rev mod_rev repo; do
-      generate_package_metadata "${pkg}" "${pkg_rev}" "${mod_rev}" "${repo}"
-      cat "${work_dir}/package-infos/${pkg}.${pkg_rev}.${mod_rev}.${repo}.depends"
-    done | \
-    sort -u
-
-  find "${work_dir}/package-infos" -name '*.groups' \
-    -exec grep -qx 'base\(-devel\)\?' {} \; \
-    -printf '%f\n' | \
-    sed '
-      s|\(\.[^.]\+\)\{4\}$||
-    ' | \
-    sort -u > \
-    "${tmp_dir}/base-packages"
-
-  # no base / base-devel packages on the build list?
-  if [ -z "$(
-      (
-        grep -vxF 'break_loops' "${work_dir}/build-list" | \
-          awk '{print $1}' | \
-          sort -u
-        sort -u "${tmp_dir}/base-packages"
-      ) | \
-        sort | \
-        uniq -d
-    )" ]; then
-    # unstage all base / base-devel packages from staging
-    cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
-  fi
-) | \
-  sort | \
-  uniq -u > \
-  "${tmp_dir}/keep-packages"
-
 # packages which are done
 
 find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
   sed '
-    s|^\(.*\)\(\(\.[^.]\+\)\{3\}\)\.done$|\1 \1\2|
+    s|\.done$||
   ' | \
-  sort > \
+  sort -u > \
   "${tmp_dir}/done-packages"
 
-# remove packages not yet done from keep-packages list
+# packages still on the build-list
 
-join -1 1 -2 1 -o 2.2 \
-  "${tmp_dir}/keep-packages" \
-  "${tmp_dir}/done-packages" | \
-  sponge "${tmp_dir}/keep-packages"
+grep -vxF 'break_loops' "${work_dir}/build-list" | \
+  tr ' ' '.' | \
+  sort -u > \
+  "${tmp_dir}/keep-packages"
+
+find "${work_dir}/package-infos" -name '*.groups' \
+  -exec grep -qx 'base\(-devel\)\?' {} \; \
+  -printf '%f\n' | \
+  sed '
+    s|\.groups$||
+  ' | \
+  sort -u > \
+  "${tmp_dir}/base-packages"
+
+# no base / base-devel packages on the build list?
+if [ -z "$(
+    join -j 1 \
+      "${tmp_dir}/base-packages" \
+      "${tmp_dir}/keep-packages"
+  )" ]; then
+  # unstage all base / base-devel packages from staging
+  cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages" "${tmp_dir}/keep-packages" | \
+    sort | \
+    uniq -u | \
+    sponge "${tmp_dir}/keep-packages"
+fi
 
 # find all dependencies of the unstageable packages
 mv \
@@ -531,28 +512,41 @@ touch "${tmp_dir}/keep-packages"
 
 while [ -s "${tmp_dir}/new-keep-packages" ]; do
 
-  while read -r package; do
-    generate_package_metadata "${package}"
-  done < "${tmp_dir}/new-keep-packages"
-
   cat "${tmp_dir}/new-keep-packages" "${tmp_dir}/keep-packages" | \
     sort -u | \
     sponge "${tmp_dir}/keep-packages"
 
-  (
-    while read -r package; do
-      cat "${work_dir}/package-infos/${package}.depends"
-    done < \
-      "${tmp_dir}/new-keep-packages" | \
-      sort -u
-    cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages"
-  ) | \
-    sort | \
-    uniq -u | \
-    join -1 1 -2 1 -o 2.2 \
-      - \
-      "${tmp_dir}/done-packages" | \
-    sponge "${tmp_dir}/new-keep-packages"
+  sed '
+    s|^|'"${work_dir}"'/package-infos/|
+    s|$|.depends|
+  ' "${tmp_dir}/keep-packages" | \
+    xargs -r grep -HF '' | \
+    sed '
+      s|^.*/||
+      s|\.depends:| |
+    ' | \
+    sort -u | \
+    sort -k2,2 > \
+    "${tmp_dir}/keep-packages.depends"
+
+  sed '
+    s|^|'"${work_dir}"'/package-infos/|
+    s|$|.builds|
+  ' "${tmp_dir}/done-packages" | \
+    xargs -r grep -HF '' | \
+    sed '
+      s|^.*/||
+      s|\.builds:| |
+    ' | \
+    sort -u | \
+    sort -k2,2 > \
+    "${tmp_dir}/done-packages.builds"
+
+  join -j 2 -o 1.1 \
+    "${tmp_dir}/done-packages.builds" \
+    "${tmp_dir}/keep-packages.depends" | \
+    sort -u > \
+    "${tmp_dir}/new-keep-packages"
 
   # "new" is only what has not been there before
   cat "${tmp_dir}/keep-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/new-keep-packages" | \
@@ -588,11 +582,10 @@ fi
 # calculate unstageable packages from keep_packages and done_packages
 
 done_packages=$(
-  (
-    cut -d' ' -f2 < \
-      "${tmp_dir}/done-packages"
-    cat "${tmp_dir}/keep-packages"
-  ) | \
+  cat \
+    "${tmp_dir}/keep-packages" \
+    "${tmp_dir}/keep-packages" \
+    "${tmp_dir}/done-packages" | \
     sort | \
     uniq -u
 )
