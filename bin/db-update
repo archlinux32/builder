@@ -454,13 +454,13 @@ for ending in 'done' 'testing'; do
     continue
   fi
   if [ -n "$(
-    find "${work_dir}/package-states" -name ".${ending}" -printf '%f\n' | \
+    find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort | \
       uniq -d
     )" ]; then
     >&2 echo 'Removing duplicates not yet implemented:'
-    find "${work_dir}/package-states" -name ".${ending}" -printf '%f\n' | \
+    find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort | \
       uniq -d
