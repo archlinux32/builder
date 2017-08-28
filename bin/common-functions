@@ -547,7 +547,11 @@ insert_break_loops_orders() {
 
 append_architectures() {
   local PKGBUILD="$1"
-  sed -i '/^arch=(/s/(/(i686 /' "${PKGBUILD}"
+  sed -i '
+    /^arch=[^#]*any/!{
+      /^arch=(/s/(/(i686 /
+    }
+  ' "${PKGBUILD}"
 }
 
 # find_newest_of_git_revisions
