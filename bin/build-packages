@@ -32,11 +32,20 @@ usage() {
   >&2 echo ''
   >&2 echo 'possible options:'
   >&2 echo '  -h|--help:   Show this help and exit.'
+  >&2 echo '  -l|--local pkgname.git-revision.git-mod-revision.repository:'
+  >&2 echo '               Build the given package without asking / reporting to the'
+  >&2 echo '               build master (except -u is given). Cannot be combined with'
+  >&2 echo '               -n, -t or -x.'
   >&2 echo '  -n count:    Build $count packages (if available), then exit.'
   >&2 echo '               $count=0 is interpreted as infinity.'
   >&2 echo '               The default is $count=1 or 0 iff -t or -x is given.'
+  >&2 echo '               Cannot be combined with -l.'
   >&2 echo '  -t seconds:  Do not request new assignment(s) $seconds seconds after start.'
+  >&2 echo '               Cannot be combined with -l.'
+  >&2 echo '  -u|--upload: Upload explicitely built package to build master.'
+  >&2 echo '               Can only be used with -l.'
   >&2 echo '  -x:          If package build fails, do not request new assignment(s).'
+  >&2 echo '               Cannot be combined with -l.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
@@ -48,7 +57,9 @@ eval set -- "$(
 )"
 
 unset count
+unset forced_package
 exit_after_failure=false
+upload_to_build_master=false
 timeout=0
 
 while true
@@ -56,6 +67,14 @@ do
   case "$1" in
     -h|--help)
       usage 0
+    ;;
+    -l|--local)
+      shift
+      if [ -n "${forced_package}" ]; then
+        >&2 echo 'Option -l, --local can be given only once.'
+        usage
+      fi
+      forced_package="$1"
     ;;
     -n)
       shift
@@ -66,6 +85,9 @@ do
     -t)
       shift
       timeout="$1"
+    ;;
+    -u|--upload)
+      upload_to_build_master=true
     ;;
     -x)
       exit_after_failure=true
@@ -85,6 +107,21 @@ done
 if [ $# -ne 0 ]; then
   >&2 echo 'Too many arguments.'
   usage
+fi
+
+if [ -n "${forced_package}" ]; then
+  if [ -n "${count}" ] || \
+    [ "${timeout}" -ne 0 ] || \
+    ${exit_after_failure}; then
+    >&2 echo 'Conflicting flags.'
+    usage
+  fi
+else
+  if ${upload_to_build_master}; then
+    >&2 echo 'Conflicting flags.'
+    usage
+  fi
+  upload_to_build_master=true
 fi
 
 if [ -z "${count}" ]; then
@@ -107,13 +144,22 @@ while [ "${count}" -ne 0 ]; do
   fi
 
   err=0
-  package=$(
-    ssh \
-      -i "${master_build_server_identity}" \
-      -p "${master_build_server_port}" \
-      "${master_build_server_user}@${master_build_server}" \
-      'get-assignment'
-  ) || err=$?
+  if [ -z "${forced_package}" ]; then
+    package=$(
+      ssh \
+        -i "${master_build_server_identity}" \
+        -p "${master_build_server_port}" \
+        "${master_build_server_user}@${master_build_server}" \
+        'get-assignment'
+    ) || err=$?
+  else
+    package=$(
+      echo "${forced_package}" | \
+        sed '
+          s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
+        '
+    )
+  fi
 
   case ${err} in
 
@@ -234,7 +280,7 @@ while [ "${count}" -ne 0 ]; do
           tar -cf 'package.tar' -- $(
             find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -not -name '*-debug-*' -printf '%f\n'
             )
-          while true; do
+          while ${upload_to_build_master}; do
             err=0
             # shellcheck disable=SC2029
             ssh \
