@@ -44,6 +44,9 @@ if [ -z "$(
     uniq -d
   )" ]; then
   >&2 echo 'No valid signature found.'
+  grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
+    cut -d' ' -f3 | \
+    sort -u >&2
   exit
 fi
 
