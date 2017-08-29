@@ -28,7 +28,22 @@ if ! sed -n '
       p
     }
   ' "${tmp_dir}/mail" | \
-    chronic gpg --batch -q -d -o "${tmp_dir}/plain-content"; then
+    chronic gpg --batch --status-file "${tmp_dir}/gpg-status" -q -d -o "${tmp_dir}/plain-content"; then
+  exit
+fi
+
+if [ -z "$(
+  (
+    grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
+      cut -d' ' -f3 | \
+      sort -u
+    printf '%s\n' "${admin_gpg_keys}" | \
+      sort -u
+  ) | \
+    sort | \
+    uniq -d
+  )" ]; then
+  >&2 echo 'No valid signature found.'
   exit
 fi
 
