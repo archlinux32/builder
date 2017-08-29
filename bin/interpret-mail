@@ -50,25 +50,18 @@ if [ -z "$(
   exit
 fi
 
-if grep -q '^From:\s' "${tmp_dir}/plain-content" &&
-  grep -q '^To:\s' "${tmp_dir}/plain-content" &&
-  grep -q '^Subject:\s' "${tmp_dir}/plain-content"; then
-  # the content is / might be "multipart"
-  sed -n '
-    /^$/!b
-    N
-    s/^\n//
-    /^--/b
-    :a
-    N
-    /\n$/!ba
-    s/\n$//
-    p
-  ' "${tmp_dir}/plain-content" > \
-    "${tmp_dir}/raw-content"
-else
-  mv "${tmp_dir}/plain-content" "${tmp_dir}/raw-content"
-fi
+sed -n '
+  /^$/!b
+  N
+  s/^\n//
+  /^--/b
+  :a
+  N
+  /\n$/!ba
+  s/\n$//
+  p
+' "${tmp_dir}/plain-content" > \
+  "${tmp_dir}/raw-content"
 
 sed -n '
   /^stabilize:/{
