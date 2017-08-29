@@ -13,10 +13,6 @@
 #  4: come back, when you've done your work - you hit the limit on
 #     maximum allowed parallel jobs per ip
 
-# TODO:
-
-#  respect build-manually-list ("blocked")
-
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
