@@ -50,8 +50,10 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o hn:t:x \
+  getopt -o hl:n:t:ux \
     --long help \
+    --long local: \
+    --long upload \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
