@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+cat > \
+  "${tmp_dir}/mail"
+
+if ! hashcash -qXc -b 20 \
+  -d -f "${tmp_dir}/hashcash.db" \
+  -r 'archlinux32-buildmaster@eckner.net' \
+  -r 'buildmaster@archlinux32.org' < \
+  "${tmp_dir}/mail"; then
+  >&2 echo 'Invalid stamp - ignoring this message.'
+  exit
+fi
+
+if ! sed -n '
+    /^-----BEGIN PGP MESSAGE-----$/{
+      :a
+      /\n-----END PGP MESSAGE-----$/!{
+        N
+        ba
+      }
+      p
+    }
+  ' "${tmp_dir}/mail" | \
+    chronic gpg --batch -q -d -o "${tmp_dir}/plain-content"; then
+  exit
+fi
+
+if grep -q '^From:\s' "${tmp_dir}/plain-content" &&
+  grep -q '^To:\s' "${tmp_dir}/plain-content" &&
+  grep -q '^Subject:\s' "${tmp_dir}/plain-content"; then
+  # the content is / might be "multipart"
+  sed -n '
+    /^$/!b
+    N
+    s/^\n//
+    /^--/b
+    :a
+    N
+    /\n$/!ba
+    s/\n$//
+    p
+  ' "${tmp_dir}/plain-content" > \
+    "${tmp_dir}/raw-content"
+else
+  mv "${tmp_dir}/plain-content" "${tmp_dir}/raw-content"
+fi
+
+sed -n '
+  /^stabilize:/{
+    s/^stabilize:\s*//
+    /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
+    w '"${tmp_dir}/stabilize"'
+  }
+' "${tmp_dir}/raw-content"
+
+if [ -s "${tmp_dir}/stabilize" ]; then
+  chronic "${base_dir}/bin/db-update" -b -f "${tmp_dir}/stabilize"
+fi
