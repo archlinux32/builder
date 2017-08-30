@@ -744,6 +744,9 @@ download_sources_by_hash() {
         join -1 1 -2 1 -o 1.2,2.2 "${tmp_dir}/sums" "${tmp_dir}/urls" > \
           "${tmp_dir}/joined"
         while read -r sum file; do
+          if [ "${sum}" = 'SKIP' ]; then
+            continue
+          fi
           if echo "${sum}  ${file}" | \
             ${sum_type} -c > /dev/null 2>&1; then
             # the correct source is already there
