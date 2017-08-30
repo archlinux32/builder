@@ -13,6 +13,12 @@
 #  4: come back, when you've done your work - you hit the limit on
 #     maximum allowed parallel jobs per ip
 
+# TODO:
+
+#  if all loops are locked, broken packages are not handed out as long
+#   as the script believes there is a looped package before the broken
+#   one on the build-list - clean up that mess!
+
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
