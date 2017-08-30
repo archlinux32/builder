@@ -398,24 +398,114 @@ ls_master_mirror() {
 
 remove_old_package_versions() {
 
-  local directory="$1/$2"
+  local arch="$1"
+  local repository="$2"
   local package="$3"
 
-  local pkgname="${package%-*-*-*.pkg.tar.xz}"
+  local delete_repositories
+  local repo
 
-  # shellcheck disable=SC2046
-  ${master_mirror_rsync_command} \
-    --recursive \
-    --delete \
-    $( \
-      ls_master_mirror "${directory}" | \
-        grep "^$(str_to_regex "${pkgname}")\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\(\.sig\)\?\$" | \
-        grep -v "^$(str_to_regex "${package}")\(\.sig\)\?\$" | \
-        sed 's|^|--include=|'
-    ) \
-    '--exclude=*' \
-    ./ \
-    "${master_mirror_rsync_directory}/${directory}/"
+  if echo "${standalone_package_repositories}" | \
+    tr ' ' '\n' | \
+    grep -qxF "${repository}"; then
+
+    delete_repositories="${repository}"
+
+  elif echo "${staging_package_repositories}" | \
+    tr ' ' '\n' | \
+    grep -qxF "${repository}"; then
+
+    delete_repositories="${staging_package_repositories}"
+
+  elif echo "${testing_package_repositories}" | \
+    tr ' ' '\n' | \
+    grep -qxF "${repository}"; then
+
+    delete_repositories="${staging_package_repositories} ${testing_package_repositories}"
+
+  elif echo "${stable_package_repositories}" | \
+    tr ' ' '\n' | \
+    grep -qxF "${repository}"; then
+
+    delete_repositories="${staging_package_repositories} ${testing_package_repositories} ${stable_package_repositories}"
+
+  else
+
+    >&2 printf 'remove_old_package_versions: Unknown repository "%s".\n' "${repository}"
+    return 1
+
+  fi
+
+  (
+    tmp_dir=$(mktemp -d)
+    trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+    {
+      for repo in ${delete_repositories}; do
+        ls_master_mirror "${arch}/${repo}" | \
+          sed '
+            /\.pkg\.tar\.xz$/!d
+            s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
+            /^'"$(str_to_regex "${package%-*-*-*}")"' /!d
+            s|^|1 '"${arch} ${repo}"' |
+          '
+      done
+      echo "${package%-*}" | \
+        sed 's|^.*-\([^-]\+-[^-]\+\)$|0 %cut% %it% %here% \1|'
+    } | \
+      sort -k5V,5 -k1n,1 | \
+      sed -n '
+        /^0 %cut% %it% %here% /q
+        s/^1 //
+        s/ \(\S\+\)$/-\1/
+        p
+      ' > \
+      "${tmp_dir}/packages-to-delete"
+
+    cut -d' ' -f1,2 < \
+      "${tmp_dir}/packages-to-delete" | \
+      grep -vxF "${arch} ${repository}" | \
+      sort -u > \
+      "${tmp_dir}/repositories-to-modify"
+
+    # fetch all databases being modified
+    while read -r del_arch del_repo; do
+      mkdir -p "${tmp_dir}/${del_arch}/${del_repo}"
+      ${master_mirror_rsync_command} \
+        "${master_mirror_rsync_directory}/${del_arch}/${del_repo}/${del_repo}.db."* \
+        "${master_mirror_rsync_directory}/${del_arch}/${del_repo}/${del_repo}.files."* \
+        "${tmp_dir}/${del_arch}/${del_repo}/"
+    done < \
+      "${tmp_dir}/repositories-to-modify"
+
+    while read -r del_arch del_repo del_package _; do
+      if [ "${del_arch}/${del_repo}" = "${arch}/${repository}" ]; then
+        # we do not repo-remove the package in the target repository
+        continue
+      fi
+      repo-remove -q "${tmp_dir}/${del_arch}/${del_repo}/${del_repo}.db.tar.gz" \
+        "${del_package}"
+    done < \
+      "${tmp_dir}/packages-to-delete"
+
+    # upload modified databases
+    while read -r del_arch del_repo; do
+      ${master_mirror_rsync_command} \
+        "${tmp_dir}/${del_arch}/${del_repo}/${del_repo}.db."* \
+        "${tmp_dir}/${del_arch}/${del_repo}/${del_repo}.files."* \
+        "${master_mirror_rsync_directory}/${del_arch}/${del_repo}/"
+    done < \
+      "${tmp_dir}/repositories-to-modify"
+
+    sed '
+      s| \(\S\+\)$|-\1|
+      y| |/|
+      s|^|rm |
+      p
+      s|$|.sig|
+    ' "${tmp_dir}/packages-to-delete" | \
+      ${master_mirror_sftp_command}
+  )
 
 }
 
