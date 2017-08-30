@@ -31,6 +31,7 @@ eval set -- "$(
 )"
 
 silence=0
+repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
 
 while true
 do
@@ -126,8 +127,6 @@ while [ $# -gt 0 ]; do
 
       [ ${silence} -gt 0 ] || \
         >&2 printf 'checking repos on master mirror ...'
-
-      repos='build-support community-staging community-testing community core extra gnome-unstable kde-unstable staging testing'
 
       errors=$(
         (
