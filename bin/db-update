@@ -288,7 +288,7 @@ move_packages() {
     # then we can safely remove old versions
 
     while read -r part; do
-      ${dummynator} remove_old_package_versions "i686/$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
+      ${dummynator} remove_old_package_versions 'i686' "$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
     done < \
       "${tmp_dir}/${package}.parts"
 

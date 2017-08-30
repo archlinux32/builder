@@ -197,7 +197,7 @@ ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/"
 
 for package in ${packages}; do
-  remove_old_package_versions "i686/${destination}" "${package}"
+  remove_old_package_versions 'i686' "${destination}" "${package}"
 done
 
 # remove old state files (these should be only "done" markers, but

@@ -392,13 +392,14 @@ ls_master_mirror() {
 
 }
 
-# remove_old_package_versions $directory $package_file
-# removes all other versions of $package_file in $directory on the master mirror
+# remove_old_package_versions $arch $repository $package_file
+# removes all older versions of $package_file for architecture $arch in all
+# repositories not-older than $repository
 
 remove_old_package_versions() {
 
-  local directory="$1"
-  local package="$2"
+  local directory="$1/$2"
+  local package="$3"
 
   local pkgname="${package%-*-*-*.pkg.tar.xz}"
 
