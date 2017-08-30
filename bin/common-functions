@@ -500,9 +500,10 @@ remove_old_package_versions() {
     sed '
       s| \(\S\+\)$|-\1|
       y| |/|
-      s|^|rm |
+      s|^|rm "|
+      s|$|"|
       p
-      s|$|.sig|
+      s|"$|.sig"|
     ' "${tmp_dir}/packages-to-delete" | \
       ${master_mirror_sftp_command}
   )
