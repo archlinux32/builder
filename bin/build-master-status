@@ -269,7 +269,7 @@ if ${web}; then
             sed '
               s|FS#\([0-9]\+\)|<a href="https://bugs.archlinux.org/task/\1">FS#\1</a>|
               /FS#[0-9]\+/!s|^\(wait for \)\(\S\+\) $|\1<a href="graphs/\2.png">\2</a> |
-              /FS#[0-9]\+/!s|^\(wait for \)\(\S\+\) \(or\|and\) \(\S\+\) $|\1<a href="graphs/\2.png">\2</a> \3 <a href="graphs/\4.png">\4</a> |
+              /FS#[0-9]\+/!s@^\(wait for \)\(\S\+\) \(or\|and\) \(\S\+\) $@\1<a href="graphs/\2.png">\2</a> \3 <a href="graphs/\4.png">\4</a> @
             '
         else
           printf '&nbsp;'
