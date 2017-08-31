@@ -393,8 +393,8 @@ ls_master_mirror() {
 }
 
 # remove_old_package_versions $arch $repository $package_file
-# removes all older versions of $package_file for architecture $arch in all
-# repositories not-older than $repository
+# removes all older (not-newer) versions of $package_file for architecture
+# $arch in all repositories not-older (newer) than $repository
 
 remove_old_package_versions() {
 
@@ -402,32 +402,47 @@ remove_old_package_versions() {
   local repository="$2"
   local package="$3"
 
-  local delete_repositories
-  local repo
+  # repositories in which older packages should be deleted
+  local delete_older_repositories
+  # repositories in which not-newer packages should be deleted
+  local delete_not_newer_repositories
 
   if echo "${standalone_package_repositories}" | \
-    tr ' ' '\n' | \
     grep -qxF "${repository}"; then
 
-    delete_repositories="${repository}"
+    delete_older_repositories="${repository}"
+    delete_not_newer_repositories=''
 
   elif echo "${staging_package_repositories}" | \
-    tr ' ' '\n' | \
     grep -qxF "${repository}"; then
 
-    delete_repositories="${staging_package_repositories}"
+    delete_older_repositories="${repository}"
+    delete_not_newer_repositories=$(
+      echo "${staging_package_repositories}" | \
+        grep -vxF "${repository}"
+    ) || true
 
   elif echo "${testing_package_repositories}" | \
-    tr ' ' '\n' | \
     grep -qxF "${repository}"; then
 
-    delete_repositories="${staging_package_repositories} ${testing_package_repositories}"
+    delete_older_repositories=$(
+      printf '%s\n' "${staging_package_repositories}" "${repository}"
+    )
+    delete_not_newer_repositories=$(
+      echo "${testing_package_repositories}" | \
+        grep -vxF "${repository}"
+    ) || true
 
   elif echo "${stable_package_repositories}" | \
-    tr ' ' '\n' | \
     grep -qxF "${repository}"; then
 
-    delete_repositories="${staging_package_repositories} ${testing_package_repositories} ${stable_package_repositories}"
+    delete_older_repositories=$(
+      printf '%s\n' "${staging_package_repositories}" "${testing_package_repositories}" "${repository}"
+    )
+    delete_not_newer_repositories=$(
+      echo "${stable_package_repositories}" | \
+        grep -vxF "${repository}"
+    ) || true
 
   else
 
@@ -441,22 +456,33 @@ remove_old_package_versions() {
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     {
-      for repo in ${delete_repositories}; do
+      for repo in ${delete_older_repositories}; do
+      echo "do:  '${repo}'" >&2
         ls_master_mirror "${arch}/${repo}" | \
           sed '
             /\.pkg\.tar\.xz$/!d
             s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
             /^'"$(str_to_regex "${package%-*-*-*}")"' /!d
-            s|^|1 '"${arch} ${repo}"' |
+            s|^|2 '"${arch} ${repo}"' |
+          '
+      done
+      for repo in ${delete_not_newer_repositories}; do
+      echo "dnn: '${repo}'" >&2
+        ls_master_mirror "${arch}/${repo}" | \
+          sed '
+            /\.pkg\.tar\.xz$/!d
+            s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
+            /^'"$(str_to_regex "${package%-*-*-*}")"' /!d
+            s|^|0 '"${arch} ${repo}"' |
           '
       done
       echo "${package%-*}" | \
-        sed 's|^.*-\([^-]\+-[^-]\+\)$|0 %cut% %it% %here% \1|'
+        sed 's|^.*-\([^-]\+-[^-]\+\)$|1 %cut% %it% %here% \1|'
     } | \
       sort -k5V,5 -k1n,1 | \
       sed -n '
-        /^0 %cut% %it% %here% /q
-        s/^1 //
+        /^1 %cut% %it% %here% /q
+        s/^[02] //
         s/ \(\S\+\)$/-\1/
         p
       ' > \
