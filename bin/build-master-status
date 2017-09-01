@@ -196,9 +196,16 @@ looped_packages=$(
 if ${web}; then
   "${base_dir}/bin/calculate-dependent-packages"
   (
-    printf '<html>\n<head>\n<title>Status of archlinux32 build master</title>\n</head>\n<body>\n'
+    printf '%s\n' \
+      '<html>' \
+      '<head>' \
+      '<title>Status of archlinux32 build master</title>' \
+      '</head>' \
+      '<body>'
     sed 's|$|<br>|' "${tmp_dir}/build-master-status.html"
-    printf '</body>\n</html>'
+    printf '%s\n' \
+      '</body>' \
+      '</html>'
   ) | \
     sponge "${tmp_dir}/build-master-status.html"
   end=$(($(date +%s)-7*24*60*60))
@@ -230,7 +237,15 @@ if ${web}; then
     "${tmp_dir}/statistics"
 
   {
-    printf '<html>\n<head>\n<title>List of broken package builds</title>\n</head>\n<body>\n<a href="build-logs/">build logs</a><br>\n<table>\n<tr>'
+    printf '%s\n' \
+      '<html>' \
+      '<head>' \
+      '<title>List of broken package builds</title>' \
+      '</head>' \
+      '<body>' \
+      '<a href="build-logs/">build logs</a><br>' \
+      '<table>' \
+      '<tr>'
     printf '<th>%s</th>' \
       'package' \
       'git revision' \
@@ -289,7 +304,10 @@ if ${web}; then
           "${reason}"
         printf '</tr>\n'
       done
-    printf '</table>\n</body>\n</html>\n'
+    printf '%s\n' \
+      '</table>' \
+      '</body>' \
+      '</html>'
   } > \
     "${tmp_dir}/broken-packages.html"
 
