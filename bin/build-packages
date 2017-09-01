@@ -176,6 +176,17 @@ while [ "${count}" -ne 0 ]; do
       git_revision="${package##* }"
       package="${package% *}"
 
+      if [ "${mod_git_revision}" = 'work-tree' ]; then
+        mod_git_revision=$(
+          # we can't just create an empty index-file with mktemp, because git doesn't like it
+          tmp_subdir=$(mktemp -d);
+          trap 'rm -rf --one-file-system "${tmp_subdir}"' EXIT
+          export GIT_INDEX_FILE="${tmp_subdir}/index.new"
+          git -C "${repo_paths__archlinux32}" add -A
+          git -C "${repo_paths__archlinux32}" write-tree
+        )
+      fi
+
       # Update git repositories (official packages, community packages and the repository of package customizations).
 
       for repo_name in ${repo_names}; do
