@@ -330,10 +330,15 @@ while [ "${count}" -ne 0 ]; do
       if ! ${success}; then
         for log in *'.build-log'; do
           if [ -f "${log}" ]; then
-            gzip "${log}"
+            if ${upload_to_build_master}; then
+              gzip "${log}"
+            else
+              grep -HF '' "${log}"
+            fi
           fi
         done
-        if tar -cf 'build-logs.gz.tar' \
+        if ${upload_to_build_master} && \
+          tar -cf 'build-logs.gz.tar' \
           -- *'.build-log.gz'; then
           while ! ssh \
             -i "${master_build_server_identity}" \
