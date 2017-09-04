@@ -189,6 +189,18 @@ while [ "${count}" -ne 0 ]; do
       git_revision="${package##* }"
       package="${package% *}"
 
+      if [ "${git_revision##*-}" = 'HEAD' ]; then
+        git_revision=$(
+          repo_name="${git_revision%-*}"
+          eval repo_path='"${repo_paths__'"${repo_name}"'}"'
+          if [ -z "${repo_path}" ]; then
+            >&2 printf 'Unknown git repository "%s".\n' "${repo_name}"
+            exit 2
+          fi
+          git -C "${repo_path}" rev-parse HEAD
+        )
+      fi
+
       if [ "${mod_git_revision}" = 'work-tree' ]; then
         mod_git_revision=$(
           # we can't just create an empty index-file with mktemp, because git doesn't like it
