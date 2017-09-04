@@ -183,6 +183,15 @@ for repo in ${repo_names}; do
     sed 's|^\(\S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|'
 done | \
   sort -u | \
+  sed '
+    s|^D\s|0 \0|
+    t
+    s|^[AM]\s|1 \0|
+    t
+    s|^|2 |
+  ' | \
+  sort -k1,1 | \
+  sed 's|^[012] ||' | \
   while read -r mode package git_revision repository; do
     case "${mode}" in
 
