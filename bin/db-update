@@ -556,28 +556,15 @@ while [ -s "${tmp_dir}/new-keep-packages" ]; do
 
 done
 
-# if build list is empty, remember all entries of 'deletion-list'
-if grep -qvxF 'break_loops' "${work_dir}/build-list"; then
-  delete_packages=''
-else
-  delete_packages=$(
-    cat "${work_dir}/deletion-list"
-  )
-fi
+# unlock build list
 
-if [ -z "${delete_packages}" ]; then
+rm -f "${build_list_lock_file}"
+flock -u 9
 
-  # unlock build list
-
-  rm -f "${build_list_lock_file}"
-  flock -u 9
-
-  clean_up_lock_file() {
-    rm -rf --one-file-system "${tmp_dir}"
-    rm -f "${package_database_lock_file}"
-  }
-
-fi
+clean_up_lock_file() {
+  rm -rf --one-file-system "${tmp_dir}"
+  rm -f "${package_database_lock_file}"
+}
 
 # calculate unstageable packages from keep_packages and done_packages
 
@@ -629,12 +616,5 @@ move_packages $(
   done
 
 )
-
-# delete packages from deletion-list
-
-if [ -n "${delete_packages}" ]; then
-  echo "there is something to delete:"
-  echo "${delete_packages}"
-fi
 
 clean_up_lock_file
