@@ -457,7 +457,6 @@ remove_old_package_versions() {
 
     {
       for repo in ${delete_older_repositories}; do
-      echo "do:  '${repo}'" >&2
         ls_master_mirror "${arch}/${repo}" | \
           sed '
             /\.pkg\.tar\.xz$/!d
@@ -467,7 +466,6 @@ remove_old_package_versions() {
           '
       done
       for repo in ${delete_not_newer_repositories}; do
-      echo "dnn: '${repo}'" >&2
         ls_master_mirror "${arch}/${repo}" | \
           sed '
             /\.pkg\.tar\.xz$/!d
