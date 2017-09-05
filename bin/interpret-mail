@@ -96,8 +96,18 @@ sed -n '
   /\n$/!ba
   s/\n$//
   p
-' "${tmp_dir}/plain-content" > \
+' "${tmp_dir}/plain-content" |
+  sed '
+    :a
+      /[:=]\s*$/N
+      s/:\s*\n/: /
+      ta
+      s/=\n//g
+      ta
+  ' > \
   "${tmp_dir}/raw-content"
+
+cat "${tmp_dir}/raw-content" >&2
 
 sed -n "$(
   while read -r action; do
