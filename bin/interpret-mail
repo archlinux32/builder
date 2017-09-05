@@ -3,6 +3,34 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+if [ $# -ne 0 ]; then
+  >&2 echo ''
+  >&2 echo 'usage: interpret-mail'
+  >&2 echo ' Read email from stdin and interpret / execute body.'
+  >&2 echo ''
+  >&2 echo ' The email needs a valid hashcash-stamp (>=20 bits)'
+  >&2 echo ' and valid encryption to buildmaster@archlinux32.org,'
+  >&2 echo ' as well as a valid gpg-signature from anyone on the'
+  >&2 echo ' list in "conf/admin-gpg-keys". This entry also'
+  >&2 echo ' determines what instructions are allowed.'
+  >&2 echo ''
+  >&2 echo ' Possible instructions are:'
+  >&2 echo ''
+  >&2 echo '  - "block: <state-file> <reason>":'
+  >&2 echo '    Block the given packge for the given reason.'
+  >&2 echo ''
+  >&2 echo '  - "stabilize: <package-file>":'
+  >&2 echo '    Move the given package from testing to stable.'
+  >&2 echo ''
+  >&2 echo '  - "unblock: <state-file>":'
+  >&2 echo '    Unblock the given packge.'
+  >&2 echo ''
+  >&2 echo '  - ALL: all of the above (only valid in'
+  >&2 echo '    "conf/admin-gpg-keys")'
+  >&2 echo ''
+  exit 1
+fi
+
 tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
