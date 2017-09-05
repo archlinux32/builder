@@ -217,8 +217,10 @@ if ${web}; then
       'package repository' \
       'build slave'
     printf '</tr>'
-    find "${work_dir}/package-states" -maxdepth 1 -name '*.locked' -printf '<tr><td>%TY-%Tm-%Td %TH:%TM</td><td>%f ' -execdir cat {} \; | \
+    find "${work_dir}/package-states" -maxdepth 1 -name '*.locked' -printf '%T@ <tr><td>%TY-%Tm-%Td %TH:%TM</td><td>%f ' -execdir head -n1 {} \; | \
+      sort -k1n,1 | \
       sed '
+        s|^\S\+ ||
         s|$|</td></tr>|
         s|\.locked |</td><td>|
         s|\.\([^.]\+\)$|</td><td>\1|
