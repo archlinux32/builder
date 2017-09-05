@@ -32,17 +32,25 @@ if ! sed -n '
   exit
 fi
 
-if [ -z "$(
-  (
-    grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
-      cut -d' ' -f3 | \
-      sort -u
-    printf '%s\n' "${admin_gpg_keys}" | \
-      sort -u
-  ) | \
-    sort | \
-    uniq -d
-  )" ]; then
+grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
+  cut -d' ' -f3 | \
+  sort -u > \
+  "${tmp_dir}/found-keys"
+
+printf '%s\n' "${admin_gpg_keys}" | \
+  sort -k1,1 -u > \
+  "${tmp_dir}/admin-gpg-keys"
+
+join -j 1 -o 2.2 \
+  "${tmp_dir}/found-keys" \
+  "${tmp_dir}/admin-gpg-keys" | \
+  tr ',' '\n' | \
+  sed 's|^ALL$|'"${possible_email_actions}"'|' | \
+  tr ' ,' '\n' | \
+  sort -u > \
+  "${tmp_dir}/allowed-actions"
+
+if [ ! -s "${tmp_dir}/allowed-actions" ]; then
   >&2 echo 'No valid signature found.'
   grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
     cut -d' ' -f3 | \
@@ -63,14 +71,32 @@ sed -n '
 ' "${tmp_dir}/plain-content" > \
   "${tmp_dir}/raw-content"
 
-sed -n '
-  /^stabilize:/{
-    s/^stabilize:\s*//
-    /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
-    w '"${tmp_dir}/stabilize"'
-  }
-' "${tmp_dir}/raw-content"
+sed -n "$(
+  while read -r action; do
+    if [ -z "${action}" ]; then
+      continue
+    fi
+    printf \
+      '/^%s:/{ s/^%s:\s*//; w %s/%s\n }\n' \
+      "${action}" \
+      "${action}" \
+      "${tmp_dir}" \
+      "${action}"
+  done < \
+    "${tmp_dir}/allowed-actions"
+)" "${tmp_dir}/raw-content"
+
+if [ -s "${tmp_dir}/block" ]; then
+  chronic "${base_dir}/bin/block-package" "${tmp_dir}/block"
+fi
 
 if [ -s "${tmp_dir}/stabilize" ]; then
-  chronic "${base_dir}/bin/db-update" -b -f "${tmp_dir}/stabilize"
+  sed -i '
+    /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
+  ' "${tmp_dir}/stabilize"
+#  chronic "${base_dir}/bin/db-update" -b -f "${tmp_dir}/stabilize"
+fi
+
+if [ -s "${tmp_dir}/unblock" ]; then
+  chronic "${base_dir}/bin/block-package" -u "${tmp_dir}/unblock"
 fi

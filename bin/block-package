@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# shellcheck disable=SC2016
+usage() {
+  >&2 echo ''
+  >&2 echo 'block-package [options] packages-file:'
+  >&2 echo ' [un]block packages in packages-file from being built.'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:        Show this help and exit.'
+  >&2 echo '  -u|--unblock:     Unblock package instead of blocking it.'
+  [ -z "$1" ] && exit 1 || exit "$1"
+}
+
+eval set -- "$(
+  getopt -o hu \
+    --long help \
+    --long unblock \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+block=true
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -u|--unblock)
+      block=false
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 1 ]; then
+  >&2 echo 'Too few or too many arguments.'
+  usage
+fi
+
+input_file="$1"
+
+if ! [ -r "${input_file}" ]; then
+  >&2 printf \
+    'Cannot open input file "%s".' \
+    "${input_file}"
+  exit 2
+fi
+
+err=0
+while read -r package reason; do
+  if ! tr ' ' '.' < \
+    "${work_dir}/build-list" | \
+    grep -qxF "${package}"; then
+    >&2 printf 'Package "%s" is not on the build-list.\n' "${package}"
+    err=2
+    continue
+  fi
+  if ${block}; then
+    if [ -z "${reason}" ]; then
+      >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
+      err=2
+    else
+      echo "${reason}" > \
+        "${work_dir}/package-states/${package}.blocked"
+    fi
+  else
+    rm -f "${work_dir}/package-states/${package}.blocked"
+  fi
+done < \
+  "${input_file}"
+
+exit ${err}
