@@ -241,6 +241,7 @@ if ${web}; then
       '<html>' \
       '<head>' \
       '<title>List of broken package builds</title>' \
+      '<link rel="stylesheet" type="text/css" href="/static/style.css">' \
       '</head>' \
       '<body>' \
       '<a href="build-logs/">build logs</a><br>' \
