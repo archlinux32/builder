@@ -99,15 +99,19 @@ sed -n '
 ' "${tmp_dir}/plain-content" |
   sed '
     :a
-      /[:=]\s*$/N
-      s/:\s*\n/: /
-      ta
-      s/=\n//g
-      ta
+      /[:=]\s*$/{
+        N
+        s/:\s*\n/: /
+        ta
+        s/=\n//g
+        ta
+      }
+    :b
+      N
+      s/\n\([^ :]\+\(\s\|\n\)\)/ \1/
+      tb
   ' > \
   "${tmp_dir}/raw-content"
-
-cat "${tmp_dir}/raw-content" >&2
 
 sed -n "$(
   while read -r action; do
