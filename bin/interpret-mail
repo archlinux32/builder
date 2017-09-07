@@ -86,6 +86,8 @@ if [ ! -s "${tmp_dir}/allowed-actions" ]; then
   exit
 fi
 
+printf '\n\n' >> "${tmp_dir}/plain-content"
+
 sed -n '
   /^$/!b
   N
