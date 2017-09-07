@@ -47,9 +47,9 @@ if ! hashcash -qXc -b 20 \
 fi
 
 if ! sed -n '
-    /^-----BEGIN PGP MESSAGE-----$/{
+    /^-----BEGIN PGP MESSAGE-----\s*$/{
       :a
-      /\n-----END PGP MESSAGE-----$/!{
+      /\n-----END PGP MESSAGE-----\s*$/!{
         N
         ba
       }
