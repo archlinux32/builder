@@ -67,10 +67,10 @@ case "${action}" in
       fi
 
       dependent_packages=$(
-        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".depends" | \
+        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".needs" | \
           sed '
             s|^.*/||
-            s|\.depends$||
+            s|\.needs$||
           '
       )
 
