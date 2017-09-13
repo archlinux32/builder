@@ -40,6 +40,9 @@ usage() {
   >&2 echo '                    stable from $file (- is stdin).'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
+  >&2 echo '  -u|--unstage $package:'
+  >&2 echo '                    Unstage package $package, even if it'
+  >&2 echo '                    would not be unstaged otherwise.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
@@ -331,11 +334,12 @@ move_packages() {
 }
 
 eval set -- "$(
-  getopt -o bf:hn \
+  getopt -o bf:hnu: \
     --long block \
     --long from: \
     --long help \
     --long no-action \
+    --long unstage: \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -362,6 +366,10 @@ do
     ;;
     -n|--no-action)
       no_action=true
+    ;;
+    -u|--unstage)
+      shift
+      packages_to_force_unstage="${packages_to_force_unstage} $1"
     ;;
     --)
       shift
@@ -421,6 +429,14 @@ for package in ${packages_to_stabilize}; do
   fi
 done
 
+for package in ${packages_to_force_unstage}; do
+  # some sanity checks
+  if [ ! -f "${work_dir}/package-states/${package}.done" ]; then
+    >&2 echo "Package '${package}' is not in staging!"
+    exit 2
+  fi
+done
+
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
@@ -451,17 +467,15 @@ for ending in 'done' 'testing'; do
     # testing packages (and maybe an unstaging fixes this anyway)
     continue
   fi
-  if [ -n "$(
+  errors=$(
     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort | \
       uniq -d
-    )" ]; then
+  )
+  if [ -n "${errors}" ]; then
     >&2 echo 'Removing duplicates not yet implemented:'
-    find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
-      sed 's|\(\.[^.]\+\)\{4\}$||' | \
-      sort | \
-      uniq -d
+    >&2 echo "${errors}"
     exit 42
   fi
 done
@@ -555,6 +569,16 @@ while [ -s "${tmp_dir}/new-keep-packages" ]; do
     sponge "${tmp_dir}/new-keep-packages"
 
 done
+
+# remove force-unstage packages from keep-packages
+{
+  cat "${tmp_dir}/keep-packages"
+  # shellcheck disable=SC2086
+  printf '%s\n' ${packages_to_force_unstage} ${packages_to_force_unstage}
+} | \
+  sort | \
+  uniq -u | \
+  sponge "${tmp_dir}/keep-packages"
 
 # unlock build list
 
