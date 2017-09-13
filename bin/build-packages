@@ -428,15 +428,6 @@ while [ "${count}" -ne 0 ]; do
 
     ;;
 
-    4)
-
-      >&2 echo 'get-assignment told me:'
-      >&2 echo " come back, when you've done your work - you hit the limit on"
-      >&2 echo ' maximum allowed parallel jobs per ip'
-      exit 1
-
-    ;;
-
     *)
 
       >&2 echo "ERROR: Unknown exit code ${err} from 'get-assignment'."

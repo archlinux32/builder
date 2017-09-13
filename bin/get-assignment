@@ -10,8 +10,6 @@
 #     but currently none has all its dependencies ready
 #  3: come back after the next run of get-package-updates - currently
 #     there are no pending packages
-#  4: come back, when you've done your work - you hit the limit on
-#     maximum allowed parallel jobs per ip
 
 # TODO:
 
@@ -75,9 +73,8 @@ clean_up() {
 trap clean_up EXIT
 
 # Check if there are any pending packages at all and if the requester
-# has already hit its max_parallel_build_per_client limit.
+# has already got an assignment.
 
-num_jobs=0
 pending_packages=false
 
 while read -r package git_revision mod_git_revision repository; do
@@ -96,7 +93,8 @@ while read -r package git_revision mod_git_revision repository; do
   if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ];
   then
     if [ "${slave}" = "$(head -n1 "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked")" ]; then
-      num_jobs=$((num_jobs+1));
+      echo "${package} ${git_revision} ${mod_git_revision} ${repository}"
+      exit
     fi
   else
     pending_packages=true
@@ -107,11 +105,6 @@ done < "${work_dir}/build-list"
 if ! ${pending_packages}; then
   >&2 echo 'come back after the next run of get-package-updates - currently there are no pending packages'
   exit 3
-fi
-
-if [ ${num_jobs} -ge ${max_parallel_build_per_client} ]; then
-  >&2 echo "come back, when you've done your work - you hit the limit on maximum allowed parallel jobs per ip"
-  exit 4
 fi
 
 # Find first package of build-list whose dependencies are all met
