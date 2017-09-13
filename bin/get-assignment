@@ -43,10 +43,13 @@ hand_out_assignment() {
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
-  grep -lxF "${1}" "${work_dir}/build-list.loops/"loop_* | \
-    tee -a "${work_dir}/package-states/$1.$2.$3.$4.locked" | \
-    sed 's|$|.locked|' | \
-    xargs -rn1 touch
+  find "${work_dir}/build-list.loops" -maxdepth 1 \
+    -name 'loop_*' \
+    -not -name 'loop_*.locked' \
+    -exec grep -qxF "$1" '{}' \; \
+    -exec touch '{}.locked' \; \
+    -print >> \
+    "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   exit 0
 

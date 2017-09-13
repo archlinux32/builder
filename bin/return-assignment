@@ -68,7 +68,11 @@ if [ "$5" = 'ERROR' ]; then
     find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' -printf '%f\n' | \
       sed 's@^\(.\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
   )
-  grep -lxF "${1}" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
+  find "${work_dir}/build-list.loops" -maxdepth 1 \
+    -name 'loop_*' \
+    -not -name 'loop_*.locked' \
+    -exec grep -qxF "$1" '{}' \; \
+    -print | \
     while read -r loop; do
       if [ -z "$(
           (
@@ -202,16 +206,18 @@ done
 
 # remove old state files (these should be only "done" markers, but
 # actually we don't care what it is) - as long as it's not "testing"
-find "${work_dir}/package-states" -maxdepth 1 | \
-  grep "/$(str_to_regex "$1")\(\.[^.]\+\)\{4\}\$" | \
-  grep -v "/$(str_to_regex "$1.$2.$3.$4")\.[^.]\+\$" | \
-  grep -v '\.testing$' | \
-  xargs -rn1 rm -f
+find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
+  -not -name '*.testing' \
+  -regex ".*/$(str_to_regex "$1")\(\.[^.]\+\)\{4\}" \
+  -not -regex ".*/$(str_to_regex "$1.$2.$3.$4")\.[^.]\+" \
+  -exec rm '{}' \;
 
 # remove all loops which are broken by this package
-grep -lxF "$1" "${work_dir}/build-list.loops/loop_"* 2> /dev/null | \
-  sed 'p;s|$|.locked|' | \
-  xargs -rn1 rm -f
+find "${work_dir}/build-list.loops" -maxdepth 1 \
+  -name 'loop_*' \
+  -not -name 'loop_*.locked' \
+  -exec grep -qxF "$1" '{}' \; \
+  -exec rm '{}' '{}.locked' \;
 
 if ! find "${work_dir}/build-list.loops" -maxdepth 1 -printf '%f\n' | \
   grep -q '^loop_[0-9]\+$'; then
