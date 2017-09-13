@@ -57,7 +57,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
     s|^|'"${work_dir}"'/package-infos/|
     s|$|.build-depends|
   ' "${tmp_dir}/build-list" | \
-    xargs -r grep -vx 'base\|base-devel' | \
+    xargs -r grep -hvx 'base\|base-devel' | \
     sort -u > \
     "${tmp_dir}/build-list.build-depends"
 
@@ -131,8 +131,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
                 s|^|'"${work_dir}"'/package-infos/|
                 s|$|.build-depends|
               ' | \
-              xargs -r cat | \
-              grep -vx 'base\|base-devel' | \
+              xargs -r grep -hvx 'base\|base-devel' | \
               sort -u
           ) | \
             sort | \
