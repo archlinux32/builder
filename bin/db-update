@@ -5,8 +5,8 @@
 # to the respective stable repository
 
 # 1] Condition for moving a package A from staging to testing is that:
-#   a) nothing on the build-list needs A and
-#   b) no done package B which is not being moved needs A
+#   a) nothing on the build-list run-depends on A and
+#   b) no done package B which is not being moved run-depends on A
 
 # TODO:
 
@@ -532,16 +532,16 @@ while [ -s "${tmp_dir}/new-keep-packages" ]; do
 
   sed '
     s|^|'"${work_dir}"'/package-infos/|
-    s|$|.needs|
+    s|$|.run-depends|
   ' "${tmp_dir}/keep-packages" | \
     xargs -r grep -HF '' | \
     sed '
       s|^.*/||
-      s|\.needs:| |
+      s|\.run-depends:| |
     ' | \
     sort -u | \
     sort -k2,2 > \
-    "${tmp_dir}/keep-packages.needs"
+    "${tmp_dir}/keep-packages.run-depends"
 
   sed '
     s|^|'"${work_dir}"'/package-infos/|
@@ -558,7 +558,7 @@ while [ -s "${tmp_dir}/new-keep-packages" ]; do
 
   join -j 2 -o 1.1 \
     "${tmp_dir}/done-packages.builds" \
-    "${tmp_dir}/keep-packages.needs" | \
+    "${tmp_dir}/keep-packages.run-depends" | \
     sort -u > \
     "${tmp_dir}/new-keep-packages"
 

@@ -31,7 +31,7 @@ if [ $# -eq 0 ]; then
       "${tmp_dir}/broken"
     broken=$(
       (
-        find "${work_dir}/package-infos" -maxdepth 1 -name '*.depends' | \
+        find "${work_dir}/package-infos" -maxdepth 1 -name '*.build-depends' | \
           sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
           sort -k1,1 | \
           join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \

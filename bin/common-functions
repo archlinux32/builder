@@ -150,8 +150,8 @@ generate_package_metadata() {
   file_prefix="${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}"
 
   if [ -e "${file_prefix}.builds" ] && \
-    [ -e "${file_prefix}.depends" ] && \
-    [ -e "${file_prefix}.needs" ] && \
+    [ -e "${file_prefix}.build-depends" ] && \
+    [ -e "${file_prefix}.run-depends" ] && \
     [ -e "${file_prefix}.groups" ] && \
     [ -e "${file_prefix}.packages" ]; then
     return 0
@@ -191,26 +191,36 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.builds"
 
-  # extract "depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \}
-  (
-    printf 'all_depend = %s\n' 'base' 'base-devel'
-    sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
-    grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
-  ) | \
-    cut -d= -f2 | \
-    sed 's|^\s\+||; s|[<>]$||' | \
-    sort -u > \
-    "${file_prefix}.depends"
-
-  # extract "needs" = "depends" \setminus ( "builds" \cup \{ base-devel \} )
-  (
-    cat "${file_prefix}.depends"
+  # extract "build-depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \} \setminus "builds"
+  {
+    {
+      printf 'all_depend = %s\n' 'base' 'base-devel'
+      sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
+      grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
+    } | \
+      cut -d= -f2 | \
+      sed 's|^\s\+||; s|[<>]$||' | \
+      sort -u
     sed 'p' "${file_prefix}.builds"
-    printf '%s\n' 'base-devel' 'base-devel'
-  ) | \
+  } | \
     sort | \
     uniq -u > \
-    "${file_prefix}.needs"
+    "${file_prefix}.build-depends"
+
+  # extract "run-depends" = depends \cup \{ base \} \setminus "builds"
+  {
+    {
+      printf 'all_depend = %s\n' 'base'
+      sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
+    } | \
+      cut -d= -f2 | \
+      sed 's|^\s\+||; s|[<>]$||' | \
+      sort -u
+    sed 'p' "${file_prefix}.builds"
+  } | \
+    sort | \
+    uniq -u > \
+    "${file_prefix}.run-depends"
 
   rm "${file_prefix}.SRCINFO"
 
@@ -798,7 +808,7 @@ find_dependencies_on_build_list() {
   generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
   (
-    cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.needs"
+    cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
     grep -vxF 'break_loops' "${work_dir}/build-list" | \
       awk '{print $1 "." $2 "." $3 "." $4}' | \
       sed "

@@ -67,10 +67,10 @@ case "${action}" in
       fi
 
       dependent_packages=$(
-        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".needs" | \
+        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".run-depends" | \
           sed '
             s|^.*/||
-            s|\.needs$||
+            s|\.run-depends$||
           '
       )
 
@@ -216,22 +216,22 @@ case "${action}" in
         continue
       fi
 
-      needs=$(
-        find "${work_dir}/package-infos" -maxdepth 1 -name "${pkg}.*.needs"
+      build_depends=$(
+        find "${work_dir}/package-infos" -maxdepth 1 -name "${pkg}.*.build-depends"
       )
-      if [ -z "${needs}" ]; then
+      if [ -z "${build_depends}" ]; then
         printf 'Package "%s" was deleted in the git repositories.\n' "${pkg}"
         continue
       fi
 
-      needs=$(
-        sort -u "${needs}"
+      build_depends=$(
+        sort -u "${build_depends}"
       )
 
       errors=$(
         (
           # shellcheck disable=SC2086
-          printf '%s\n' ${needs}
+          printf '%s\n' ${build_depends}
           awk '{print $3}' "${tmp_file}" | \
             sort -u
         ) | \

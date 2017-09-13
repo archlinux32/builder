@@ -55,24 +55,23 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
 
   sed '
     s|^|'"${work_dir}"'/package-infos/|
-    s|$|.needs|
+    s|$|.build-depends|
   ' "${tmp_dir}/build-list" | \
-    xargs -r cat | \
-    grep -vx 'base\|base-devel' | \
+    xargs -r grep -vx 'base\|base-devel' | \
     sort -u > \
-    "${tmp_dir}/build-list.needs"
+    "${tmp_dir}/build-list.build-depends"
 
   sed '
     s|^\S\+ |'"${work_dir}"'/package-infos/|
-    s|$|.needs|
+    s|$|.build-depends|
   ' "${tmp_dir}/dependent-count" | \
     xargs -r grep -Hvx 'base\|base-devel' | \
     sed '
       s|^.*/||
-      s|\.needs:| |
+      s|\.build-depends:| |
     ' | \
     sort -k2,2 > \
-    "${tmp_dir}/dependent-count.needs"
+    "${tmp_dir}/dependent-count.build-depends"
 
   rm -f "${tmp_dir}/dependent-count.new"
   touch "${tmp_dir}/dependent-count.new"
@@ -81,7 +80,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
     if [ -n "$(
         (
           sort -u "${work_dir}/package-infos/${sf}.builds"
-          cat "${tmp_dir}/build-list.needs"
+          cat "${tmp_dir}/build-list.build-depends"
         ) | \
           sort | \
           uniq -d
@@ -91,7 +90,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
 
     count="/$(
       sort -u "${work_dir}/package-infos/${sf}.builds" | \
-        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.needs" | \
+        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.build-depends" | \
         sort -u | \
         join -1 1 -2 2 -o 2.1,2.2 - "${tmp_dir}/dependent-count" | \
         tr '/ ' '\n' | \
@@ -130,7 +129,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
               uniq -u | \
               sed '
                 s|^|'"${work_dir}"'/package-infos/|
-                s|$|.needs|
+                s|$|.build-depends|
               ' | \
               xargs -r cat | \
               grep -vx 'base\|base-devel' | \
@@ -149,7 +148,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
         ' "${loop}" | \
           xargs -r cat | \
           sort -u | \
-        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.needs" | \
+        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/dependent-count.build-depends" | \
         sort -u | \
         join -1 1 -2 2 -o 2.1,2.2 - "${tmp_dir}/dependent-count" | \
         tr '/ ' '\n' | \
