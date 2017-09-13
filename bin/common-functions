@@ -785,7 +785,8 @@ extract_source_directory() {
 }
 
 # find_dependencies_on_build_list $package $git_revision $mod_git_revision $repository
-# return a list of packages on the build list which are dependencies of the given package
+# return a list of packages on the build list which are (run- / build- / check-time)
+# dependencies of the given package
 
 find_dependencies_on_build_list() {
 
