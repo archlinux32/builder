@@ -61,6 +61,8 @@ log_from_file() {
 }
 
 run_and_log_on_error() {
+  # shellcheck disable=SC2039
+  local err
   err=0
   "$@" 2> "${tmp_dir}/stderr" > "${tmp_dir}/stdout" || \
     err=$?
