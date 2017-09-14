@@ -120,9 +120,9 @@ testing=$(
       fi
     done
   (
-    find "${work_dir}/build-list.loops" -maxdepth 1 | \
-      grep '/loop_[0-9]\+$' | \
-      xargs -r cat | \
+    find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+      -regex '.*/loop_[0-9]\+' \
+      -exec cat {} \; | \
       sort -u
     find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}||' | \
