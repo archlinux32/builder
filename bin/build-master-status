@@ -284,9 +284,12 @@ if ${web}; then
     find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\.broken$||' | \
       sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
-      sort -k1,1 | \
-      join -1 2 -2 1 -o 1.1,1.2,1.3,1.4,1.5 - "${tmp_dir}/broken-packages-names" | \
       while read -r sf pkg rev mod_rev repo; do
+        if grep -qxF "${pkg}" "${tmp_dir}/broken-packages-names"; then
+          printf '1 '
+        else
+          printf '0 '
+        fi
         printf '%s ' \
           "${pkg}" \
           "${rev}" \
@@ -346,11 +349,18 @@ if ${web}; then
         fi
         printf '\n'
       done | \
-      sort -k5n,5 | \
-      while read -r pkg rev mod_rev repo count log_file dependent reason; do
+      sort -k6n,6 | \
+      while read -r buildable pkg rev mod_rev repo count log_file dependent reason; do
+        if [ "${buildable}" -eq 0 ]; then
+          left='('
+          right=')'
+        else
+          unset left
+          unset right
+        fi
         printf '<tr>'
         printf '<td>%s</td>' \
-          '<a href="graphs/'"${pkg}"'.png">'"${pkg}"'</a>' \
+          '<a href="graphs/'"${pkg}"'.png">'"${left}${pkg}${right}"'</a>' \
           "${rev}" \
           "${mod_rev}" \
           "${repo}" \
