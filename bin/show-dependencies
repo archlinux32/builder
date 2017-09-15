@@ -157,7 +157,6 @@ for target_package in "$@"; do
 
     # groups and split packages built by jobs on the build list
     cat "${tmp_dir}/known-groups" "${tmp_dir}/known-split-packages" | \
-      grep -v '^\(\S\+\) \1$' | \
       sort -k1,1 | \
       join -1 1 -2 1 -o 1.2 - "${tmp_dir}/build-list.sorted-by-package" | \
       sort -u > \
@@ -173,10 +172,13 @@ for target_package in "$@"; do
       sort -u | \
       sponge "${tmp_dir}/relevant-stuff"
 
-    sort -k1,1 "${tmp_dir}/original-build-order" | \
-      join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" | \
-      sort -k2,2 | \
-      join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" > \
+    {
+      sort -k1,1 "${tmp_dir}/original-build-order" | \
+        join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" | \
+        sort -k2,2 | \
+        join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff"
+      sed 's/.*/\0 \0/' "${tmp_dir}/relevant-stuff"
+    } > \
       "${tmp_dir}/build-order"
 
     rm "${tmp_dir}/relevant-stuff"
@@ -220,8 +222,8 @@ for target_package in "$@"; do
 
   fi
 
-  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
-    sponge "${tmp_dir}/build-order"
+#  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
+#    sponge "${tmp_dir}/build-order"
 
   # shellcheck disable=SC2129
   tr ' ' '\n' < \
@@ -340,7 +342,8 @@ for target_package in "$@"; do
 
   fi
 
-  sort -u "${tmp_dir}/build-order" | \
+  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
+    sort -u | \
     sponge "${tmp_dir}/build-order"
   sort -u "${tmp_dir}/knots" | \
     sponge "${tmp_dir}/knots"
