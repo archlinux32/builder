@@ -95,13 +95,9 @@ if [ $# -eq 0 ]; then
   exit
 fi
 
-# shellcheck disable=SC2009
-if ps ax | \
-  grep -v grep | \
-  grep -v "^\s*$$\s" | \
-  grep -wF "$0$(
-    printf ' %s' "$@"
-  )"; then
+
+if pgrep -f "^\S+ $0." | \
+  grep -vxF "$$" >&2; then
 
   >&2 echo $$
   >&2 echo 'I was running already.'
