@@ -173,7 +173,9 @@ while read -r mirror; do
         s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
       '
   ) | \
+    expand_version 3 | \
     sort -k4,4 -k3Vr,3 -k1,1 | \
+    shrink_version 3 | \
     uniq -f3 | \
     grep '^theirs ' | \
     awk '{print $4}' | \

@@ -487,7 +487,9 @@ remove_old_package_versions() {
       echo "${package%-*}" | \
         sed 's|^.*-\([^-]\+-[^-]\+\)$|1 %cut% %it% %here% \1|'
     } | \
+      expand_version 5 | \
       sort -k5V,5 -k1n,1 | \
+      shrink_version 5 | \
       sed -n '
         /^1 %cut% %it% %here% /q
         s/^[02] //
@@ -892,4 +894,28 @@ download_sources_by_hash() {
   rm -rf --one-file-system "${tmp_dir}"
   return ${return_value}
 
+}
+
+# expand_version $column_num
+# add "+0" to version in $colum_num-th column if no "+" is there
+
+expand_version() {
+  local column_num
+  column_num="$1"
+
+  sed '
+    /^\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*+/! s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*\)-/\1+0-/
+  '
+}
+
+# shrink_version $column_num
+# remove "+0" from version in $colum_num-th column
+
+shrink_version() {
+  local column_num
+  column_num="$1"
+
+  sed '
+    s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*\)+0-/\1-/
+  '
 }
