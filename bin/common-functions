@@ -403,8 +403,16 @@ ls_master_mirror() {
 }
 
 # remove_old_package_versions $arch $repository $package_file
-# removes all older (not-newer) versions of $package_file for architecture
-# $arch in all repositories not-older (newer) than $repository
+
+# removes all older (not-newer) versions of $package_file
+# in all repositories not-older (newer) than $repository
+
+# TODO: implement b) and c)
+
+# A package is considered older (not newer) if
+#  a) its version is older (not newer) or
+#  b) if its architecture is 'any' and different or
+#  c) if the other architecture is 'any' and different
 
 remove_old_package_versions() {
 
