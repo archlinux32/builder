@@ -23,6 +23,9 @@
 #  correctly handle if a package moved from community to official or
 #    vice versa
 
+#  only move packages from testing to stable if all dependencies are
+#    moved, too
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
