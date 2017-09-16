@@ -60,16 +60,24 @@ case "${action}" in
 
     for pkg in "$@"; do
 
-      if ! find "${work_dir}/package-states" -maxdepth 1 | \
-        grep -q "/$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done\$"; then
+      state_file=$(
+        find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
+          -regex ".*/$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done" \
+          -printf '%f\n' | \
+          sed 's|\.[^.]\+$||'
+      )
+      if [ -z "${state_file}" ]; then
         printf '"%s" is not in staging!\n' "${pkg}"
         continue
       fi
 
+      generate_package_metadata "${state_file}"
+
       dependent_packages=$(
-        grep -lxF "${pkg}" "${work_dir}/package-infos/"*".run-depends" | \
+        find "${work_dir}/package-infos/" -maxdepth 1 -name '*.run-depends' \
+          -exec grep -qxF "$(cat "${work_dir}/package-infos/${state_file}.builds")" '{}' \; \
+          -printf '%f\n' | \
           sed '
-            s|^.*/||
             s|\.run-depends$||
           '
       )
