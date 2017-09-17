@@ -208,8 +208,17 @@ rm "${tmp_dir}/delta-packages"
 
 # convert append-packages to build-list.new (add git hashes)
 
-cut -d' ' -f1,2,3,4 < \
+cut -d' ' -f1,4 < \
   "${tmp_dir}/append-packages" | \
+  sort -u | \
+  while read -r pkg repo; do
+    git_repo=$(find_git_repository_to_package_repository "${repo}")
+    printf '%s %s %s %s\n' \
+      "${pkg}" \
+      "$(cat "${work_dir}/${git_repo}.revision")" \
+      "$(cat "${work_dir}/archlinux32.revision")" \
+      "${repo}"
+  done | \
   sort -u > \
   "${tmp_dir}/build-list.append"
 
