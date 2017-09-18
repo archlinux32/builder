@@ -539,6 +539,10 @@ cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" | \
   sort -u > \
   "${tmp_dir}/keep-packages"
 
+# shellcheck disable=SC2086
+printf '%s\n' ${packages_to_stabilize} > \
+  "${tmp_dir}/stabilize-packages"
+
 find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-run-depends" | \
   sponge "${tmp_dir}/stabilize-packages"
 
