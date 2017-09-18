@@ -23,9 +23,6 @@
 #  correctly handle if a package moved from community to official or
 #    vice versa
 
-#  only move packages from testing to stable if all dependencies are
-#    moved, too
-
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
@@ -49,7 +46,7 @@ usage() {
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
-# move_packages $package/$from_repository/$to_repository ...
+# move_packages file with one "$package $from_repository $to_repository" per line
 # the existence of a directory $tmp_dir is assumed
 
 move_packages() {
@@ -69,12 +66,15 @@ move_packages() {
   local dummynator
   local file
 
-  rm -rf --one-file-system "${tmp_dir:?}/"*
+  if [ -e "${tmp_dir:?}/tmp" ]; then
+    rm -rf --one-file-system "${tmp_dir:?}/tmp"
+  fi
+  mkdir "${tmp_dir}/tmp"
 
-  touch "${tmp_dir}/repos"
-  touch "${tmp_dir}/packages"
-  touch "${tmp_dir}/master-mirror-listing"
-  mkdir "${tmp_dir}/transit"
+  touch "${tmp_dir}/tmp/repos"
+  touch "${tmp_dir}/tmp/packages"
+  touch "${tmp_dir}/tmp/master-mirror-listing"
+  mkdir "${tmp_dir}/tmp/transit"
 
   if ${no_action}; then
     dummynator='echo'
@@ -86,18 +86,13 @@ move_packages() {
     while read -r repo; do
       ls_master_mirror "i686/${repo}" | \
         sed "s|^|i686/${repo}/|" >> \
-        "${tmp_dir}/master-mirror-listing"
+        "${tmp_dir}/tmp/master-mirror-listing"
     done
 
-  for package in "$@"; do
+  while read -r package from_repo to_repo; do
     if [ -z "${package}" ]; then
       continue
     fi
-
-    to_repo="${package##*/}"
-    package="${package%/*}"
-    from_repo="${package##*/}"
-    package="${package%/*}"
 
     if ${no_action}; then
       printf \
@@ -108,7 +103,7 @@ move_packages() {
     fi
 
     echo "${package}" >> \
-      "${tmp_dir}/packages"
+      "${tmp_dir}/tmp/packages"
 
     if echo "${from_repo}" | \
       grep -q 'staging$' && \
@@ -128,13 +123,13 @@ move_packages() {
     fi
 
     echo "${from_repo}" > \
-      "${tmp_dir}/${package}.from_repo"
+      "${tmp_dir}/tmp/${package}.from_repo"
     echo "${to_repo}" > \
-      "${tmp_dir}/${package}.to_repo"
+      "${tmp_dir}/tmp/${package}.to_repo"
     echo "${from_ending}" > \
-      "${tmp_dir}/${package}.from_ending"
+      "${tmp_dir}/tmp/${package}.from_ending"
     echo "${to_ending}" > \
-      "${tmp_dir}/${package}.to_ending"
+      "${tmp_dir}/tmp/${package}.to_ending"
 
     if [ ! -f "${work_dir}/package-states/${package}.${from_ending}" ]; then
       >&2 printf 'move_packages: Cannot find package state file "%s"\n' "${package}.${from_ending}"
@@ -143,20 +138,20 @@ move_packages() {
 
     cp \
       "${work_dir}/package-states/${package}.${from_ending}" \
-      "${tmp_dir}/${package}.parts"
+      "${tmp_dir}/tmp/${package}.parts"
 
     sed \
       's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||' \
-      "${tmp_dir}/${package}.parts" > \
-      "${tmp_dir}/${package}.parts_names"
+      "${tmp_dir}/tmp/${package}.parts" > \
+      "${tmp_dir}/tmp/${package}.parts_names"
 
     sed \
       'p;s|$|.sig|' \
-      "${tmp_dir}/${package}.parts" > \
-      "${tmp_dir}/${package}.parts_and_signatures"
+      "${tmp_dir}/tmp/${package}.parts" > \
+      "${tmp_dir}/tmp/${package}.parts_and_signatures"
 
     while read -r part; do
-      if ! grep -qxF "i686/${from_repo}/${part}" "${tmp_dir}/master-mirror-listing"; then
+      if ! grep -qxF "i686/${from_repo}/${part}" "${tmp_dir}/tmp/master-mirror-listing"; then
         >&2 printf \
           'move_packages: Cannot find file "%s", part of package "%s".\n' \
           "i686/${from_repo}/${part}" \
@@ -164,23 +159,24 @@ move_packages() {
         exit 2
       fi
     done < \
-      "${tmp_dir}/${package}.parts"
+      "${tmp_dir}/tmp/${package}.parts"
 
-    mkdir -p "${tmp_dir}/${from_repo}"
-    mkdir -p "${tmp_dir}/${to_repo}"
+    mkdir -p "${tmp_dir}/tmp/${from_repo}"
+    mkdir -p "${tmp_dir}/tmp/${to_repo}"
 
     repos=$(
       # shellcheck disable=SC2046
-      printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/repos") | \
+      printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/tmp/repos") | \
         sort -u
     )
     echo "${repos}" > \
-      "${tmp_dir}/repos"
+      "${tmp_dir}/tmp/repos"
 
-  done
+  done < \
+    "$1"
 
   if ${no_action}; then
-    find "${tmp_dir}" -type f | \
+    find "${tmp_dir}/tmp" -type f | \
       while read -r file; do
         if [ "${file%.pkg.tar.xz}.pkg.tar.xz" = "${file}" ] ||
           [ "${file%.pkg.tar.xz.sig}.pkg.tar.xz.sig" = "${file}" ]; then
@@ -200,17 +196,17 @@ move_packages() {
     ${master_mirror_rsync_command} \
       "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
       "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
-      "${tmp_dir}/${repo}/"
+      "${tmp_dir}/tmp/${repo}/"
 
     # add and remove the packages locally
 
-    if grep -qxF "${repo}" "${tmp_dir}/"*".from_repo"; then
+    if grep -qxF "${repo}" "${tmp_dir}/tmp/"*".from_repo"; then
 
       # shellcheck disable=SC2046
       repo-remove -q \
-        "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
+        "${tmp_dir}/tmp/${repo}/${repo}.db.tar.gz" \
         $(
-          grep -lxF "${repo}" "${tmp_dir}/"*".from_repo" | \
+          grep -lxF "${repo}" "${tmp_dir}/tmp/"*".from_repo" | \
             sed '
               s|\.from_repo$|.parts_names|
             ' | \
@@ -218,8 +214,8 @@ move_packages() {
         )
     fi
 
-    if grep -qxF "${repo}" "${tmp_dir}/"*".to_repo"; then
-      grep -lxF "${repo}" "${tmp_dir}/"*".to_repo" | \
+    if grep -qxF "${repo}" "${tmp_dir}/tmp/"*".to_repo"; then
+      grep -lxF "${repo}" "${tmp_dir}/tmp/"*".to_repo" | \
         sed '
           s|\.to_repo$||
         ' | \
@@ -228,22 +224,22 @@ move_packages() {
             ${master_mirror_rsync_command} \
               "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}" \
               "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}.sig" \
-              "${tmp_dir}/transit/"
+              "${tmp_dir}/tmp/transit/"
             repo-add -q \
-              "${tmp_dir}/${repo}/${repo}.db.tar.gz" \
-              "${tmp_dir}/transit/${part}"
+              "${tmp_dir}/tmp/${repo}/${repo}.db.tar.gz" \
+              "${tmp_dir}/tmp/transit/${part}"
             rm \
-              "${tmp_dir}/transit/${part}" \
-              "${tmp_dir}/transit/${part}.sig"
+              "${tmp_dir}/tmp/transit/${part}" \
+              "${tmp_dir}/tmp/transit/${part}.sig"
           done < \
             "${package}.parts"
         done
     fi
 
-  done < "${tmp_dir}/repos"
+  done < "${tmp_dir}/tmp/repos"
 
   if ${no_action}; then
-    find "${tmp_dir}" -type f
+    find "${tmp_dir}/tmp" -type f
   fi
 
   # move the packages remotely via sftp
@@ -261,13 +257,13 @@ move_packages() {
         fi
         printf \
           'rename "%s" "%s"\n' \
-          "i686/$(cat "${tmp_dir}/${package}.from_repo")/${part}" \
-          "i686/$(cat "${tmp_dir}/${package}.to_repo")/${part}"
+          "i686/$(cat "${tmp_dir}/tmp/${package}.from_repo")/${part}" \
+          "i686/$(cat "${tmp_dir}/tmp/${package}.to_repo")/${part}"
       done < \
-        "${tmp_dir}/${package}.parts_and_signatures"
+        "${tmp_dir}/tmp/${package}.parts_and_signatures"
 
     done < \
-      "${tmp_dir}/packages"
+      "${tmp_dir}/tmp/packages"
     echo 'quit'
   ) | \
     if ${no_action}; then
@@ -282,29 +278,29 @@ move_packages() {
 
     # shellcheck disable=SC2086
     ${dummynator} ${master_mirror_rsync_command} \
-      "${tmp_dir}/${repo}/${repo}.db."* \
-      "${tmp_dir}/${repo}/${repo}.files."* \
+      "${tmp_dir}/tmp/${repo}/${repo}.db."* \
+      "${tmp_dir}/tmp/${repo}/${repo}.files."* \
       "${master_mirror_rsync_directory}/i686/${repo}/"
 
   done < \
-    "${tmp_dir}/repos"
+    "${tmp_dir}/tmp/repos"
 
   while read -r package; do
 
     # then we can safely remove old versions
 
     while read -r part; do
-      ${dummynator} remove_old_package_versions 'i686' "$(cat "${tmp_dir}/${package}.to_repo")" "${part}"
+      ${dummynator} remove_old_package_versions 'i686' "$(cat "${tmp_dir}/tmp/${package}.to_repo")" "${part}"
     done < \
-      "${tmp_dir}/${package}.parts"
+      "${tmp_dir}/tmp/${package}.parts"
 
     # and update the state files
 
     from_ending=$(
-      cat "${tmp_dir}/${package}.from_ending"
+      cat "${tmp_dir}/tmp/${package}.from_ending"
     )
     to_ending=$(
-      cat "${tmp_dir}/${package}.to_ending"
+      cat "${tmp_dir}/tmp/${package}.to_ending"
     )
 
     if [ -z "${to_ending}" ]; then
@@ -321,18 +317,18 @@ move_packages() {
     fi
 
   done < \
-    "${tmp_dir}/packages"
+    "${tmp_dir}/tmp/packages"
 
   if ! ${no_action}; then
     date '+%s' > \
-      "${tmp_dir}/lastupdate"
+      "${tmp_dir}/tmp/lastupdate"
     # shellcheck disable=SC2086
     ${dummynator} ${master_mirror_rsync_command} \
-      "${tmp_dir}/lastupdate" \
+      "${tmp_dir}/tmp/lastupdate" \
       "${master_mirror_rsync_directory}/lastupdate"
   fi
 
-  rm -rf --one-file-system "${tmp_dir:?}/"*
+  rm -rf --one-file-system "${tmp_dir:?}/tmp"
 
 }
 
@@ -497,10 +493,10 @@ find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f
 grep -vxF 'break_loops' "${work_dir}/build-list" | \
   tr ' ' '.' | \
   sort -u > \
-  "${tmp_dir}/keep-packages"
+  "${tmp_dir}/build-list-packages"
 
 find "${work_dir}/package-infos" -name '*.groups' \
-  -exec grep -qx 'base\(-devel\)\?' {} \; \
+  -exec grep -qxF 'base' {} \; \
   -printf '%f\n' | \
   sed '
     s|\.groups$||
@@ -508,80 +504,43 @@ find "${work_dir}/package-infos" -name '*.groups' \
   sort -u > \
   "${tmp_dir}/base-packages"
 
-# no base / base-devel packages on the build list?
+# shellcheck disable=SC2086
+printf '%s\n' ${packages_to_force_unstage} > \
+  "${tmp_dir}/force-unstage-packages"
+
+# calculate what packages should be unstaged:
+
+find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-unstage-packages" > \
+  "${tmp_dir}/unstage-packages"
+
+# no base / base-devel packages on the build list anymore?
 if [ -z "$(
     join -j 1 \
       "${tmp_dir}/base-packages" \
-      "${tmp_dir}/keep-packages"
+      "${tmp_dir}/build-list-packages"
   )" ]; then
-  # unstage all base / base-devel packages from staging
-  cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages" "${tmp_dir}/keep-packages" | \
-    sort | \
-    uniq -u | \
-    sponge "${tmp_dir}/keep-packages"
+
+  # we pretend, the group "base" does not exist, so we only fetch 'direct' dependencies on base-packages
+
+  mv "${tmp_dir}/all-run-depends" "${tmp_dir}/really-all-run-depends"
+  grep -v ' base$' "${tmp_dir}/really-all-run-depends" > \
+    "${tmp_dir}/all-run-depends" || \
+    true
+
+  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-unstage-packages" > \
+    "${tmp_dir}/unstage-packages"
+
+  mv "${tmp_dir}/really-all-run-depends" "${tmp_dir}/all-run-depends"
 fi
 
-# find all dependencies of the unstageable packages
-mv \
-  "${tmp_dir}/keep-packages" \
-  "${tmp_dir}/new-keep-packages"
-touch "${tmp_dir}/keep-packages"
+# calculate what packages should be stabilized
 
-while [ -s "${tmp_dir}/new-keep-packages" ]; do
+cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" | \
+  sort -u > \
+  "${tmp_dir}/keep-packages"
 
-  cat "${tmp_dir}/new-keep-packages" "${tmp_dir}/keep-packages" | \
-    sort -u | \
-    sponge "${tmp_dir}/keep-packages"
-
-  sed '
-    s|^|'"${work_dir}"'/package-infos/|
-    s|$|.run-depends|
-  ' "${tmp_dir}/keep-packages" | \
-    xargs -r grep -HF '' | \
-    sed '
-      s|^.*/||
-      s|\.run-depends:| |
-    ' | \
-    sort -u | \
-    sort -k2,2 > \
-    "${tmp_dir}/keep-packages.run-depends"
-
-  sed '
-    s|^|'"${work_dir}"'/package-infos/|
-    s|$|.builds|
-  ' "${tmp_dir}/done-packages" | \
-    xargs -r grep -HF '' | \
-    sed '
-      s|^.*/||
-      s|\.builds:| |
-    ' | \
-    sort -u | \
-    sort -k2,2 > \
-    "${tmp_dir}/done-packages.builds"
-
-  join -j 2 -o 1.1 \
-    "${tmp_dir}/done-packages.builds" \
-    "${tmp_dir}/keep-packages.run-depends" | \
-    sort -u > \
-    "${tmp_dir}/new-keep-packages"
-
-  # "new" is only what has not been there before
-  cat "${tmp_dir}/keep-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/new-keep-packages" | \
-    sort | \
-    uniq -u | \
-    sponge "${tmp_dir}/new-keep-packages"
-
-done
-
-# remove force-unstage packages from keep-packages
-{
-  cat "${tmp_dir}/keep-packages"
-  # shellcheck disable=SC2086
-  printf '%s\n' ${packages_to_force_unstage} ${packages_to_force_unstage}
-} | \
-  sort | \
-  uniq -u | \
-  sponge "${tmp_dir}/keep-packages"
+find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-run-depends" | \
+  sponge "${tmp_dir}/stabilize-packages"
 
 # unlock build list
 
@@ -593,55 +552,36 @@ clean_up_lock_file() {
   rm -f "${package_database_lock_file}"
 }
 
-# calculate unstageable packages from keep_packages and done_packages
+# testing -> stable
 
-done_packages=$(
-  cat \
-    "${tmp_dir}/keep-packages" \
-    "${tmp_dir}/keep-packages" \
-    "${tmp_dir}/done-packages" | \
-    sort | \
-    uniq -u
-)
+while read -r package; do
+  printf '%s %s %s\n' \
+    "${package}" \
+    "$(official_or_community "${package}" 'testing')" \
+    "$(repository_of_package "${package}")"
+done < \
+  "${tmp_dir}/stabilize-packages" | \
+  sponge "${tmp_dir}/stabilize-packages"
+
+# staging -> testing
+
+while read -r package; do
+  printf '%s %s %s\n' \
+    "${package}" \
+    "$(official_or_community "${package}" 'staging')" \
+    "$(official_or_community "${package}" 'testing')"
+done < \
+  "${tmp_dir}/unstage-packages" | \
+  sponge "${tmp_dir}/unstage-packages"
 
 # move packages in packages_to_stabilize from *testing/ to the stable repos
-
-# shellcheck disable=SC2046
-move_packages $(
-
-  for package in ${packages_to_stabilize}; do
-
-    if [ -z "${package}" ]; then
-      continue
-    fi
-
-    printf '%s/%s/%s\n' \
-      "${package}" \
-      "$(official_or_community "${package}" 'testing')" \
-      "$(repository_of_package "${package}")"
-
-  done
-
-)
+if [ -s "${tmp_dir}/stabilize-packages" ]; then
+  move_packages "${tmp_dir}/stabilize-packages"
+fi
 
 # move packages from *staging to *testing
-
-# shellcheck disable=SC2046
-move_packages $(
-
-  for package in ${done_packages}; do
-
-    if [ -z "${package}" ]; then
-      continue
-    fi
-
-    printf '%s/%s/%s\n' \
-      "${package}" \
-      "$(official_or_community "${package}" 'staging')" \
-      "$(official_or_community "${package}" 'testing')"
-
-  done
-
-)
+if [ -s "${tmp_dir}/unstage-packages" ]; then
+  move_packages "${tmp_dir}/unstage-packages"
+fi
 
 clean_up_lock_file

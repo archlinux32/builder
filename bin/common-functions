@@ -927,3 +927,97 @@ shrink_version() {
     s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*\)+0-/\1-/
   '
 }
+
+# find_biggest_subset_of_packages $omega $keep $all_run_depends [ $force ]
+
+# Return (to stdout) the biggest subset A of the packages in $omega whose
+# runtime dependencies in $omega \cup $keep are also in A
+
+# $all_builds either points to an empty file - then it will get filled
+# with cached data for subsequent calls - or to the same file of a previous
+# call
+
+# If non-empty, $force contains packages which are assumed to match the above
+# condition without checking.
+
+# The arguments are names of files with one $package.$revision.$mod_revision.$repository
+# per line.
+
+find_biggest_subset_of_packages() {
+
+  (
+    omega="$1"
+    keep="$2"
+    all_builds="$3"
+    if [ $# -eq 3 ]; then
+      force='/dev/null'
+    elif [ $# -eq 4 ]; then
+      force="$4"
+    else
+      >&2 printf 'find_biggest_subset_of_packages: Wrong number of arguments: %s given, 3 or 4 expected.' "$#"
+      return 2
+    fi
+
+    if [ ! -s "${all_run_depends}" ]; then
+      find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' \
+        -exec sed '
+          s|^|{} |
+          s|^\S\+/||
+          s|\.builds | |
+        ' {} \; | \
+        sort -k2,2 > \
+        "${all_builds}"
+    fi
+
+    sort -u "${omega}" | \
+      sponge "${omega}"
+
+    temp_dir=$(mktemp -d)
+    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
+
+    {
+      sort -u "${keep}"
+      cat "${force}" "${force}"
+    } | \
+      sort | \
+      uniq -u > \
+      "${temp_dir}/keep.new"
+    touch "${temp_dir}/keep"
+
+    while [ -s "${temp_dir}/keep.new" ]; do
+      cat "${temp_dir}/keep.new" "${temp_dir}/keep" | \
+        sort -u | \
+        sponge "${temp_dir}/keep"
+
+      sed '
+        s|^|'"${work_dir}"'/package-infos/|
+        s|$|.run-depends|
+      ' "${temp_dir}/keep" | \
+        xargs -r grep -HF '' | \
+        sed '
+          s|^.*/||
+          s|\.run-depends:| |
+        ' | \
+        sort -u | \
+        sort -k2,2 | \
+        uniq -f1 | \
+        join -1 2 -2 2 -o 2.1 - "${all_builds}" | \
+        sort -u | \
+        join -1 1 -2 1 -o 2.1 - "${omega}" | \
+        sort -u > \
+        "${temp_dir}/keep.new"
+
+      # "new" is only what has not been there before and what is not forced
+      cat "${temp_dir}/keep" "${temp_dir}/keep" "${force}" "${force}" "${temp_dir}/keep.new" | \
+        sort | \
+        uniq -u | \
+        sponge "${temp_dir}/keep.new"
+    done
+
+    cat "${omega}" "${temp_dir}/keep" "${temp_dir}/keep" | \
+      sort | \
+      uniq -u
+
+  )
+
+}
