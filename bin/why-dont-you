@@ -10,6 +10,9 @@
 action="$1"
 shift
 
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
 case "${action}" in
 
   'build')
@@ -58,6 +61,31 @@ case "${action}" in
 
   'unstage')
 
+    {
+      tr ' ' '.' < \
+        "${work_dir}/build-list"
+      find "${work_dir}/package-states" -maxdepth 1 -name '*.done' -printf '%f\n' | \
+        sed 's|\.done$||'
+    } | \
+      sort -u | \
+      sed '
+        s|^|'"${work_dir}/package-infos/"'|
+        s|$|.run-depends|
+      ' | \
+      # base is boring, so we ignore it (might give result "... can be unstaged" although it _will_not_ be unstaged!
+      xargs -r grep -vHxF 'base' | \
+      sed '
+        s|^[^:]*/||
+        s|\.run-depends:| |
+      ' | \
+      sort -k2,2 > \
+      "${tmp_dir}/all-run-depends"
+
+    grep -vxF 'break_loops' "${work_dir}/build-list" | \
+      awk '{print $1 "." $2 "." $3 "." $4}' | \
+      sort -u > \
+      "${tmp_dir}/build-list"
+
     for pkg in "$@"; do
 
       state_file=$(
@@ -66,63 +94,43 @@ case "${action}" in
           -printf '%f\n' | \
           sed 's|\.[^.]\+$||'
       )
-      if [ -z "${state_file}" ]; then
+      if [ -z "${state_file}" ] || \
+        [ ! -f "${work_dir}/package-states/${state_file}.done" ]; then
         printf '"%s" is not in staging!\n' "${pkg}"
         continue
       fi
 
-      generate_package_metadata "${state_file}"
+      echo "${state_file}" > "${tmp_dir}/dependent.new"
+      touch "${tmp_dir}/dependent"
 
-      dependent_packages=$(
-        find "${work_dir}/package-infos/" -maxdepth 1 -name '*.run-depends' \
-          -exec grep -qxF "$(cat "${work_dir}/package-infos/${state_file}.builds")" '{}' \; \
-          -printf '%f\n' | \
-          sed '
-            s|\.run-depends$||
-          '
-      )
+      while [ -s "${tmp_dir}/dependent.new" ]; do
+        cat "${tmp_dir}/dependent.new" "${tmp_dir}/dependent" | \
+          sort -u | \
+          sponge "${tmp_dir}/dependent"
 
-      build_list_items_file=$(mktemp)
-      dependent_packages_file=$(mktemp)
+        sed '
+          s|^|'"${work_dir}"'/package-infos/|
+          s|$|.builds|
+        ' "${tmp_dir}/dependent.new" | \
+          xargs -r cat | \
+          sort -u | \
+          join -1 1 -2 2 -o 2.1 - "${tmp_dir}/all-run-depends" | \
+          sort -u | \
+          sponge "${tmp_dir}/dependent.new"
 
-      grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        awk '{print $1 "." $2 "." $3 "." $4}' | \
-        sort -u > \
-        "${build_list_items_file}"
-
-      printf '%s\n' "${dependent_packages}" | \
-        sort -u > \
-        "${dependent_packages_file}"
+        cat "${tmp_dir}/dependent.new" "${tmp_dir}/dependent" "${tmp_dir}/dependent" | \
+          sort | \
+          uniq -u | \
+          sponge "${tmp_dir}/dependent.new"
+      done
 
       dependent_still_on_build_list=$(
-        join -1 1 -2 1 -o 1.1 \
-          "${build_list_items_file}" \
-          "${dependent_packages_file}"
+        join -1 1 -2 1 -o 2.1 "${tmp_dir}/build-list" "${tmp_dir}/dependent"
       )
-
-      rm -f \
-        "${build_list_items_file}" \
-        "${dependent_packages_file}"
 
       if [ -n "${dependent_still_on_build_list}" ]; then
-        printf 'The following packages are dependent on "%s", but still on the build list:\n' "${pkg}"
+        printf 'The following packages are dependent on "%s" and still on the build list:\n' "${pkg}"
         echo "${dependent_still_on_build_list}"
-        printf '\n'
-        continue
-      fi
-
-      dependent_still_in_staging=$(
-        echo "${dependent_packages}" | \
-          while read -r sf; do
-            if [ -f "${work_dir}/package-states/${sf}.done" ]; then
-              echo "${sf}"
-            fi
-          done
-      )
-
-      if [ -n "${dependent_still_in_staging}" ]; then
-        printf 'The following packages are dependent on "%s" and still in staging - maybe they cannot be unstaged:\n' "${pkg}"
-        echo "${dependent_still_in_staging}"
         printf '\n'
         continue
       fi
@@ -134,9 +142,6 @@ case "${action}" in
   ;;
 
   'keep')
-
-    tmp_file=$(mktemp)
-    trap 'rm -f "${tmp_file}"' EXIT
 
     while read -r pkg; do
 
@@ -197,13 +202,13 @@ case "${action}" in
       fi
 
       sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.${prepo}.builds" >> \
-        "${tmp_file}"
+        "${tmp_dir}/deleted.builds"
 
     done < \
       "${work_dir}/deletion-list"
 
-    sort -k3,3 "${tmp_file}" | \
-      sponge "${tmp_file}"
+    sort -k3,3 "${tmp_dir}/deleted.builds" | \
+      sponge "${tmp_dir}/deleted.builds"
 
     for pkg in "$@"; do
 
@@ -240,12 +245,12 @@ case "${action}" in
         (
           # shellcheck disable=SC2086
           printf '%s\n' ${build_depends}
-          awk '{print $3}' "${tmp_file}" | \
+          awk '{print $3}' "${tmp_dir}/deleted.builds" | \
             sort -u
         ) | \
           sort | \
           uniq -d | \
-          join -1 1 -2 3 -o 2.1,2.2,2.3 - "${tmp_file}"
+          join -1 1 -2 3 -o 2.1,2.2,2.3 - "${tmp_dir}/deleted.builds"
       )
       if [ -n "${errors}" ]; then
         printf 'Package "%s" has dependencies on the deletion list:\n' "${pkg}"
