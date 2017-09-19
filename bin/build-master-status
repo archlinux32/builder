@@ -378,6 +378,42 @@ if ${web}; then
 
   rm -f "${tmp_dir}/broken-packages-names"
 
+  {
+    printf '%s\n' \
+      '<html>' \
+      '<head>' \
+      '<title>Todos in the build scripts</title>' \
+      '</head>' \
+      '<body>'
+    find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
+      -exec sed -n '
+        /^\s*#\s*TODO:/{
+          s/^\s*#\s*TODO:\s*//
+          :a
+            N
+            s/\s*\n\s*#/\n/
+            ta
+          s/\n\n\+/\n/g
+          s/\n[^\n]*$/\n/
+          i {}
+          =
+          p
+        }' {} \; | \
+      sed '
+        :a
+        N
+        /\n$/!ba
+        s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n|\1 (line \2):\n|
+      ' | \
+      sed '
+        s|$|<br>|
+      '
+    printf '%s\n' \
+      '</body>' \
+      '</html>'
+  } > \
+    "${tmp_dir}/todos.html"
+
   find "${tmp_dir}" -maxdepth 1 -type f | \
     while read -r file; do
       cat "${file}" > \
