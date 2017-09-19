@@ -18,6 +18,9 @@
 # TODO: correctly handle if a package moved from community to official or
 # vice versa (delete residues)
 
+# TODO: mark a package as tested if it shall be stabilized but
+# can't due to pending dependent packages
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
