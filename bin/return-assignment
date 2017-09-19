@@ -14,9 +14,7 @@
 #  3: signature error
 #  4: package error (e.g. wrong packages sent)
 
-# TODO:
-
-#  fix signing of database
+# TODO: sign database
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"

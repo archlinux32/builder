@@ -4,13 +4,12 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
-# TODOs:
+# TODO: be more secure in case of update while build(s) is/are still in
+# progress -> (stale) lock files, moving (or changing content of) loop
+# lock files
 
-#  be more secure in case of update while build(s) is/are still in progress
-#   -> (stale) lock files, moving (or changing content of) loop lock files
-
-#  (might be connected to above): find out who deletes loop-files which
-#   should not be deleted
+# TODO: (might be connected to above): find out who deletes loop-files which
+# should not be deleted
 
 #  remove extra whitelist cases
 
@@ -87,8 +86,7 @@ delete_package() {
 
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
-  # TODO:
-  #  this is somewhat redundant and slow -- improve it!
+  # TODO: this is somewhat redundant and slow -- improve git performance!
   git -C "${repo_path}" checkout -f master
   git -C "${repo_path}" clean -xdf
   git -C "${repo_path}" fetch

@@ -8,20 +8,15 @@
 #   a) nothing on the build-list run-depends on A and
 #   b) no done package B which is not being moved run-depends on A
 
-# TODO:
+# TODO: correctly handle if multiple versions of a single package are marked
+# as "done" or "testing"
 
-#  the meta data used to evaluate condition "b" might be for a different
-#    version
+# TODO: be (even?) more atomic
 
-#  correctly handle if multiple versions of a single package are marked
-#    as "done" or "testing"
+# TODO: separate locks for staging, testing (and stable)
 
-#  be (even?) more atomic
-
-#  separate locks for staging, testing (and stable)
-
-#  correctly handle if a package moved from community to official or
-#    vice versa
+# TODO: correctly handle if a package moved from community to official or
+# vice versa (delete residues)
 
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf

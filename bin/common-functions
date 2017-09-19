@@ -408,7 +408,7 @@ ls_master_mirror() {
 # in all repositories not-older (newer) than $repository
 
 # TODO: implement b) and c)
-
+#
 # A package is considered older (not newer) if
 #  a) its version is older (not newer) or
 #  b) if its architecture is 'any' and different or
