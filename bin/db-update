@@ -559,6 +559,9 @@ clean_up_lock_file() {
 # testing -> stable
 
 while read -r package; do
+  if [ -z "${package}" ]; then
+    continue
+  fi
   printf '%s %s %s\n' \
     "${package}" \
     "$(official_or_community "${package}" 'testing')" \
@@ -570,6 +573,9 @@ done < \
 # staging -> testing
 
 while read -r package; do
+  if [ -z "${package}" ]; then
+    continue
+  fi
   printf '%s %s %s\n' \
     "${package}" \
     "$(official_or_community "${package}" 'staging')" \
