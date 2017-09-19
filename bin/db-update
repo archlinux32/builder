@@ -118,7 +118,7 @@ move_packages() {
       from_ending='testing'
       to_ending=''
     else
-      >&2 printf 'move_packages: Cannot move package from "%s" to "%s".\n' "${from_repo}" "${to_repo}"
+      >&2 printf 'move_packages: Cannot move package "%s" from "%s" to "%s".\n' "${package}" "${from_repo}" "${to_repo}"
       exit 2
     fi
 
