@@ -38,6 +38,9 @@ usage() {
   >&2 echo '                    stable from $file (- is stdin).'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
+  >&2 echo '  -s|--stabilize $package:'
+  >&2 echo '                    Stabilize package $package, even if it'
+  >&2 echo '                    would not be stabilized otherwise.'
   >&2 echo '  -u|--unstage $package:'
   >&2 echo '                    Unstage package $package, even if it'
   >&2 echo '                    would not be unstaged otherwise.'
@@ -331,11 +334,12 @@ move_packages() {
 }
 
 eval set -- "$(
-  getopt -o bf:hnu: \
+  getopt -o bf:hns:u: \
     --long block \
     --long from: \
     --long help \
     --long no-action \
+    --long stabilize: \
     --long unstage: \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
@@ -363,6 +367,10 @@ do
     ;;
     -n|--no-action)
       no_action=true
+    ;;
+    -s|--stabilze)
+      shift
+      packages_to_force_stabilize="${packages_to_force_stabilize} $1"
     ;;
     -u|--unstage)
       shift
@@ -418,7 +426,7 @@ packages_to_stabilize=$(
     sort -u
 )
 
-for package in ${packages_to_stabilize}; do
+for package in ${packages_to_stabilize} ${packages_to_force_stabilize}; do
   # some sanity checks
   if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then
     >&2 echo "Package '${package}' is not in testing!"
@@ -531,6 +539,10 @@ if [ -z "$(
   mv "${tmp_dir}/really-all-run-depends" "${tmp_dir}/all-run-depends"
 fi
 
+# shellcheck disable=SC2086
+printf '%s\n' ${packages_to_force_stabilize} > \
+  "${tmp_dir}/force-stabilize-packages"
+
 # calculate what packages should be stabilized
 
 cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" | \
@@ -541,7 +553,7 @@ cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" | \
 printf '%s\n' ${packages_to_stabilize} > \
   "${tmp_dir}/stabilize-packages"
 
-find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-run-depends" | \
+find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-stabilize-packages" | \
   sponge "${tmp_dir}/stabilize-packages"
 
 # unlock build list
