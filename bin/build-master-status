@@ -102,7 +102,7 @@ staging=$(
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-)
+) || true
 testing=$(
   ls_master_mirror 'i686' | \
     grep 'testing$' | \
@@ -110,7 +110,7 @@ testing=$(
       ls_master_mirror "i686/${dir}"
     done | \
     grep -c '\.pkg\.tar\.xz$'
-)
+) || true
 (
   find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
     sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
