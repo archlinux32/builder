@@ -341,7 +341,7 @@ while [ -n "${black_listed_new}" ]; do
       sort | \
       uniq -d | \
       awk '{print $2}' | \
-      sort -k2,2 | \
+      sort -k1,1 | \
       join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
       while read -r pkg; do
         if [ "${pkg}" = 'dev86' ] || \
