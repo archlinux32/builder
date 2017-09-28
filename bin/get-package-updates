@@ -345,7 +345,6 @@ while [ -n "${black_listed_new}" ]; do
       join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
       while read -r pkg; do
         if [ "${pkg}" = 'dev86' ] || \
-          [ "${pkg}" = 'luxblend25' ] || \
           [ "${pkg}" = 'python-pysocks' ] || \
           [ "${pkg}" = 'wine' ] || \
           [ "${pkg}" = 'wine-staging' ] || \
