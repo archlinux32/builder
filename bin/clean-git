@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# clean git repositories
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+for repo in ${repo_names}; do
+  eval 'repo_path="${repo_paths__'"${repo}"'}"'
+  printf 'cleaning %s (%s) ...\n' \
+    "${repo}" \
+    "${repo_path}"
+  git -C "${repo_path}" gc
+  printf '... done\n'
+done
