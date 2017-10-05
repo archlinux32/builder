@@ -18,6 +18,7 @@ usage() {
 
 i_am_insane() {
   echo 'build master is insane' > "${work_dir}/build-master-sanity"
+  echo 'SANITY CHECK FAILED'
   exit 1
 }
 
