@@ -11,6 +11,9 @@
 # TODO: (might be connected to above): find out who deletes loop-files which
 # should not be deleted
 
+# TODO: a package must be deleted in the upstream repository and in the
+# modification repository to get onto the deletion list
+
 #  remove extra whitelist cases
 
 # shellcheck source=conf/default.conf
