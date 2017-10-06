@@ -419,14 +419,30 @@ if ${web}; then
       '<html>' \
       '<head>' \
       '<title>Blacklisted packages</title>' \
+      '<link rel="stylesheet" type="text/css" href="/static/style.css">' \
       '</head>' \
-      '<body>'
+      '<body>' \
+      '<table>'
+    printf '<tr>'
+    printf '<th>%s</th>' \
+      'package' \
+      'reason'
+    printf '</tr>\n'
     git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
       tar -Ox | \
       sed '
-        s|$|<br>|
+        /.#/!s/$/#/
+        s|\(.\)#|\1</td><td>|
+        /^\s*#/{
+          s/^\s*#\s*//
+          s|\s*\(</td><td>\)|</font>\1|
+          s/^/<font color="#808080">/
+        }
+        s|^|<tr><td>|
+        s|$|</td></tr>|
       '
     printf '%s\n' \
+      '</table>' \
       '</body>' \
       '</html>'
   } > \
