@@ -21,6 +21,8 @@
 # TODO: mark a package as tested if it shall be stabilized but
 # can't due to pending dependent packages
 
+# TODO: handle deletion of parts of a split package
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
