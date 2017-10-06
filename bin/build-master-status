@@ -436,8 +436,8 @@ if ${web}; then
         s|\(.\)#|\1</td><td>|
         /^\s*#/{
           s/^\s*#\s*//
-          s|\s*\(</td><td>\)|</font>\1|
-          s/^/<font color="#808080">/
+          s|\s*\(</td><td>\)|</font></s>\1|
+          s/^/<s><font color="#808080">/
         }
         s|^|<tr><td>|
         s|$|</td></tr>|
