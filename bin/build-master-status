@@ -431,6 +431,7 @@ if ${web}; then
     git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
       tar -Ox | \
       sed '
+        s@FS#\([0-9]\+\)@<a href="https://bugs.archlinux.org/task/\1">\0</a>@
         /.#/!s/$/#/
         s|\(.\)#|\1</td><td>|
         /^\s*#/{
