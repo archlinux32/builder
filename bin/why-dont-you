@@ -219,6 +219,10 @@ case "${action}" in
 
       if git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
         tar -Ox 'blacklist' | \
+        sed '
+          s/\s*#.*$//
+          /^\s*$/d
+        ' | \
         grep -qxF "${pkg}"; then
         printf 'Package "%s" is explicitely blacklisted.\n' "${pkg}"
         continue

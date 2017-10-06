@@ -238,7 +238,11 @@ black_listed=''
 black_listed_new=$(
   (
     git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
-      tar -Ox 'blacklist'
+      tar -Ox 'blacklist' | \
+      sed '
+        s/\s*#.*$//
+        /^\s*$/d
+      '
     find "${work_dir}/package-infos" -maxdepth 1 -name 'lib32-*' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       uniq

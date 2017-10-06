@@ -244,6 +244,10 @@ fi
   # ignore packages on the blacklist
   git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
     tar -Ox blacklist | \
+    sed '
+      s/\s*#.*$//
+      /^\s*$/d
+    ' | \
     awk '{print "X X X " $1}' | \
     sed 'p'
 
