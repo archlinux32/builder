@@ -11,9 +11,6 @@
 # TODO: (might be connected to above): find out who deletes loop-files which
 # should not be deleted
 
-# TODO: a package must be deleted in the upstream repository and in the
-# modification repository to get onto the deletion list
-
 # TODO: remove extra whitelist cases
 
 # shellcheck source=conf/default.conf
@@ -207,7 +204,30 @@ done | \
 
       # deleted PKGBUILD
       "D")
-        delete_package "${package}"
+        found_package=false
+        for repository in ${repo_names}; do
+          eval 'repo_path="${repo_paths__'"${repository}"'}"'
+          if [ "${repository}" = "archlinux32" ]; then
+            if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" 2> /dev/null | \
+              tar -t 2> /dev/null | \
+              grep -q "$(str_to_regex "${package}")/PKGBUILD$"; then
+              found_package=true
+              break;
+            fi
+          else
+            if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- "${package}/repos" 2> /dev/null | \
+              tar -t --wildcards "${package}/repos/*/PKGBUILD" 2> /dev/null | \
+              cut -d/ -f3 | \
+              grep -v 'staging\|testing\|-unstable' | \
+              grep -vq -- '-i686$'; then
+              found_package=true
+              break;
+            fi
+          fi
+        done
+        if ! ${found_package}; then
+          delete_package "${package}"
+        fi
       ;;
 
       *)
