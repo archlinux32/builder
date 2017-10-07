@@ -14,7 +14,7 @@
 # TODO: a package must be deleted in the upstream repository and in the
 # modification repository to get onto the deletion list
 
-#  remove extra whitelist cases
+# TODO: remove extra whitelist cases
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
