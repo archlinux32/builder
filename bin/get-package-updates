@@ -86,13 +86,7 @@ delete_package() {
 
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
-  # TODO: this is somewhat redundant and slow -- improve git performance!
-  git -C "${repo_path}" checkout -f master
-  git -C "${repo_path}" clean -xdf
   git -C "${repo_path}" fetch
-  if ${pull}; then
-    git -C "${repo_path}" reset --hard origin/master
-  fi
 done
 
 # Read previous git revision numbers from files.
@@ -106,7 +100,11 @@ for repo in ${repo_names}; do
   )'"
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval "new_repo_revisions__${repo}='$(
-    git -C "${repo_path}" rev-parse HEAD | \
+    if ${pull}; then
+      git -C "${repo_path}" rev-parse HEAD
+    else
+      cat "${work_dir}/${repo}.revision"
+    fi | \
       tee "${work_dir}/${repo}.revision.new"
   )'"
   if ! eval '[ "${new_repo_revisions__'"${repo}"'}" = "${old_repo_revisions__'"${repo}"'}" ]'; then
