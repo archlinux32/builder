@@ -191,6 +191,7 @@ done | \
   while read -r mode package git_revision repository; do
     if [ "${mode}" = 'D' ]; then
       # deleted PKGBUILD
+      git_revision=$(cat "${work_dir}/packages32.revision")
       found_package=false
       for repository in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repository}"'}"'
@@ -207,6 +208,7 @@ done | \
             cut -d/ -f3 | \
             grep -v 'staging\|testing\|-unstable' | \
             grep -vq -- '-i686$'; then
+            git_revision=$(cat "${work_dir}/${repository}.revision")
             found_package=true
             break;
           fi
