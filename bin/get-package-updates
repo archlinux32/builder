@@ -189,51 +189,48 @@ done | \
   sort -k1,1 | \
   sed 's|^[012] ||' | \
   while read -r mode package git_revision repository; do
-    case "${mode}" in
-
-      # new or modified PKGBUILD
-      "A"|"M")
-        sed -i "/^$(str_to_regex "${package}") /d" "${work_dir}/build-list.new"
-        # shellcheck disable=SC2154
-        echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
-          "${work_dir}/build-list.new"
-        sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
-      ;;
-
+    if [ "${mode}" = 'D' ]; then
       # deleted PKGBUILD
-      "D")
-        found_package=false
-        for repository in ${repo_names}; do
-          eval 'repo_path="${repo_paths__'"${repository}"'}"'
-          if [ "${repository}" = "archlinux32" ]; then
-            if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" 2> /dev/null | \
-              tar -t 2> /dev/null | \
-              grep -q "$(str_to_regex "${package}")/PKGBUILD$"; then
-              found_package=true
-              break;
-            fi
-          else
-            if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- "${package}/repos" 2> /dev/null | \
-              tar -t --wildcards "${package}/repos/*/PKGBUILD" 2> /dev/null | \
-              cut -d/ -f3 | \
-              grep -v 'staging\|testing\|-unstable' | \
-              grep -vq -- '-i686$'; then
-              found_package=true
-              break;
-            fi
+      found_package=false
+      for repository in ${repo_names}; do
+        eval 'repo_path="${repo_paths__'"${repository}"'}"'
+        if [ "${repository}" = "archlinux32" ]; then
+          if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" 2> /dev/null | \
+            tar -t 2> /dev/null | \
+            grep -q "$(str_to_regex "${package}")/PKGBUILD$"; then
+            found_package=true
+            break;
           fi
-        done
-        if ! ${found_package}; then
-          delete_package "${package}"
+        else
+          if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- "${package}/repos" 2> /dev/null | \
+            tar -t --wildcards "${package}/repos/*/PKGBUILD" 2> /dev/null | \
+            cut -d/ -f3 | \
+            grep -v 'staging\|testing\|-unstable' | \
+            grep -vq -- '-i686$'; then
+            found_package=true
+            break;
+          fi
         fi
-      ;;
+      done
+      if ${found_package}; then
+        mode='M'
+      else
+        delete_package "${package}"
+        continue
+      fi
+    fi
+    if [ "${mode}" = 'A' ] || [ "${mode}" = 'M' ]; then
+      # new or modified PKGBUILD
+      sed -i "/^$(str_to_regex "${package}") /d" "${work_dir}/build-list.new"
+      # shellcheck disable=SC2154
+      echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
+        "${work_dir}/build-list.new"
+      sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
+      continue
+    fi
 
-      *)
-        >&2 echo "unknown git diff mode '${mode}'"
-        exit 1
-      ;;
-
-    esac
+    >&2 echo "unknown git diff mode '${mode}'"
+    exit 1
   done
 
 sort -u "${work_dir}/deletion-list.new" | \
