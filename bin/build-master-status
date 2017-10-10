@@ -359,6 +359,9 @@ if ${web}; then
           unset right
         fi
         printf '<tr>'
+        if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
+          mod_rev="<a href=\"https://github.com/archlinux32/packages/tree/${mod_rev}/${repo}/${pkg}\">${mod_rev}</a>"
+        fi
         printf '<td>%s</td>' \
           '<a href="graphs/'"${pkg}"'.png">'"${left}${pkg}${right}"'</a>' \
           "${rev}" \
