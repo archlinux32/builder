@@ -62,12 +62,38 @@ tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- build-list repos package-database state-files
+  set -- git-repositories build-list repos package-database state-files
 fi
 
 while [ $# -gt 0 ]; do
 
   case "$1" in
+
+    git-repositories)
+
+      [ ${silence} -gt 0 ] || \
+        >&2 printf 'checking git repositories ...'
+
+      for repo in ${repo_names}; do
+        eval 'repo_path="${repo_paths__'"${repo}"'}"'
+        repo_revision=$(
+          cat "${work_dir}/${repo}.revision"
+        )
+        if ! git -C "${repo_path}" archive "${repo_revision}" -- | \
+          tar -t > /dev/null; then
+          if [ ${silence} -le 1 ]; then
+            echo
+            printf 'The repository %s (%s) cannot archive the current revision %s.\n' \
+              "${repo}" "${repo_path}" "${repo_revision}"
+          fi
+          i_am_insane
+        fi
+      done
+
+      [ ${silence} -gt 0 ] || \
+        >&2 echo ' passed.'
+
+    ;;
 
     build-list)
 
