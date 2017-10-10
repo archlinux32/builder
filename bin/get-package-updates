@@ -86,7 +86,7 @@ delete_package() {
 
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
-  git -C "${repo_path}" fetch
+  git -C "${repo_path}" fetch origin master:master
 done
 
 # Read previous git revision numbers from files.
