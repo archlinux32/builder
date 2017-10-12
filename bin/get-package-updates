@@ -191,7 +191,7 @@ done | \
   while read -r mode package git_revision repository; do
     if [ "${mode}" = 'D' ]; then
       # deleted PKGBUILD
-      git_revision=$(cat "${work_dir}/packages32.revision.new")
+      git_revision=$(cat "${work_dir}/archlinux32.revision.new")
       found_package=false
       for repository in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repository}"'}"'
