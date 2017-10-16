@@ -2,10 +2,10 @@
 
 # report back on a build assignment
 # either on success via:
-#   "$0 $package $revision $mod_revision $repository" and tar'ed packages (= a tar of
-#   package(s) and signature(s)) on stdin
+#   "$0 $package $revision $mod_revision $repository" and tar'ed packages and logs
+#   (= a tar of package(s), signature(s) and log(s)) on stdin
 # or on failure via:
-#   "$0 $package $revision $mod_revision $repository ERROR"
+#   "$0 $package $revision $mod_revision $repository ERROR" and tar'ed logs
 
 # exit codes:
 #  0: ok
@@ -132,7 +132,8 @@ tar -x \
   --wildcards \
   --no-wildcards-match-slash \
   '*.pkg.tar.xz' \
-  '*.pkg.tar.xz.sig'
+  '*.pkg.tar.xz.sig' \
+  '*.build-log'
 
 # check if all packages are signed and all signatures belong to a package
 signature_errors=$(
@@ -179,6 +180,9 @@ if [ -n "${package_errors}" ]; then
   >&2 echo "${package_errors}"
   exit 4
 fi
+
+# move build-logs
+find . -maxdepth 1 -name '*.build-log' -exec mv '{}' "${build_log_directory}/" \;
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
