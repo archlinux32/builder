@@ -133,7 +133,7 @@ tar -x \
   --no-wildcards-match-slash \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
-  '*.build-log'
+  '*.build-log.gz'
 
 # check if all packages are signed and all signatures belong to a package
 signature_errors=$(
@@ -182,7 +182,7 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move build-logs
-find . -maxdepth 1 -name '*.build-log' -exec mv '{}' "${build_log_directory}/" \;
+find . -maxdepth 1 -name '*.build-log.gz' -exec mv '{}' "${build_log_directory}/$1.$2.$3.$4.{}" \;
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
