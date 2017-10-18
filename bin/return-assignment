@@ -182,7 +182,8 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move build-logs
-find . -maxdepth 1 -name '*.build-log.gz' -exec mv '{}' "${build_log_directory}/success/$1.$2.$3.$4.{}" \;
+find . -maxdepth 1 -name '*.build-log.gz' -printf "%p ${build_log_directory}/success/$1.$2.$3.$4.%f\n" | \
+  xargs -rn2 mv
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
