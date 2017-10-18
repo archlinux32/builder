@@ -261,6 +261,40 @@ if ${web}; then
     tac > \
     "${tmp_dir}/statistics"
 
+  find "${build_log_directory}/error" -maxdepth 1 -type f -name '*.build-log.gz' \( \
+    \( \
+      -exec zgrep -q '^==> ERROR: A failure occurred in build()\.$' {} \; \
+      -printf '%f build()\n' \
+    \) -o \
+    \( \
+      -exec zgrep -q '^==> ERROR: A failure occurred in check()\.$' {} \; \
+      -printf '%f check()\n' \
+    \) -o \
+    \( \
+      -exec zgrep -q '^==> ERROR: Could not download sources\.$' {} \; \
+      -printf '%f source\n' \
+    \) -o \
+    \( \
+      -exec zgrep -q 'error: failed to commit transaction (invalid or corrupted package)$' {} \; \
+      -printf '%f package-cache\n' \
+    \) -o \
+    -printf '%f unknown\n' \
+    \) | \
+    sed '
+      s|\(\.[^.]\+\)\{3\} | |
+    ' | \
+    sort -u | \
+    sed '
+      :a
+        $!N
+        s/^\(\S\+\) \([^\n]\+\)\n\1 /\1 \2,/
+      ta
+      P
+      D
+    ' | \
+    sort -k1,1 > \
+    "${tmp_dir}/broken-packages.reason"
+
   {
     printf '%s\n' \
       '<html>' \
@@ -279,12 +313,15 @@ if ${web}; then
       'package repository' \
       'compilations' \
       'dependent' \
+      'build error' \
       'blocked'
     printf '</tr>\n'
     find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\.broken$||' | \
-      sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\)$|\1 \2 \3 \4 \5|' | \
-      while read -r sf pkg rev mod_rev repo; do
+      sort -k1,1 | \
+      join -j 1 - "${tmp_dir}/broken-packages.reason" | \
+      sed 's|^\(\(.\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\) \(\S\+\)$|\1 \2 \3 \4 \5 \6|' | \
+      while read -r sf pkg rev mod_rev repo build_error; do
         if grep -qxF "${pkg}" "${tmp_dir}/broken-packages-names"; then
           printf '1 '
         else
@@ -307,7 +344,8 @@ if ${web}; then
                 echo 'x &nbsp;'
             ) | \
               cut -d' ' -f2
-          )"
+          )" \
+          "${build_error}"
         if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
           while read -r blocked_reason; do
             if echo "${blocked_reason}" | \
@@ -350,7 +388,7 @@ if ${web}; then
         printf '\n'
       done | \
       sort -k6n,6 | \
-      while read -r buildable pkg rev mod_rev repo count log_file dependent reason; do
+      while read -r buildable pkg rev mod_rev repo count log_file dependent build_error reason; do
         if [ "${buildable}" -eq 0 ]; then
           left='('
           right=')'
@@ -362,6 +400,10 @@ if ${web}; then
         if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
           mod_rev="<a href=\"https://github.com/archlinux32/packages/tree/${mod_rev}/${repo}/${pkg}\">${mod_rev}</a>"
         fi
+        build_error=$(
+          echo "${build_error}" | \
+            sed 's|,|, |g'
+        )
         printf '<td>%s</td>' \
           '<a href="graphs/'"${pkg}"'.png">'"${left}${pkg}${right}"'</a>' \
           "${rev}" \
@@ -369,6 +411,7 @@ if ${web}; then
           "${repo}" \
           '<a href="build-logs/error/'"${log_file}"'">'"${count}"'</a>' \
           "${dependent}" \
+          "${build_error}" \
           "${reason}"
         printf '</tr>\n'
       done
@@ -379,7 +422,7 @@ if ${web}; then
   } > \
     "${tmp_dir}/broken-packages.html"
 
-  rm -f "${tmp_dir}/broken-packages-names"
+  rm -f "${tmp_dir}/broken-packages-names" "${tmp_dir}/broken-packages.reason"
 
   {
     printf '%s\n' \
