@@ -40,7 +40,7 @@ fi
 # remove logs where package is not broken/locked anymore
 
 (
-  find "${build_log_directory}" -maxdepth 1 -printf '%f\n' | \
+  find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
     sed 's|\.[^.]\+\.build-log\.gz$||' | \
     sort -u
   find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' \) -printf '%f\n' | \
@@ -53,30 +53,34 @@ fi
   uniq -u | \
   cut -d' ' -f1 | \
   while read -r s; do
-    rm -f "${build_log_directory}/${s}."*
+    rm -f "${build_log_directory}/error/${s}."*
   done
 
 # only keep 10 newest logs per package
 
-find "${build_log_directory}" -maxdepth 1 -printf '%f\n' | \
-  sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
-  sort -k3,3 -k2r,2 | \
-  uniq -f2 --group=prepend | \
-  cut -d' ' -f1 | \
-  (
-    count=0
-    while read -r a; do
-      if [ -z "${a}" ]; then
-        count=0
-        continue
-      fi
-      if [ ${count} -ge 10 ]; then
-        echo "${build_log_directory}/${a}"
-      fi
-      count=$((count+1))
-    done
-  ) | \
-  xargs -rn1 rm
+for sub_dir in 'error' 'success'; do
+
+  find "${build_log_directory}/${sub_dir}" -maxdepth 1 -type f -printf '%f\n' | \
+    sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
+    sort -k3,3 -k2r,2 | \
+    uniq -f2 --group=prepend | \
+    cut -d' ' -f1 | \
+    (
+      count=0
+      while read -r a; do
+        if [ -z "${a}" ]; then
+          count=0
+          continue
+        fi
+        if [ ${count} -ge 10 ]; then
+          echo "${build_log_directory}/${sub_dir}/${a}"
+        fi
+        count=$((count+1))
+      done
+    ) | \
+    xargs -rn1 rm
+
+done
 
 # remove old package meta data
 delete_old_metadata

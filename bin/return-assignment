@@ -48,7 +48,7 @@ if [ "$5" = 'ERROR' ]; then
 
   # save sent build logs
   tar -x \
-    -C "${build_log_directory}" \
+    -C "${build_log_directory}/error" \
     --wildcards \
     --no-wildcards-match-slash \
     --transform="s|^|$1.$2.$3.$4.|" \
@@ -182,7 +182,7 @@ if [ -n "${package_errors}" ]; then
 fi
 
 # move build-logs
-find . -maxdepth 1 -name '*.build-log.gz' -exec mv '{}' "${build_log_directory}/$1.$2.$3.$4.{}" \;
+find . -maxdepth 1 -name '*.build-log.gz' -exec mv '{}' "${build_log_directory}/success/$1.$2.$3.$4.{}" \;
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
