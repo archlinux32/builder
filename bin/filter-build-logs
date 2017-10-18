@@ -37,6 +37,7 @@
     sed '
       /^Checking \(PKGBUILD\|\S\+\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\)$/d
       / on your system is a testing release$/d
+      s/^PKGBUILD\s\+(\([^) ]\+\))\s\+/\1 /
     ' | \
     sort -u | \
     while read -r a b c; do
