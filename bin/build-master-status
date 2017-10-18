@@ -298,7 +298,7 @@ if ${web}; then
           "$(wc -l < "${work_dir}/package-states/${sf}.broken")" \
           "$(
             # shellcheck disable=SC2010
-            ls -t "${webserver_directory}/build-logs" | \
+            ls -t "${webserver_directory}/build-logs/error" | \
               grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
           )" \
           "$(
@@ -367,7 +367,7 @@ if ${web}; then
           "${rev}" \
           "${mod_rev}" \
           "${repo}" \
-          '<a href="build-logs/'"${log_file}"'">'"${count}"'</a>' \
+          '<a href="build-logs/error/'"${log_file}"'">'"${count}"'</a>' \
           "${dependent}" \
           "${reason}"
         printf '</tr>\n'
