@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# filter content of build-logs for display on the webserver
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+{
+  printf '%s\n' \
+    '<html>' \
+    '<head>' \
+    '<title>Output of namcap of successful builds</title>' \
+    '<link rel="stylesheet" type="text/css" href="/static/style.css">' \
+    '</head>' \
+    '<body>' \
+    '<table>'
+  printf '<tr>'
+  printf '<th>%s</th>' \
+    'package' \
+    'type' \
+    'message'
+  printf '</tr>\n'
+  find "${build_log_directory}/success" -maxdepth 1 -name '*.build-log.gz' -printf '%p\n' | \
+    while read -r log; do
+      zcat "${log}" | \
+        sed -n '
+          /^Checking PKGBUILD$/{
+            :a
+              $!{
+                N
+                ba
+              }
+              p
+          }
+        '
+    done | \
+    sed '
+      /^Checking \(PKGBUILD\|\S\+\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\)$/d
+      / on your system is a testing release$/d
+    ' | \
+    sort -u | \
+    while read -r a b c; do
+      b="${b%:}"
+      if [ "${b}" = 'E' ]; then
+        left='<font color="red">'
+        right='</font>'
+      else
+        unset left
+        unset right
+      fi
+      printf '<tr>'
+      printf '<td>%s</td>' \
+        "${left}${a}${right}" "${left}${b}${right}" "${left}${c}${right}"
+      printf '</tr>\n'
+    done
+  printf '%s\n' \
+    '</table>' \
+    '</body>' \
+    '</html>'
+} > \
+  "${webserver_directory}/namcap-outputs.html"
