@@ -300,13 +300,13 @@ while [ "${count}" -ne 0 ]; do
           find . -maxdepth 1 -type f -name '*.pkg.tar.xz' -exec \
             gpg --local-user="${package_key}" --detach-sign {} \;
           if ${upload_to_build_master}; then
-            find . -maxdepth 1 -name '*.build-log' -execdir gzip '{}' \;
+            find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
           else
-            find . -maxdepth 1 -name '*.build-log' -execdir grep -HF '' '{}' \;
+            find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir grep -HF '' '{}' \;
           fi
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -- $(
-            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.build-log.gz' \) -not -name '*-debug-*' -printf '%f\n'
+            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' \) -not -name '*-debug-*' -printf '%f\n'
             )
           while ${upload_to_build_master}; do
             err=0

@@ -133,21 +133,53 @@ tar -x \
   --no-wildcards-match-slash \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
-  '*.build-log.gz'
+  '*.pkg.tar.xz-namcap.log.gz'
 
 # check if all packages are signed and all signatures belong to a package
-signature_errors=$(
-  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' | \
-    sed 's|\.sig$||' | \
-    sort | \
-    uniq -c | \
-    grep -v '^\s*2\s' | \
-    awk '{print $2}'
+missing_files=$(
+  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' | \
+    sed '
+      s@\.sig$@ signature@
+      t
+      s@-namcap\.log\.gz$@ namcap@
+      t
+      s@$@ package@
+    ' | \
+    sort -k1,1 -k2,2 | \
+    sed '
+      :a
+        $!N
+        s/^\(\(\S\+\) [^\n]\+\)\n\2 /\1 /
+        ta
+      P
+      D
+    ' | \
+    sed -n '
+      s/$/ /
+      / package /!{
+        h
+        s/^\(\S\+\) .*$/Package "\1" is missing./
+        p
+        g
+      }
+      / signature /!{
+        h
+        s/^\(\S\+\) .*$/Signature of "\1" is missing./
+        p
+        g
+      }
+      / namcap /!{
+        h
+        s/^\(\S\+\) .*$/Namcap log of "\1" is missing./
+        p
+        g
+      }
+    '
 )
 
-if [ -n "${signature_errors}" ]; then
-  >&2 echo 'The following packages lack a signature or vice versa:'
-  >&2 echo "${signature_errors}"
+if [ -n "${missing_files}" ]; then
+  >&2 echo 'The following packages lack a signature, namcap log or package file:'
+  >&2 echo "${missing_files}"
   exit 3
 fi
 
@@ -181,9 +213,8 @@ if [ -n "${package_errors}" ]; then
   exit 4
 fi
 
-# move build-logs
-find . -maxdepth 1 -name '*.build-log.gz' -printf "%p ${build_log_directory}/success/$1.$2.$3.$4.%f\n" | \
-  xargs -rn2 mv
+# move namcap.logs
+find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
