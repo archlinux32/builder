@@ -301,6 +301,8 @@ while [ "${count}" -ne 0 ]; do
             gpg --local-user="${package_key}" --detach-sign {} \;
           if ${upload_to_build_master}; then
             find . -maxdepth 1 -name '*.build-log' -execdir gzip '{}' \;
+          else
+            find . -maxdepth 1 -name '*.build-log' -execdir grep -HF '' '{}' \;
           fi
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -- $(
