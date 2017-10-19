@@ -20,20 +20,7 @@
     'type' \
     'message'
   printf '</tr>\n'
-  find "${build_log_directory}/success" -maxdepth 1 -name '*.build-log.gz' -printf '%p\n' | \
-    while read -r log; do
-      zcat "${log}" | \
-        sed -n '
-          /^Checking PKGBUILD$/{
-            :a
-              $!{
-                N
-                ba
-              }
-              p
-          }
-        '
-    done | \
+  find "${build_log_directory}/success" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir zcat {} \; | \
     sed '
       /^Checking \(PKGBUILD\|\S\+\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\)$/d
       / on your system is a testing release$/d
