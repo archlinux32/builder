@@ -4,6 +4,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 
 ## requirements
 * `git`
+* `moreutils`
 ### build master only
 * some ssh-server
 * `pkgbuild-introspection`
