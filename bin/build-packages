@@ -340,8 +340,7 @@ while [ "${count}" -ne 0 ]; do
                   ' | \
                   sponge "${tar_content_dir}/${log}"
               else
-                # we imitate a diff agains an empty log file
-                sed -i 's|^|+|' "${tar_content_dir}/${log}"
+                sed -i 's|^|*|' "${tar_content_dir}/${log}"
               fi
             done
           >&2 printf ' done.\n'
