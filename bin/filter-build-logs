@@ -16,6 +16,7 @@
     '<table>'
   printf '<tr>'
   printf '<th>%s</th>' \
+    '&nbsp;' \
     'package' \
     'type' \
     'message'
@@ -25,20 +26,29 @@
       /^Checking \(PKGBUILD\|\S\+\(-[^-]\+\)\{3\}\.pkg\.tar\.xz\)$/d
       / on your system is a testing release$/d
       s/^PKGBUILD\s\+(\([^) ]\+\))\s\+/\1 /
+      s/^./\0 /
     ' | \
     sort -u | \
-    while read -r a b c; do
-      b="${b%:}"
-      if [ "${b}" = 'E' ]; then
-        left='<font color="red">'
-        right='</font>'
+    while read -r a b c d; do
+      c="${c%:}"
+      if [ "${c}" = 'E' ]; then
+        color='FF'
       else
-        unset left
-        unset right
+        color='80'
       fi
+      case "${a}" in
+        '+')
+          color="${color}0000"
+        ;;
+        '-')
+          color="00${color}00"
+        ;;
+        *)
+          color="0000${color}"
+      esac
       printf '<tr>'
-      printf '<td>%s</td>' \
-        "${left}${a}${right}" "${left}${b}${right}" "${left}${c}${right}"
+      printf '<td><font color="#'"${color}"'">%s</font></td>' \
+        "${a}" "${b}" "${c}" "${d}"
       printf '</tr>\n'
     done
   printf '%s\n' \
