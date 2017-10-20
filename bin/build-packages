@@ -297,16 +297,62 @@ while [ "${count}" -ne 0 ]; do
           ).build-log" 2>&1; then
           # build successful
           >&2 printf ' ok.\n'
-          find . -maxdepth 1 -type f -name '*.pkg.tar.xz' -exec \
-            gpg --local-user="${package_key}" --detach-sign {} \;
-          if ${upload_to_build_master}; then
-            find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
+          tar_content_dir=$(mktemp -d "${tmp_dir}/tar-content.XXXXXX")
+          find . -maxdepth 1 -type f -name '*-debug-*.pkg.tar.xz*' -delete
+          >&2 printf 'generating namcap-log for x86_64 package(s) ...'
+          find . -maxdepth 1 -type f -name '*.pkg.tar.xz' \
+            -execdir gpg --local-user="${package_key}" --detach-sign '{}' \; \
+            -execdir mv '{}' '{}.sig' '{}-namcap.log' "${tar_content_dir}/" \; \
+            -printf '%f\n' | \
+            sponge | \
+            while read -r pkg_file; do
+              url=$(
+                pacman -Spdd --print-format '%l' --noconfirm "${pkg_file%-*-*-*}"
+              )
+              wget -q -nd "${url}" || \
+                true
+            done
+          if [ "${repository}" = 'multilib' ]; then
+            x86_64_build_command='multilib-build'
           else
-            find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir grep -HF '' '{}' \;
+            x86_64_build_command='extra-x86_64-build'
+          fi
+          # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
+          # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
+          "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
+            true
+          # now we generate diffs from the namcap.logs
+          find . "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%p\n' | \
+            while read -r log; do
+              sort "${log}" | \
+                sponge "${log}"
+            done
+          find "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%f\n' | \
+            sed '
+              s|\(^.*\)-i686\(\.pkg\.tar\.xz-namcap.log\)$|\0 \1-x86_64\2|
+              s|^.*-any\.pkg\.tar\.xz-namcap.log$|\0 \0|
+            ' | \
+            while read -r log x86_64_log; do
+              if [ -f "${x86_64_log}" ]; then
+                diff -u "${x86_64_log}" "${tar_content_dir}/${log}" | \
+                  sed '
+                    /^[^+-]/d
+                  ' | \
+                  sponge "${tar_content_dir}/${log}"
+              else
+                # we imitate a diff agains an empty log file
+                sed -i 's|^|+|' "${tar_content_dir}/${log}"
+              fi
+            done
+          >&2 printf ' done.\n'
+          if ${upload_to_build_master}; then
+            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
+          else
+            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir grep -HF '' '{}' \;
           fi
           # shellcheck disable=SC2046
-          tar -cf 'package.tar' -- $(
-            find . -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' \) -not -name '*-debug-*' -printf '%f\n'
+          tar -cf 'package.tar' -C "${tar_content_dir}" -- $(
+            find "${tar_content_dir}/" -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' \) -printf '%f\n'
             )
           while ${upload_to_build_master}; do
             err=0
