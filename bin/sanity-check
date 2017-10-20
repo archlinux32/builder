@@ -13,26 +13,31 @@ usage() {
   >&2 echo '  -h|--help:             Show this help and exit.'
   >&2 echo '  -q|--quiet:            Only print errors found.'
   >&2 echo '  -r|--really-quiet:     Do not print anything.'
+  >&2 echo '  -w|--webserver:        Generate output suitable for webserver.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 i_am_insane() {
-  echo 'build master is insane' > "${work_dir}/build-master-sanity"
-  echo 'SANITY CHECK FAILED'
+  echo 'build master is insane' > \
+    "${work_dir}/build-master-sanity"
+  echo 'SANITY CHECK FAILED' >> \
+    "${tmp_dir}/messages"
   exit 1
 }
 
 eval set -- "$(
-  getopt -o hqr \
+  getopt -o hqrw \
     --long help \
     --long quiet \
     --long really-quiet \
+    --long webserver \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 silence=0
 repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
+web=false
 
 while true
 do
@@ -46,6 +51,9 @@ do
     -r|--really-quiet)
       silence=2
     ;;
+    -w|--webserver)
+      web=true
+    ;;
     --)
       shift
       break
@@ -58,8 +66,30 @@ do
   shift
 done
 
+finish() {
+  if ${web}; then
+    {
+      printf '%s\n' \
+        '<html>' \
+        '<head>' \
+        '<title>result of archlinux32 build master'"'"'s sanity check</title>' \
+        '</head>' \
+        '<body>'
+      sed 's|$|<br>|' "${tmp_dir}/messages"
+      printf '%s\n' \
+        '</body>' \
+        '</html>'
+    } > \
+      "${webserver_directory}/master-sanity.html"
+  else
+    cat "${tmp_dir}/messages" >&2
+  fi
+  rm -rf --one-file-system "${tmp_dir}"
+}
+
 tmp_dir=$(mktemp -d)
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+touch "${tmp_dir}/messages"
+trap 'finish' EXIT
 
 if [ $# -eq 0 ]; then
   set -- git-repositories build-list repos package-database state-files
@@ -72,7 +102,8 @@ while [ $# -gt 0 ]; do
     git-repositories)
 
       [ ${silence} -gt 0 ] || \
-        >&2 printf 'checking git repositories ...'
+        printf 'checking git repositories ...' >> \
+        "${tmp_dir}/messages"
 
       for repo in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repo}"'}"'
@@ -82,32 +113,34 @@ while [ $# -gt 0 ]; do
         if ! git -C "${repo_path}" archive "${repo_revision}" -- | \
           tar -t > /dev/null; then
           if [ ${silence} -le 1 ]; then
-            echo
-            printf 'The repository %s (%s) cannot archive the current revision %s.\n' \
-              "${repo}" "${repo_path}" "${repo_revision}"
+            printf '\nThe repository %s (%s) cannot archive the current revision %s.\n' \
+              "${repo}" "${repo_path}" "${repo_revision}" >> \
+              "${tmp_dir}/messages"
           fi
           i_am_insane
         fi
       done
 
       [ ${silence} -gt 0 ] || \
-        >&2 echo ' passed.'
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
     build-list)
 
       [ ${silence} -gt 0 ] || \
-        >&2 printf 'checking build-list ...'
+        printf 'checking build-list ...' >> \
+        "${tmp_dir}/messages"
 
       errors=$(
         grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$\|^break_loops$' "${work_dir}/build-list"
       ) || true
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
-          echo
-          echo "The following build orders are wrongly formatted:"
-          echo "${errors}"
+          printf '\nThe following build orders are wrongly formatted:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
         i_am_insane
       fi
@@ -120,9 +153,9 @@ while [ $# -gt 0 ]; do
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
-          echo
-          echo "The following packages have duplicate build orders:"
-          echo "${errors}"
+          printf '\nThe following packages have duplicate build orders:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
         i_am_insane
       fi
@@ -138,22 +171,24 @@ while [ $# -gt 0 ]; do
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
-          echo
-          echo "The following packages appear on the build- and deletion-list:"
-          echo "${errors}"
+          printf '\nThe following packages appear on the build- and deletion-list:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
         i_am_insane
       fi
 
       [ ${silence} -gt 0 ] || \
-        >&2 echo ' passed.'
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
     repos)
 
       [ ${silence} -gt 0 ] || \
-        >&2 printf 'checking repos on master mirror ...'
+        printf 'checking repos on master mirror ...' >> \
+        "${tmp_dir}/messages"
 
       errors=$(
         (
@@ -167,15 +202,16 @@ while [ $# -gt 0 ]; do
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
-          echo
-          echo "The following repos are missing or obsolete on the mirror:"
-          echo "${errors}"
+          printf '\nThe following repos are missing or obsolete on the mirror:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
         i_am_insane
       fi
 
       [ ${silence} -gt 0 ] || \
-        >&2 echo ' passed.'
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
@@ -184,7 +220,8 @@ while [ $# -gt 0 ]; do
       for repo in ${repos}; do
 
         [ ${silence} -gt 0 ] || \
-          >&2 printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}"
+          printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}" >> \
+          "${tmp_dir}/messages"
 
         packages=$(
           ls_master_mirror "i686/${repo}" | \
@@ -205,9 +242,10 @@ while [ $# -gt 0 ]; do
         ) || true
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
-            echo
-            echo "The following packages in ${repo} are missing a signature or vice versa:"
-            echo "'${errors}'"
+            printf '\nThe following packages in %s are missing a signature or vice versa:\n%s\n' \
+              "${repo}" \
+              "${errors}" >> \
+              "${tmp_dir}/messages"
           fi
           i_am_insane
         fi
@@ -238,9 +276,10 @@ while [ $# -gt 0 ]; do
         )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
-            echo
-            echo "The following packages in ${repo} are missing from the database or vice versa:"
-            echo "${errors}"
+            printf '\nThe following packages in %s are missing from the database or vice versa:\n%s\n' \
+              "${repo}" \
+              "${errors}" >> \
+              "${tmp_dir}/messages"
           fi
           i_am_insane
         fi
@@ -266,17 +305,19 @@ while [ $# -gt 0 ]; do
         )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
-            echo
-            echo "The following packages in ${repo} are missing from the file-database or vice versa:"
-            echo "${errors}"
+            printf '\nThe following packages in %s are missing from the file-database or vice versa:\n%s\n' \
+              "${repo}" \
+              "${errors}" >> \
+              "${tmp_dir}/messages"
           fi
           i_am_insane
         fi
 
-        rm -rf --one-file-system "${tmp_dir:?}/"*
+        find "${tmp_dir:?}" -mindepth 1 \( -not -name 'messages' \) -delete
 
         [ ${silence} -gt 0 ] || \
-          >&2 echo ' passed.'
+          echo ' passed.' >> \
+          "${tmp_dir}/messages"
 
       done
 
@@ -287,7 +328,8 @@ while [ $# -gt 0 ]; do
       for status in 'staging:done' 'testing:testing'; do
 
         [ ${silence} -gt 0 ] || \
-          >&2 printf 'checking state-files of "%s" ...' "${status%:*}"
+          printf 'checking state-files of "%s" ...' "${status%:*}" >> \
+          "${tmp_dir}/messages"
 
         errors=$(
           (
@@ -309,15 +351,17 @@ while [ $# -gt 0 ]; do
         )
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
-            echo
-            echo "The following ${status%:*} packages do not have state files or vice versa:"
-            echo "${errors}"
+            printf '\nThe following %s packages do not have state files or vice versa:\n%s\n' \
+              "${status%:*}" \
+              "${errors}" >> \
+              "${tmp_dir}/messages"
           fi
           i_am_insane
         fi
 
         [ ${silence} -gt 0 ] || \
-          >&2 echo ' passed.'
+          echo ' passed.' >> \
+          "${tmp_dir}/messages"
 
       done
 
