@@ -306,11 +306,27 @@ while [ "${count}" -ne 0 ]; do
             -printf '%f\n' | \
             sponge | \
             while read -r pkg_file; do
-              url=$(
+              {
                 pacman -Spdd --print-format '%l' --noconfirm "${pkg_file%-*-*-*}"
-              )
-              wget -q -nd "${url}" || \
-                true
+                # shellcheck disable=SC2016
+                curl -Ss 'https://www.archlinux.org/mirrorlist/?country=all&protocol=https&tier=1&use_mirror_status=on' | \
+                  sed -n '
+                    s/^#Server = //
+                    T
+                    s/\$repo/'"${repository}"'/g
+                    s/\$arch/x86_64/g
+                    s|/$||
+                    s|$|/'"${pkg_file}"'|
+                    s/-i686\(\.pkg\.tar\.xz\)$/-x86_64\1/
+                    p
+                  ' | \
+                  shuf
+              } | \
+                while read -r url; do
+                if wget -q -nd "${url}"; then
+                  break;
+                fi
+              done
             done
           if [ "${repository}" = 'multilib' ]; then
             x86_64_build_command='multilib-build'
