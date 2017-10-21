@@ -315,13 +315,15 @@ while [ "${count}" -ne 0 ]; do
                     T
                     s/\$repo/'"${repository}"'/g
                     s/\$arch/x86_64/g
-                    s|/$||
-                    s|$|/'"${pkg_file}"'|
-                    s/-i686\(\.pkg\.tar\.xz\)$/-x86_64\1/
                     p
                   ' | \
                   shuf
               } | \
+                sed '
+                  s|/[^/]\+\.pkg\.tar\.xz$||
+                  s|$|/'"${pkg_file}"'|
+                  s/-i686\(\.pkg\.tar\.xz\)$/-x86_64\1/
+                ' | \
                 while read -r url; do
                   if wget -q -nd "${url}"; then
                     break;
