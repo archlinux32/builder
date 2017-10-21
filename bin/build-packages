@@ -346,8 +346,8 @@ while [ "${count}" -ne 0 ]; do
             done
           find "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%f\n' | \
             sed '
-              s|\(^.*\)-i686\(\.pkg\.tar\.xz-namcap.log\)$|\0 \1-x86_64\2|
-              s|^.*-any\.pkg\.tar\.xz-namcap.log$|\0 \0|
+              s|\(^.*\)-i686\(\.pkg\.tar\.xz-namcap\.log\)$|\0 \1-x86_64\2|
+              s|^.*-any\.pkg\.tar\.xz-namcap\.log$|\0 \0|
             ' | \
             while read -r log x86_64_log; do
               if [ -f "${x86_64_log}" ]; then
