@@ -355,6 +355,7 @@ while [ "${count}" -ne 0 ]; do
               if [ -f "${x86_64_log}" ]; then
                 diff -u "${x86_64_log}" "${tar_content_dir}/${log}" | \
                   sed '
+                    1,3d
                     /^[^+-]/d
                   ' | \
                   sponge "${tar_content_dir}/${log}"
