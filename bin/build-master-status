@@ -406,8 +406,8 @@ if ${web}; then
         )
         printf '<td>%s</td>' \
           '<a href="graphs/'"${pkg}"'.png">'"${left}${pkg}${right}"'</a>' \
-          "${rev}" \
-          "${mod_rev}" \
+          "<p style=\"font-size:8px\">${rev}</p>" \
+          "<p style=\"font-size:8px\">${mod_rev}</p>" \
           "${repo}" \
           '<a href="build-logs/error/'"${log_file}"'">'"${count}"'</a>' \
           "${dependent}" \
