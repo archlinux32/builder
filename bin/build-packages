@@ -336,6 +336,7 @@ while [ "${count}" -ne 0 ]; do
           # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
           # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
           "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
+            "${x86_64_build_command}" -c -- -- --version > /dev/null 2>&1 || \
             true
           # now we generate diffs from the namcap.logs
           find . "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%p\n' | \
