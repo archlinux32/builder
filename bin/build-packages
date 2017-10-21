@@ -323,10 +323,10 @@ while [ "${count}" -ne 0 ]; do
                   shuf
               } | \
                 while read -r url; do
-                if wget -q -nd "${url}"; then
-                  break;
-                fi
-              done
+                  if wget -q -nd "${url}"; then
+                    break;
+                  fi
+                done
             done
           if [ "${repository}" = 'multilib' ]; then
             x86_64_build_command='multilib-build'
