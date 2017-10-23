@@ -56,31 +56,29 @@ fi
     rm -f "${build_log_directory}/error/${s}."*
   done
 
-# only keep 10 newest logs per package
+# only keep 10 newest logs per failed package
 
-for sub_dir in 'error' 'success'; do
+find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
+  sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
+  sort -k3,3 -k2r,2 | \
+  uniq -f2 --group=prepend | \
+  cut -d' ' -f1 | \
+  (
+    count=0
+    while read -r a; do
+      if [ -z "${a}" ]; then
+        count=0
+        continue
+      fi
+      if [ ${count} -ge 10 ]; then
+        rm "${build_log_directory}/error/${a}"
+      fi
+      count=$((count+1))
+    done
+  )
 
-  find "${build_log_directory}/${sub_dir}" -maxdepth 1 -type f -printf '%f\n' | \
-    sed 's|^\(.*\)\(\.\([^.]\+\)\.build-log\.gz\)$|\1\2 \3 \1|' | \
-    sort -k3,3 -k2r,2 | \
-    uniq -f2 --group=prepend | \
-    cut -d' ' -f1 | \
-    (
-      count=0
-      while read -r a; do
-        if [ -z "${a}" ]; then
-          count=0
-          continue
-        fi
-        if [ ${count} -ge 10 ]; then
-          echo "${build_log_directory}/${sub_dir}/${a}"
-        fi
-        count=$((count+1))
-      done
-    ) | \
-    xargs -rn1 rm
-
-done
+# only keep namcap logs of last 2 weeks for succeeded packages
+find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 -delete
 
 # remove old package meta data
 delete_old_metadata
