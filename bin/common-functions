@@ -476,24 +476,31 @@ remove_old_package_versions() {
     {
       for repo in ${delete_older_repositories}; do
         ls_master_mirror "${arch}/${repo}" | \
-          sed '
+          sed -n '
             /\.pkg\.tar\.xz$/!d
             s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
-            /^'"$(str_to_regex "${package%-*-*-*}")"' /!d
-            s|^|2 '"${arch} ${repo}"' |
+            /^'"$(str_to_regex "${package%-*-*-*}")"' / {
+              s|^|2 '"${arch} ${repo}"' |
+              p
+            }
           '
       done
       for repo in ${delete_not_newer_repositories}; do
         ls_master_mirror "${arch}/${repo}" | \
-          sed '
+          sed -n '
             /\.pkg\.tar\.xz$/!d
             s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
-            /^'"$(str_to_regex "${package%-*-*-*}")"' /!d
-            s|^|0 '"${arch} ${repo}"' |
+            /^'"$(str_to_regex "${package%-*-*-*}")"' / {
+              s|^|0 '"${arch} ${repo}"' |
+              p
+            }
           '
       done
       echo "${package%-*}" | \
         sed 's|^.*-\([^-]\+-[^-]\+\)$|1 %cut% %it% %here% \1|'
+
+      # the generated list contains the following columns:
+      # $delete-if-newer-vs-not-older $arch-directory $repo-directory $pkgname $pkgver-$pkgrel $pkg-arch.pkg.tar.xz
     } | \
       expand_version 5 | \
       sort -k5V,5 -k1n,1 | \
@@ -503,8 +510,11 @@ remove_old_package_versions() {
         s/^[02] //
         s/ \(\S\+\)$/-\1/
         p
-      ' > \
+      ' | \
+      sort -u > \
       "${tmp_dir}/packages-to-delete"
+    # this file contains a list of packages to be delete, one on each line:
+    # $architecture-directory $repository-directory $package-name $pkgver-$pkgrel-$package-architecture.pkg.tar.xz
 
     cut -d' ' -f1,2 < \
       "${tmp_dir}/packages-to-delete" | \
