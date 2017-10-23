@@ -46,6 +46,12 @@ if [ "$5" = 'ERROR' ]; then
     exit 0
   fi
 
+  # shellcheck disable=SC2154
+  if ! grep -xF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
+    # whoops, this package is built by someone else
+    exit 0
+  fi
+
   # save sent build logs
   tar -x \
     -C "${build_log_directory}/error" \
