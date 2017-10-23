@@ -5,13 +5,21 @@
 
 if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
   [ "${SSH_ORIGINAL_COMMAND%% *}" = "return-assignment" ]; then
-  export slave="$1"
-  # this is somewhat cumbersome, but we want:
-  #  - no expansion of special shell-chars (*,;,\n,&&,~,$HOME)
-  #  - splitting of arguments on spaces
-  echo "${SSH_ORIGINAL_COMMAND#* }" | \
-    xargs "${base_dir}/bin/${SSH_ORIGINAL_COMMAND%% *}"
+
+  # small check to prevent some shell-injections
+  if echo "${SSH_ORIGINAL_COMMAND}" | \
+    grep -q '[^-a-zA-Z0-9.+_]'; then
+
+    >&2 printf 'Invalid command: "%s".\n' "${SSH_ORIGINAL_COMMAND}"
+    exit 42
+
+  fi
+
+  slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
+
 else
-  >&2 echo "Invalid command: '${SSH_ORIGINAL_COMMAND%% *}'"
+
+  >&2 printf 'Invalid command: "%s".\n' "${SSH_ORIGINAL_COMMAND}"
   exit 42
+
 fi
