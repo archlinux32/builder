@@ -407,12 +407,14 @@ ls_master_mirror() {
 # removes all older (not-newer) versions of $package_file
 # in all repositories not-older (newer) than $repository
 
-# TODO: implement b) and c)
-#
-# A package is considered older (not newer) if
-#  a) its version is older (not newer) or
-#  b) if its architecture is 'any' and different or
-#  c) if the other architecture is 'any' and different
+# A package is considered not newer if
+#  a) its version is not newer
+# A package is considered older if
+#  b) its version is older or
+#  c) if it's "not newer" and its architecture is 'any' and different or
+#  d) if it's "not newer" and the other architecture is 'any' and different
+
+# this ensures an any package may replace arch-specific packages of the same version and vice versa
 
 remove_old_package_versions() {
 
@@ -474,6 +476,15 @@ remove_old_package_versions() {
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     {
+      # the architecture of the package (any vs. i686)
+      package_arch="${package##*-}"
+      package_arch="${package_arch%%.*}"
+      if [ "${package_arch}" = 'any' ]; then
+        package_arch_regex_inverter='!'
+      else
+        unset package_arch_regex_inverter
+      fi
+
       for repo in ${delete_older_repositories}; do
         ls_master_mirror "${arch}/${repo}" | \
           sed -n '
@@ -481,6 +492,9 @@ remove_old_package_versions() {
             s|-\([^-]\+-[^-]\+\)-\([^-]\+\)$| \1 \2|
             /^'"$(str_to_regex "${package%-*-*-*}")"' / {
               s|^|2 '"${arch} ${repo}"' |
+              / any\.pkg\.tar\.xz$/'"${package_arch_regex_inverter}"'{
+                s|^2|0|
+              }
               p
             }
           '
