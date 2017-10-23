@@ -1,0 +1,347 @@
+#!/bin/sh
+
+# delete obsolete binary packages
+
+# 1] Condition for deleting a package A is that:
+#   a) nothing on the build-list (make|check|)depends on A and
+#   b) no built package B which is not being deleted depends on A
+
+# "Package x depends on package y" means, that something needed by x
+# is provided by y and no other package which will not be deleted.
+
+# shellcheck disable=SC2039
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# shellcheck disable=SC2016
+usage() {
+  >&2 echo ''
+  >&2 echo 'delete-packages [options]:'
+  >&2 echo ' delete obsolete binary packages.'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
+  >&2 echo '  -h|--help:        Show this help and exit.'
+  >&2 echo '  -n|--no-action:   Only print what would be deleted.'
+  [ -z "$1" ] && exit 1 || exit "$1"
+}
+
+eval set -- "$(
+  getopt -o bhn \
+    --long block \
+    --long help \
+    --long no-action \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+block_flag='-n'
+no_action=false
+
+while true
+do
+  case "$1" in
+    -b|--block)
+      block_flag=''
+    ;;
+    -h|--help)
+      usage 0
+    ;;
+    -n|--no-action)
+      no_action=true
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ -s "${work_dir}/build-master-sanity" ]; then
+  >&2 echo 'Build master is not sane.'
+  exit 1
+fi
+
+tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+# Create a lock file and a trap.
+
+if ! ${no_action}; then
+
+  exec 9> "${build_list_lock_file}"
+  if ! flock ${block_flag} 9; then
+    >&2 echo 'come back (shortly) later - I cannot lock build list.'
+    exit 1
+  fi
+
+  exec 8> "${package_database_lock_file}"
+  if ! flock ${block_flag} 8; then
+    >&2 echo 'come back (shortly) later - I cannot lock package database.'
+    exit 1
+  fi
+
+fi
+
+clean_up_lock_file() {
+  if ! ${no_action}; then
+    rm -f "${package_database_lock_file}" "${build_list_lock_file}"
+  fi
+  rm -rf --one-file-system "${tmp_dir}"
+}
+
+trap clean_up_lock_file EXIT
+
+cp \
+  "${work_dir}/deletion-list" \
+  "${work_dir}/build-list" \
+  "${tmp_dir}/"
+
+all_repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
+all_repos="core"
+
+for repo in ${all_repos}; do
+  mkdir "${tmp_dir}/${repo}"
+  ${master_mirror_rsync_command} \
+    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
+    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
+    "${tmp_dir}/${repo}/"
+done
+
+for repo in ${all_repos}; do
+  tar -C "${tmp_dir}/${repo}" -xzf "${tmp_dir}/${repo}/${repo}.db.tar.gz"
+done
+
+find "${tmp_dir}" -mindepth 3 -maxdepth 3 -name 'desc' -exec \
+  sed '
+    /^%DEPENDS%$/{
+      s/.*//
+      :dep_loop
+      N
+      /\n$/{
+        s@\(^\|\n\)\(.\)@\1depends \2@g
+        bend
+      }
+      bdep_loop
+    }
+    /^%PROVIDES%$/{
+      s/.*//
+      :pro_loop
+      N
+      /\n$/{
+        s@\(^\|\n\)\(.\)@\1provides \2@g
+        bend
+      }
+      bpro_loop
+    }
+    d
+    :end
+    s/[<>=]\S*\($\|\n\)/\1/g
+    s#\(^\|\n\)\(.\)#\1{} \2#g
+  ' {} \; \
+  -printf '%p provides %p\n' | \
+  sed '
+    /^$/d
+    s|^\S\+/\([^/ ]\+\)/\([^/ ]\+\)\(-[^-/ ]\+\)\{2\}/desc |\1 \2 |
+    s| \S\+/\([^/]\+\)\(-[^/-]\+\)\{2\}/desc$| \1|
+  ' | \
+  awk '{print $3 " " $1 " " $2 " " $4}' | \
+  sed -n '
+    /^provides /{
+      s/^provides //
+      w '"${tmp_dir}"'/db.provides
+      b
+    }
+    /^depends /{
+      s/^depends //
+      w '"${tmp_dir}"'/db.depends
+      b
+    }
+  '
+
+
+
+echo 'OK' >&2
+exit 42
+
+# # sanity check
+#
+# for ending in 'done' 'testing'; do
+#   if [ "${ending}" = 'testing' ] && \
+#     [ -z "${packages_to_stabilize}" ]; then
+#     # if nothing is to be untested, we don't care about duplicate
+#     # testing packages (and maybe an unstaging fixes this anyway)
+#     continue
+#   fi
+#   if [ -n "$(
+#     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
+#       sed 's|\(\.[^.]\+\)\{4\}$||' | \
+#       sort | \
+#       uniq -d
+#     )" ]; then
+#     >&2 echo 'Removing duplicates not yet implemented:'
+#     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
+#       sed 's|\(\.[^.]\+\)\{4\}$||' | \
+#       sort | \
+#       uniq -d
+#     exit 42
+#   fi
+# done
+#
+# # packages which are done
+#
+# find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
+#   sed '
+#     s|\.done$||
+#   ' | \
+#   sort -u > \
+#   "${tmp_dir}/done-packages"
+#
+# # packages still on the build-list
+#
+# grep -vxF 'break_loops' "${work_dir}/build-list" | \
+#   tr ' ' '.' | \
+#   sort -u > \
+#   "${tmp_dir}/keep-packages"
+#
+# find "${work_dir}/package-infos" -name '*.groups' \
+#   -exec grep -qx 'base\(-devel\)\?' {} \; \
+#   -printf '%f\n' | \
+#   sed '
+#     s|\.groups$||
+#   ' | \
+#   sort -u > \
+#   "${tmp_dir}/base-packages"
+#
+# # no base / base-devel packages on the build list?
+# if [ -z "$(
+#     join -j 1 \
+#       "${tmp_dir}/base-packages" \
+#       "${tmp_dir}/keep-packages"
+#   )" ]; then
+#   # unstage all base / base-devel packages from staging
+#   cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages" "${tmp_dir}/keep-packages" | \
+#     sort | \
+#     uniq -u | \
+#     sponge "${tmp_dir}/keep-packages"
+# fi
+#
+# # find all dependencies of the unstageable packages
+# mv \
+#   "${tmp_dir}/keep-packages" \
+#   "${tmp_dir}/new-keep-packages"
+# touch "${tmp_dir}/keep-packages"
+#
+# while [ -s "${tmp_dir}/new-keep-packages" ]; do
+#
+#   cat "${tmp_dir}/new-keep-packages" "${tmp_dir}/keep-packages" | \
+#     sort -u | \
+#     sponge "${tmp_dir}/keep-packages"
+#
+#   sed '
+#     s|^|'"${work_dir}"'/package-infos/|
+#     s|$|.depends|
+#   ' "${tmp_dir}/keep-packages" | \
+#     xargs -r grep -HF '' | \
+#     sed '
+#       s|^.*/||
+#       s|\.depends:| |
+#     ' | \
+#     sort -u | \
+#     sort -k2,2 > \
+#     "${tmp_dir}/keep-packages.depends"
+#
+#   sed '
+#     s|^|'"${work_dir}"'/package-infos/|
+#     s|$|.builds|
+#   ' "${tmp_dir}/done-packages" | \
+#     xargs -r grep -HF '' | \
+#     sed '
+#       s|^.*/||
+#       s|\.builds:| |
+#     ' | \
+#     sort -u | \
+#     sort -k2,2 > \
+#     "${tmp_dir}/done-packages.builds"
+#
+#   join -j 2 -o 1.1 \
+#     "${tmp_dir}/done-packages.builds" \
+#     "${tmp_dir}/keep-packages.depends" | \
+#     sort -u > \
+#     "${tmp_dir}/new-keep-packages"
+#
+#   # "new" is only what has not been there before
+#   cat "${tmp_dir}/keep-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/new-keep-packages" | \
+#     sort | \
+#     uniq -u | \
+#     sponge "${tmp_dir}/new-keep-packages"
+#
+# done
+#
+# # unlock build list
+#
+# rm -f "${build_list_lock_file}"
+# flock -u 9
+#
+# clean_up_lock_file() {
+#   rm -rf --one-file-system "${tmp_dir}"
+#   rm -f "${package_database_lock_file}"
+# }
+#
+# # calculate unstageable packages from keep_packages and done_packages
+#
+# done_packages=$(
+#   cat \
+#     "${tmp_dir}/keep-packages" \
+#     "${tmp_dir}/keep-packages" \
+#     "${tmp_dir}/done-packages" | \
+#     sort | \
+#     uniq -u
+# )
+#
+# # move packages in packages_to_stabilize from *testing/ to the stable repos
+#
+# # shellcheck disable=SC2046
+# move_packages $(
+#
+#   for package in ${packages_to_stabilize}; do
+#
+#     if [ -z "${package}" ]; then
+#       continue
+#     fi
+#
+#     printf '%s/%s/%s\n' \
+#       "${package}" \
+#       "$(official_or_community "${package}" 'testing')" \
+#       "$(repository_of_package "${package}")"
+#
+#   done
+#
+# )
+#
+# # move packages from *staging to *testing
+#
+# # shellcheck disable=SC2046
+# move_packages $(
+#
+#   for package in ${done_packages}; do
+#
+#     if [ -z "${package}" ]; then
+#       continue
+#     fi
+#
+#     printf '%s/%s/%s\n' \
+#       "${package}" \
+#       "$(official_or_community "${package}" 'staging')" \
+#       "$(official_or_community "${package}" 'testing')"
+#
+#   done
+#
+# )
+#
+# clean_up_lock_file
