@@ -47,7 +47,7 @@ if [ "$5" = 'ERROR' ]; then
   fi
 
   # shellcheck disable=SC2154
-  if ! grep -xF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
+  if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
     # whoops, this package is built by someone else
     exit 0
   fi
