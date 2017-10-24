@@ -66,8 +66,10 @@ fi
 
 clean_up() {
   rm -f "${build_list_lock_file}"
+  rm -rf --one-file-system "${tmp_dir}"
 }
 
+tmp_dir=$(mktemp -d)
 trap clean_up EXIT
 
 # Check if there are any pending packages at all and if the requester
@@ -159,7 +161,7 @@ locked_packages=$(
 
 grep -vxF 'break_loops' "${work_dir}/build-list" | \
   sort -k1,1 > \
-  "${work_dir}/build-list.sorted-by-package"
+  "${tmp_dir}/build-list.sorted-by-package"
 
 for package in $(
   # shellcheck disable=SC2030
@@ -181,7 +183,7 @@ for package in $(
     uniq -c | \
     join -1 2 -2 1 -o 1.1,2.1,2.2,2.3,2.4 \
       - \
-      "${work_dir}/build-list.sorted-by-package" | \
+      "${tmp_dir}/build-list.sorted-by-package" | \
     while read -r count package git_revision git_mod_revision repository; do
       if [ -f "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken" ]; then
         trials=$(
