@@ -343,7 +343,7 @@ while [ "${count}" -ne 0 ]; do
           # now we generate diffs from the namcap.logs
           find . "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%p\n' | \
             while read -r log; do
-              sort_quare_bracket_content "${log}" | \
+              sort_square_bracket_content "${log}" | \
                 sort | \
                 sponge "${log}"
             done

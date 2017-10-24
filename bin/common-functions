@@ -1046,10 +1046,10 @@ find_biggest_subset_of_packages() {
 
 }
 
-# sort_quare_bracket_content $file
+# sort_square_bracket_content $file
 # sort the content of [] in $file, print to stdout
 
-sort_quare_bracket_content() {
+sort_square_bracket_content() {
   local file
   local line
   local token
