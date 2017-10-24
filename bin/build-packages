@@ -17,11 +17,15 @@ usage() {
   >&2 echo '  -l|--local pkgname.git-revision.git-mod-revision.repository:'
   >&2 echo '               Build the given package without asking / reporting to the'
   >&2 echo '               build master (except -u is given). Cannot be combined with'
-  >&2 echo '               -n, -t or -x.'
+  >&2 echo '               -n, -p, -t or -x.'
   >&2 echo '  -n count:    Build $count packages (if available), then exit.'
   >&2 echo '               $count=0 is interpreted as infinity.'
   >&2 echo '               The default is $count=1 or 0 iff -t or -x is given.'
   >&2 echo '               Cannot be combined with -l.'
+  >&2 echo '  -p|--prefer pkgname:'
+  >&2 echo '               Ask the build master to get an assignment for the given'
+  >&2 echo '               package but built what is offered anyway. Cannot be combined'
+  >&2 echo '               with -l.'
   >&2 echo '  -s|--straw $straw:'
   >&2 echo '               Use this straw instead of the preconfigured ones. -- May be'
   >&2 echo '               given multiple times to allow using multiple straws.'
@@ -35,9 +39,10 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o hl:n:s:t:ux \
+  getopt -o hl:n:p:s:t:ux \
     --long help \
     --long local: \
+    --long prefer: \
     --long straw: \
     --long upload \
     -n "$(basename "$0")" -- "$@" || \
@@ -47,6 +52,7 @@ eval set -- "$(
 unset count
 unset forced_package
 unset forced_straws
+unset prefered_package
 exit_after_failure=false
 upload_to_build_master=false
 timeout=0
@@ -70,6 +76,14 @@ do
       count="$1"
       [ "${count}" -eq 0 ] && \
         count=-1
+    ;;
+    -p|--prefer)
+      shift
+      if [ -n "${prefered_package}" ]; then
+        >&2 echo 'Option -p, --prefer can be given only once.'
+        usage
+      fi
+      prefered_package="$1"
     ;;
     -s|--straw)
       shift
@@ -105,6 +119,7 @@ fi
 if [ -n "${forced_package}" ]; then
   if [ -n "${count}" ] || \
     [ "${timeout}" -ne 0 ] || \
+    [ -n "${prefered_package}" ] || \
     ${exit_after_failure}; then
     >&2 echo 'Conflicting flags.'
     usage
@@ -143,11 +158,12 @@ while [ "${count}" -ne 0 ]; do
   err=0
   if [ -z "${forced_package}" ]; then
     package=$(
+      # shellcheck disable=SC2029
       ssh \
         -i "${master_build_server_identity}" \
         -p "${master_build_server_port}" \
         "${master_build_server_user}@${master_build_server}" \
-        'get-assignment'
+        'get-assignment' "${prefered_package}"
     ) || err=$?
   else
     package=$(

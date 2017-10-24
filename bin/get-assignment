@@ -34,6 +34,13 @@ hand_out_assignment() {
     grep -v "/$(str_to_regex "$1.$2.$3.$4.")[^.]\+\$" | \
     xargs -rn1 rm -f
 
+  {
+    grep -vxF "$1 $2 $3 $4" "${work_dir}/build-list" || \
+      true
+    printf '%s %s %s %s\n' "$1" "$2" "$3" "$4"
+  } | \
+    sponge "${work_dir}/build-list"
+
   echo "$1 $2 $3 $4"
   # shellcheck disable=SC2154
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
@@ -101,51 +108,89 @@ if ! ${pending_packages}; then
   exit 3
 fi
 
-# Find first package of build-list whose dependencies are all met
+# Find first package of build-list whose "dependencies" are all met
+# 1st: prefered packages on the build list which have all dependencies met
+# 2nd: unbroken packages on the build list which have all dependencies met
+# 3rd: unbroken packages breaking a loop
 
-for hand_out_broken in false true; do
+for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
 
-  # shellcheck disable=SC2094
+  case "${iteration}" in
+    'prefered')
+      hand_out_broken=true
+      hand_out_loop=false
+      echo "$1" | \
+        tr ',' '\n' | \
+        sort -u > \
+        "${tmp_dir}/hand-out-only-these-packages"
+    ;;
+    'fresh')
+      hand_out_broken=false
+      hand_out_loop=false
+      {
+        grep -vxF 'break_loops' "${work_dir}/build-list"
+        find "${work_dir}/package-states" -name '*.broken' -printf '%f\n' | \
+          sed '
+            s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
+            p
+          '
+      } | \
+        sort -k1,1 -k2 | \
+        uniq -u | \
+        cut -d' ' -f1 | \
+        uniq > \
+        "${tmp_dir}/hand-out-only-these-packages"
+    ;;
+    'loops')
+      hand_out_broken=false
+      hand_out_loop=true
+      find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+        -regex '.*/loop_[0-9]\+' \
+        -exec cat {} \; | \
+        sort -u > \
+        "${tmp_dir}/hand-out-only-these-packages"
+    ;;
+  esac
+
+  grep -vxF 'break_loops' "${work_dir}/build-list" | \
+    cat -n | \
+    sort -k2,2 | \
+    join -1 1 -2 2 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/hand-out-only-these-packages" - | \
+    sort -k1,1 | \
+    sed 's|^\s*\S\+\s\+||' > \
+    "${tmp_dir}/try-to-hand-out-these-packages"
+
   while read -r package git_revision mod_git_revision repository; do
-
-    if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
-      [ "${package}" = 'break_loops' ]; then
-      if ${hand_out_broken}; then
-        first=true
-        while read -r s; do
-          if [ "${s}" = 'break_loops' ] && \
-            ${first}; then
-            first=false
-            continue
-          fi
-          printf '%s\n' "${s}"
-        done < \
-          "${work_dir}/build-list" | \
-          sponge "${work_dir}/build-list"
-        insert_break_loops_orders "${work_dir}/build-list"
-        break
-      else
-        continue
-      fi
-    fi
 
     if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
       continue
     fi
 
+    # package broken?
     if ! ${hand_out_broken} && \
       [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ]; then
       continue
     fi
 
+    # dependencies met?
     if [ -n "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
-      continue
+      # do we hand out looped packages?
+      if ! ${hand_out_loop}; then
+        continue
+      fi
+      # is it a looped package?
+      if ! find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+        -regex '.*/loop_[0-9]\+' \
+        -exec cat {} \; | \
+        grep -qxF "${package}"; then
+        continue
+      fi
     fi
 
     hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
   done < \
-    "${work_dir}/build-list"
+    "${tmp_dir}/try-to-hand-out-these-packages"
 
 done
 
