@@ -39,9 +39,8 @@ hand_out_assignment() {
   echo "${slave}" > "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
   # lock every loop this package breaks
-  find "${work_dir}/build-list.loops" -maxdepth 1 \
-    -name 'loop_*' \
-    -not -name 'loop_*.locked' \
+  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+    -regex '.*/loop_[0-9]\+' \
     -exec grep -qxF "$1" '{}' \; \
     -exec touch '{}.locked' \; \
     -print >> \
@@ -155,8 +154,11 @@ done
 
 locked_packages=$(
   find "${work_dir}/package-states/" -maxdepth 1 -printf '%f\n' | \
-    grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$' | \
-    sed 's|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||'
+    sed '
+      s|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||
+      t
+      d
+    '
 )
 
 grep -vxF 'break_loops' "${work_dir}/build-list" | \
