@@ -112,6 +112,7 @@ fi
 # 1st: prefered packages on the build list which have all dependencies met
 # 2nd: unbroken packages on the build list which have all dependencies met
 # 3rd: unbroken packages breaking a loop
+# 4th: broken packages which have all dependencies met or break a loop
 
 for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
 
@@ -147,6 +148,14 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
       find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
         -regex '.*/loop_[0-9]\+' \
         -exec cat {} \; | \
+        sort -u > \
+        "${tmp_dir}/hand-out-only-these-packages"
+    ;;
+    'broken')
+      hand_out_broken=true
+      hand_out_loop=true
+      grep -vxF 'break_loops' "${work_dir}/build-list" | \
+        cut -d' ' -f1 | \
         sort -u > \
         "${tmp_dir}/hand-out-only-these-packages"
     ;;
@@ -192,70 +201,6 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
   done < \
     "${tmp_dir}/try-to-hand-out-these-packages"
 
-done
-
-# Find package (of all packages which are not locked and have been broken the least times)
-# which breaks the most unlocked loops
-
-locked_packages=$(
-  find "${work_dir}/package-states/" -maxdepth 1 -printf '%f\n' | \
-    sed '
-      s|\(\.[0-9a-f]\{40\}\)\{2\}\.[^\.\]\+\.locked$||
-      t
-      d
-    '
-)
-
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  sort -k1,1 > \
-  "${tmp_dir}/build-list.sorted-by-package"
-
-for package in $(
-  # shellcheck disable=SC2030
-  find "${work_dir}/build-list.loops/" -maxdepth 1 | \
-    grep '/loop_[0-9]\+$' | \
-    while read -r loop; do
-      if [ -z "$(
-        (
-          cat "${loop}"
-          echo "${locked_packages}"
-        ) | \
-          sort | \
-          uniq -d
-        )" ]; then
-        cat "${loop}"
-      fi
-    done | \
-    sort | \
-    uniq -c | \
-    join -1 2 -2 1 -o 1.1,2.1,2.2,2.3,2.4 \
-      - \
-      "${tmp_dir}/build-list.sorted-by-package" | \
-    while read -r count package git_revision git_mod_revision repository; do
-      if [ -f "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken" ]; then
-        trials=$(
-          wc -l < \
-            "${work_dir}/package-states/${package}.${git_revision}.${git_mod_revision}.${repository}.broken"
-        )
-      else
-        trials='0'
-      fi
-      printf '%s %s %s.%s.%s.%s\n' \
-        "${trials}" \
-        "${count}" \
-        "${package}" \
-        "${git_revision}" \
-        "${git_mod_revision}" \
-        "${repository}"
-    done | \
-    sort -k1n,1 -k2nr,2 | \
-    cut -d' ' -f3
-); do
-  # shellcheck disable=SC2046,SC2031
-  hand_out_assignment $(
-    echo "${package}" | \
-      sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|'
-  )
 done
 
 # Remove the lock file
