@@ -1045,3 +1045,53 @@ find_biggest_subset_of_packages() {
   )
 
 }
+
+# sort_quare_bracket_content $file
+# sort the content of [] in $file, print to stdout
+
+sort_quare_bracket_content() {
+  local file
+  local line
+  local token
+  local token_list
+  local rest
+  file="$1"
+
+  while read -r line; do
+    printf '%s ' "${line}" | \
+      tr ' ' '\n' | \
+      while read -r token; do
+        if echo "${token}" | \
+          grep -qF '['; then
+          printf '%s[' "${token%[*}"
+          token="${token##*[}"
+          token_list="${token%,}"
+          while ! echo "${token_list}" | \
+            grep -qF ']'; do
+            read -r token
+            token_list=$(
+              printf '%s\n' \
+                "${token_list}" \
+                "${token%,}"
+            )
+          done
+          rest="]${token_list#*]}"
+          token_list="${token_list%%]*}"
+          token=$(
+            printf '%s' "${token_list}" | \
+              sort | \
+              sed 's|$|,|'
+            printf '%s' "${rest}"
+          )
+        fi
+        printf '%s\n' "${token}"
+      done | \
+      tr '\n' ' ' | \
+      sed '
+        s|, ]|]|g
+        s| $||
+      '
+    printf '\n'
+  done < \
+    "${file}"
+}
