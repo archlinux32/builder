@@ -1095,3 +1095,25 @@ sort_square_bracket_content() {
   done < \
     "${file}"
 }
+
+# smoothen_namcap_log $file
+# remove unneccesary differences from namcap-logs:
+#   - remove architecture specific information
+#   - sort lines
+#   - sort content of square brackets
+
+smoothen_namcap_log() {
+  local file
+  file="$1"
+  # shellcheck disable=SC2016
+  sort_square_bracket_content "${file}" | \
+    sed '
+      # normalize architecture specific information
+      s|i[34567]86|$ARCH|g
+      s|x86\([-_]64\)\?|$ARCH|g
+      # remove haskell hashes
+      '"s|\('[^']*-[0-9.]\+\)-[a-zA-Z0-9]\{1,22\}\(-ghc[^']*'\)|\1\2|g"'
+    ' | \
+    sort | \
+    sponge "${file}"
+}
