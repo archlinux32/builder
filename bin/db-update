@@ -8,15 +8,10 @@
 #   a) nothing on the build-list run-depends on A and
 #   b) no done package B which is not being moved run-depends on A
 
-# TODO: correctly handle if multiple versions of a single package are marked
-# as "done" or "testing"
 
 # TODO: be (even?) more atomic
 
 # TODO: separate locks for staging, testing (and stable)
-
-# TODO: correctly handle if a package moved from community to official or
-# vice versa (delete residues)
 
 # TODO: mark a package as tested if it shall be stabilized but
 # can't due to pending dependent packages
