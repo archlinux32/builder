@@ -952,7 +952,7 @@ shrink_version() {
   '
 }
 
-# find_biggest_subset_of_packages $omega $keep $all_run_depends [ $force ]
+# find_biggest_subset_of_packages $omega $keep $all_builds [ $force ]
 
 # Return (to stdout) the biggest subset A of the packages in $omega whose
 # runtime dependencies in $omega \cup $keep are also in A
