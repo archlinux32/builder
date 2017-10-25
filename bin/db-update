@@ -1,20 +1,18 @@
 #!/bin/sh
 
 # move binary packages from staging to testing (if possible [1]) and
-# additionally all packages specified on the command line from testing
-# to the respective stable repository
+# additionally tested packages from testing to the respective stable
+# repository (if possible [1])
 
-# 1] Condition for moving a package A from staging to testing is that:
+# 1] Condition for moving a package A from staging (testing) to
+#    testing (stable) is that:
 #   a) nothing on the build-list run-depends on A and
-#   b) no done package B which is not being moved run-depends on A
-
+#   b) no done package B (in a not-more stable repository) which is
+#      not being moved run-depends on A
 
 # TODO: be (even?) more atomic
 
 # TODO: separate locks for staging, testing (and stable)
-
-# TODO: mark a package as tested if it shall be stabilized but
-# can't due to pending dependent packages
 
 # TODO: handle deletion of parts of a split package
 
@@ -27,12 +25,10 @@ usage() {
   >&2 echo ''
   >&2 echo 'db-update [options] [packages]:'
   >&2 echo ' move possible packages from staging to testing.'
-  >&2 echo ' move packages on the command line from testing to stable.'
+  >&2 echo ' move tested packages from testing to stable.'
   >&2 echo ''
   >&2 echo 'possible options:'
   >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
-  >&2 echo '  -f|--from $file:  Read packages to move from testing to'
-  >&2 echo '                    stable from $file (- is stdin).'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
   >&2 echo '  -s|--stabilize $package:'
@@ -351,14 +347,6 @@ do
     -b|--block)
       block_flag=''
     ;;
-    -f|--from)
-      shift
-      if [ "x$1" = "x-" ]; then
-        packages_to_stabilize=$(cat)
-      else
-        packages_to_stabilize=$(cat "$1")
-      fi
-    ;;
     -h|--help)
       usage 0
     ;;
@@ -385,12 +373,10 @@ do
   shift
 done
 
-packages_to_stabilize=$(
-  # shellcheck disable=SC2086
-  printf '%s\n' \
-    ${packages_to_stabilize} \
-    "${@}"
-)
+if [ $# -ne 0 ]; then
+  >&2 echo 'db-update: too many arguments'
+  usage
+fi
 
 if [ -s "${work_dir}/build-master-sanity" ]; then
   >&2 echo 'Build master is not sane.'
@@ -400,30 +386,7 @@ fi
 tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-packages_to_stabilize=$(
-  (
-    # shellcheck disable=SC2086
-    printf '%s\n' ${packages_to_stabilize} | \
-      sort -u | \
-      sed '
-        /\.pkg\.tar\.xz$/{
-          w '"${tmp_dir}/packages-to-stabilize"'
-          d
-        }
-      '
-    find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' -exec \
-      grep -HF '' {} \; | \
-      sed '
-        s|^.*/||
-        s|^\([^:]\+\)\.testing:|\1 |
-      ' | \
-      sort -k2,2 | \
-      join -1 2 -2 1 -o 1.1 - "${tmp_dir}/packages-to-stabilize"
-  ) | \
-    sort -u
-)
-
-for package in ${packages_to_stabilize} ${packages_to_force_stabilize}; do
+for package in ${packages_to_force_stabilize}; do
   # some sanity checks
   if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then
     >&2 echo "Package '${package}' is not in testing!"
@@ -462,13 +425,7 @@ trap clean_up_lock_file EXIT
 
 # sanity check
 
-for ending in 'done' 'testing'; do
-  if [ "${ending}" = 'testing' ] && \
-    [ -z "${packages_to_stabilize}" ]; then
-    # if nothing is to be untested, we don't care about duplicate
-    # testing packages (and maybe an unstaging fixes this anyway)
-    continue
-  fi
+for ending in 'done' 'tested'; do
   errors=$(
     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
@@ -513,7 +470,7 @@ printf '%s\n' ${packages_to_force_unstage} > \
 
 # calculate what packages should be unstaged:
 
-find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-unstage-packages" > \
+find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-unstage-packages" > \
   "${tmp_dir}/unstage-packages"
 
 # no base / base-devel packages on the build list anymore?
@@ -525,15 +482,15 @@ if [ -z "$(
 
   # we pretend, the group "base" does not exist, so we only fetch 'direct' dependencies on base-packages
 
-  mv "${tmp_dir}/all-run-depends" "${tmp_dir}/really-all-run-depends"
-  grep -v ' base$' "${tmp_dir}/really-all-run-depends" > \
-    "${tmp_dir}/all-run-depends" || \
+  mv "${tmp_dir}/all-builds" "${tmp_dir}/really-all-builds"
+  grep -v ' base$' "${tmp_dir}/really-all-builds" > \
+    "${tmp_dir}/all-builds" || \
     true
 
-  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-unstage-packages" > \
+  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
 
-  mv "${tmp_dir}/really-all-run-depends" "${tmp_dir}/all-run-depends"
+  mv "${tmp_dir}/really-all-builds" "${tmp_dir}/all-builds"
 fi
 
 # shellcheck disable=SC2086
@@ -542,15 +499,19 @@ printf '%s\n' ${packages_to_force_stabilize} > \
 
 # calculate what packages should be stabilized
 
-cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" | \
+{
+  cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages"
+  find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' -printf '%f\n' | \
+    sed 's|\.testing$||'
+} | \
   sort -u > \
   "${tmp_dir}/keep-packages"
 
-# shellcheck disable=SC2086
-printf '%s\n' ${packages_to_stabilize} > \
+find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.tested' -printf '%f\n' | \
+    sed 's|\.tested$||' > \
   "${tmp_dir}/stabilize-packages"
 
-find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-run-depends" "${tmp_dir}/force-stabilize-packages" | \
+find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-stabilize-packages" | \
   sponge "${tmp_dir}/stabilize-packages"
 
 # unlock build list
