@@ -982,7 +982,7 @@ find_biggest_subset_of_packages() {
       return 2
     fi
 
-    if [ ! -s "${all_run_depends}" ]; then
+    if [ ! -s "${all_builds}" ]; then
       find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' \
         -exec sed '
           s|^|{} |
