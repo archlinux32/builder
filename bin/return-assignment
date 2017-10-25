@@ -245,9 +245,10 @@ for package in ${packages}; do
 done
 
 # remove old state files (these should be only "done" markers, but
-# actually we don't care what it is) - as long as it's not "testing"
+# actually we don't care what it is) - as long as it's not "testing" or "tested"
 find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
   -not -name '*.testing' \
+  -not -name '*.tested' \
   -regex ".*/$(str_to_regex "$1")\(\.[^.]\+\)\{4\}" \
   -not -regex ".*/$(str_to_regex "$1.$2.$3.$4")\.[^.]\+" \
   -exec rm '{}' \;

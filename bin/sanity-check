@@ -325,19 +325,23 @@ while [ $# -gt 0 ]; do
 
     state-files)
 
-      for status in 'staging:done' 'testing:testing'; do
+      for status in 'staging' 'testing'; do
 
         [ ${silence} -gt 0 ] || \
-          printf 'checking state-files of "%s" ...' "${status%:*}" >> \
+          printf 'checking state-files of "%s" ...' "${status}" >> \
           "${tmp_dir}/messages"
 
         errors=$(
           (
-            find "${work_dir}/package-states" -name "*.${status#*:}" -exec \
-              cat {} \; | \
-              sed 's|^|package-state-file |'
+            if [ "${status}" = 'staging' ]; then
+              find "${work_dir}/package-states" -name '*.done' \
+                -exec sed 's|^|package-state-file |' '{}' \;
+            else
+              find "${work_dir}/package-states" \( -name '*.testing' -o -name '*.tested' \) \
+                -exec sed 's|^|package-state-file |' '{}' \;
+            fi
             ls_master_mirror 'i686' | \
-              grep "${status%:*}\$" | \
+              grep "${status}\$" | \
               while read -r repo; do
                 ls_master_mirror "i686/${repo}"
               done | \
@@ -352,7 +356,7 @@ while [ $# -gt 0 ]; do
         if [ -n "${errors}" ]; then
           if [ ${silence} -le 1 ]; then
             printf '\nThe following %s packages do not have state files or vice versa:\n%s\n' \
-              "${status%:*}" \
+              "${status}" \
               "${errors}" >> \
               "${tmp_dir}/messages"
           fi

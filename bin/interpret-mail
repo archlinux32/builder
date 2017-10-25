@@ -20,7 +20,7 @@ if [ $# -ne 0 ]; then
   >&2 echo '    Block the given packge for the given reason.'
   >&2 echo ''
   >&2 echo '  - "stabilize: <package-file>":'
-  >&2 echo '    Move the given package from testing to stable.'
+  >&2 echo '    Mark the given package as tested.'
   >&2 echo ''
   >&2 echo '  - "unblock: <state-file>":'
   >&2 echo '    Unblock the given packge.'
@@ -191,11 +191,14 @@ if [ -s "${tmp_dir}/stabilize" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/stabilize"
-  if run_and_log_on_error "${base_dir}/bin/db-update" -b -f "${tmp_dir}/stabilize"; then
-    log 'Successfully stabilized %s packages.\n' "$(wc -l < "${tmp_dir}/stabilize")"
-  else
-    log 'There was an error while stabilizing the packages - ignoring this message.\n'
-  fi
+  find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' \
+    -exec grep -qxF -f "${tmp_dir}/stabilize" '{}' \; \
+    -printf '%p\n' | \
+    tee "${tmp_dir}/stabilized" | \
+    while read -r sf; do
+      mv "${sf}" "${sf%.testing}.tested"
+    done
+  log 'Successfully stabilized %s packages.\n' "$(wc -l < "${tmp_dir}/stabilized")"
 fi
 
 if [ -s "${tmp_dir}/unblock" ]; then
