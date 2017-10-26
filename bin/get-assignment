@@ -118,6 +118,7 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
 
   case "${iteration}" in
     'prefered')
+      hand_out_blocked=true
       hand_out_broken=true
       hand_out_loop=false
       echo "$1" | \
@@ -126,6 +127,7 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
         "${tmp_dir}/hand-out-only-these-packages"
     ;;
     'fresh')
+      hand_out_blocked=false
       hand_out_broken=false
       hand_out_loop=false
       {
@@ -143,6 +145,7 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
         "${tmp_dir}/hand-out-only-these-packages"
     ;;
     'loops')
+      hand_out_blocked=false
       hand_out_broken=false
       hand_out_loop=true
       find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
@@ -152,6 +155,7 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
         "${tmp_dir}/hand-out-only-these-packages"
     ;;
     'broken')
+      hand_out_blocked=false
       hand_out_broken=true
       hand_out_loop=true
       grep -vxF 'break_loops' "${work_dir}/build-list" | \
@@ -171,7 +175,14 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
 
   while read -r package git_revision mod_git_revision repository; do
 
-    if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
+    # package locked?
+    if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
+      continue
+    fi
+
+    # package blocked?
+    if ! ${hand_out_blocked} &&
+      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
       continue
     fi
 
