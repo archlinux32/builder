@@ -78,7 +78,9 @@ find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
   )
 
 # only keep namcap logs of last 2 weeks for succeeded packages
-find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 -delete
+find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 \
+  -not -exec zgrep -q '^+.*ELF file .* has text relocations' '{}' \; \
+  -delete
 
 # remove old package meta data
 delete_old_metadata
