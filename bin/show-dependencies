@@ -107,7 +107,13 @@ fi
 
 exec 9> "${work_dir}/${0##*/}.lock"
 if ! flock -n 9; then
-  echo 'Cannot get lock.'
+  >&2 echo 'Cannot get show-dependencies lock.'
+  exit
+fi
+
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 8; then
+  >&2 echo 'Cannot get sanity-check lock.'
   exit
 fi
 

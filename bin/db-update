@@ -416,6 +416,12 @@ if ! flock ${block_flag} 8; then
   exit 1
 fi
 
+exec 7> "${sanity_check_lock_file}"
+if ! flock -s ${block_flag} 7; then
+  >&2 echo 'come back (shortly) later - sanity-check currently running.'
+  exit 1
+fi
+
 clean_up_lock_file() {
   rm -f "${package_database_lock_file}" "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"

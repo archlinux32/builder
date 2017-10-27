@@ -66,6 +66,12 @@ if ! flock -n 9; then
   exit 1
 fi
 
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 8; then
+  >&2 echo 'come back (shortly) later - sanity-check running.'
+  exit 1
+fi
+
 clean_up() {
   rm -f "${build_list_lock_file}"
   rm -rf --one-file-system "${tmp_dir}"

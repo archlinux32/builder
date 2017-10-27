@@ -225,8 +225,12 @@ cut -d' ' -f1,4 < \
 # Create a lock file for build list.
 
 if ${update}; then
+  # always block if locked
   exec 9> "${build_list_lock_file}"
   flock 9
+
+  exec 8> "${sanity_check_lock_file}"
+  flock -s 8
 fi
 
 {

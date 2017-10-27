@@ -128,6 +128,12 @@ if ! flock ${block_flag} 9; then
   exit
 fi
 
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s ${block_flag} 8; then
+  >&2 echo 'come back (shortly) later - sanity-check running.'
+  exit
+fi
+
 echo 'Check modified packages from the last update, and put them to the build list.'
 
 # Check modified packages from the last update, and put them to the build list.

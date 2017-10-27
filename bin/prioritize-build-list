@@ -17,6 +17,12 @@ if ! flock -n 9; then
   exit 1
 fi
 
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 8; then
+  >&2 echo 'come back (shortly) later - sanity-check running.'
+  exit 1
+fi
+
 (
   sed -n "/^$1/p" "${work_dir}/build-list"
   sed "/^$1/d" "${work_dir}/build-list"

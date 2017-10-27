@@ -86,6 +86,12 @@ if ! ${no_action}; then
     exit 1
   fi
 
+  exec 7> "${sanity_check_lock_file}"
+  if ! flock -s ${block_flag} 7; then
+    >&2 echo 'come back (shortly) later - sanity-check running.'
+    exit 1
+  fi
+
 fi
 
 clean_up_lock_file() {

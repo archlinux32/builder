@@ -32,6 +32,12 @@ if ! flock -n 9; then
   exit 1
 fi
 
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 8; then
+  >&2 echo 'come back (shortly) later - sanity-check running.'
+  exit 1
+fi
+
 clean_up_lock_file() {
   rm -f "${build_list_lock_file}"
 }
@@ -106,8 +112,8 @@ fi
 
 # so we also need a lock on the package database
 
-exec 8> "${package_database_lock_file}"
-if ! flock -n 8; then
+exec 7> "${package_database_lock_file}"
+if ! flock -n 7; then
   >&2 echo 'come back (shortly) later - I cannot lock package database.'
   exit 1
 fi
