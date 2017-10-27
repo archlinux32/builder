@@ -255,7 +255,7 @@ echo 'apply blacklisting'
 black_listed=''
 black_listed_new=$(
   (
-    git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- 'blacklist' | \
+    git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision.new")" -- 'blacklist' | \
       tar -Ox 'blacklist' | \
       sed '
         s/\s*#.*$//
