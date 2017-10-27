@@ -81,6 +81,7 @@ finish() {
         '<title>result of archlinux32 build master'"'"'s sanity check</title>' \
         '</head>' \
         '<body>'
+      printf '%s<br>\n' "$(date)"
       sed 's|$|<br>|' "${tmp_dir}/messages"
       printf '%s\n' \
         '</body>' \
