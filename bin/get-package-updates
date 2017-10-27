@@ -11,8 +11,6 @@
 # TODO: (might be connected to above): find out who deletes loop-files which
 # should not be deleted
 
-# TODO: remove extra whitelist cases
-
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
@@ -367,17 +365,6 @@ while [ -n "${black_listed_new}" ]; do
       awk '{print $2}' | \
       sort -k1,1 | \
       join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
-      while read -r pkg; do
-        if [ "${pkg}" = 'dev86' ] || \
-          [ "${pkg}" = 'python-pysocks' ] || \
-          [ "${pkg}" = 'wine' ] || \
-          [ "${pkg}" = 'wine-staging' ] || \
-          [ "${pkg}" = 'wine-staging-nine' ]; then
-          >&2 printf 'blacklisting: %s would be black listed, but is ignored.\n' "${pkg}"
-        else
-          echo "${pkg}"
-        fi
-      done | \
       sort -u
   )
   black_listed_new=$(
