@@ -80,6 +80,10 @@ delete_package() {
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
 }
 
+# create tmp_dir and trap
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
 for repo in ${repo_names}; do
@@ -273,55 +277,63 @@ find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' -printf '%f\n' | 
   sed '
     s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|\2 \3 \4 \1|
   ' | \
-  sort -k4,4 | \
-  uniq -f3 --group=append | \
-  while read -r rev mod_rev repo pkg; do
-    if [ -z "${rev}" ] && \
-      [ -z "${mod_rev}" ] && \
-      [ -z "${repo}" ] && \
-      [ -z "${pkg}" ]; then
-      # shellcheck disable=SC2031
-      printf '%s %s.%s.%s.%s\n' \
-        "${opkg}" \
-        "${opkg}" \
-        "$(
-          # shellcheck disable=SC2086
-          printf '%s\n' ${revs} | \
-            sort -u | \
-            find_newest_of_git_revisions
-        )" \
-        "$(
-          # shellcheck disable=SC2086
-          printf '%s\n' ${mod_revs} | \
-            sort -u | \
-            find_newest_of_git_revisions
-        )" \
-        "${orepo}" | \
-        grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+$'
-      revs=''
-      mod_revs=''
-      continue
-    fi
-    revs=$(
-      printf '%s\n' \
-        ${revs} \
-        "${rev}"
-    )
-    mod_revs=$(
-      printf '%s\n' \
-        ${mod_revs} \
-        "${mod_rev}"
-    )
-    opkg="${pkg}"
-    orepo="${repo}"
-  done | \
+  sort -u | \
+  sort -k4,4 > \
+  "${tmp_dir}/packages"
+
+{
+  uniq -f3 -u "${tmp_dir}/packages" | \
+    awk '{print $4 " " $4 "." $1 "." $2 "." $3}'
+  uniq -f3 -D "${tmp_dir}/packages" | \
+    uniq -f3 --group=append | \
+    while read -r rev mod_rev repo pkg; do
+      if [ -z "${rev}" ] && \
+        [ -z "${mod_rev}" ] && \
+        [ -z "${repo}" ] && \
+        [ -z "${pkg}" ]; then
+        # shellcheck disable=SC2031
+        printf '%s %s.%s.%s.%s\n' \
+          "${opkg}" \
+          "${opkg}" \
+          "$(
+            # shellcheck disable=SC2086
+            printf '%s\n' ${revs} | \
+              sort -u | \
+              find_newest_of_git_revisions
+          )" \
+          "$(
+            # shellcheck disable=SC2086
+            printf '%s\n' ${mod_revs} | \
+              sort -u | \
+              find_newest_of_git_revisions
+          )" \
+          "${orepo}" | \
+          grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+$'
+        revs=''
+        mod_revs=''
+        continue
+      fi
+      revs=$(
+        printf '%s\n' \
+          ${revs} \
+          "${rev}"
+      )
+      mod_revs=$(
+        printf '%s\n' \
+          ${mod_revs} \
+          "${mod_rev}"
+      )
+      opkg="${pkg}"
+      orepo="${repo}"
+    done
+} | \
   sort -k1,1 > \
-  "${work_dir}/newest-revisions"
+  "${tmp_dir}/newest-revisions"
 
 sed "
   s|^\S\+ |${work_dir}/package-infos/|
   s|\$|.builds|
-" "${work_dir}/newest-revisions" | \
+" "${tmp_dir}/newest-revisions" | \
   xargs -r cat | \
   sort | \
   uniq -c > \
@@ -330,7 +342,7 @@ sed "
 sed "
   s|^\S\+ |${work_dir}/package-infos/|
   s|\$|.build-depends|
-" "${work_dir}/newest-revisions" | \
+" "${tmp_dir}/newest-revisions" | \
   xargs -r grep -HF '' | \
   sed '
     s|\(\.[^.]\+\)\{4\}:\([^:]\+\)$| \2|
@@ -350,7 +362,7 @@ while [ -n "${black_listed_new}" ]; do
       # shellcheck disable=SC2086
       printf '%s\n' ${black_listed} | \
         sort -k1,1 | \
-        join -j1 -o 2.2 - "${work_dir}/newest-revisions" | \
+        join -j1 -o 2.2 - "${tmp_dir}/newest-revisions" | \
         sed "
           s|^|${work_dir}/package-infos/|
           s|\$|.builds|
