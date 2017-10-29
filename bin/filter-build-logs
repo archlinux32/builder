@@ -58,3 +58,23 @@
     '</html>'
 } > \
   "${webserver_directory}/namcap-outputs.html"
+
+{
+  printf '%s\n' \
+    '<html>' \
+    '<head>' \
+    '<title>packages with text relocations</title>' \
+    '</head>' \
+    '<body>'
+  find "${webserver_directory}/build-logs/success" -name '*-namcap.log.gz' \
+    -exec zgrep -q '^[+*].*\sELF file (.*) has text relocations\.$' '{}' \; \
+    -printf '%f\n' | \
+    sort | \
+    sed '
+      s|-namcap\.log\.gz$|<br>|
+    '
+  printf '%s\n' \
+    '</body>' \
+    '</html>'
+} > \
+  "${webserver_directory}/text-relocations-packages.html"
