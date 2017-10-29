@@ -109,7 +109,7 @@ move_packages() {
       grep -q 'testing$' && \
       ! echo "${to_repo}" | \
         grep -q 'testing$\|staging$'; then
-      from_ending='testing'
+      from_ending='tested'
       to_ending=''
     else
       >&2 printf 'move_packages: Cannot move package "%s" from "%s" to "%s".\n' "${package}" "${from_repo}" "${to_repo}"
