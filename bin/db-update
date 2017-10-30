@@ -52,6 +52,7 @@ move_packages() {
   local from_repo
   local to_repo
   local from_ending
+  local rm_ending
   local to_ending
   local repo
   local part
@@ -102,12 +103,14 @@ move_packages() {
       echo "${to_repo}" | \
         grep -q 'testing$'; then
       from_ending='done'
+      rm_ending='test\(ing\|ed\)'
       to_ending='testing'
     elif echo "${from_repo}" | \
       grep -q 'testing$' && \
       ! echo "${to_repo}" | \
         grep -q 'testing$\|staging$'; then
       from_ending='tested'
+      rm_ending=''
       to_ending=''
     else
       >&2 printf 'move_packages: Cannot move package "%s" from "%s" to "%s".\n' "${package}" "${from_repo}" "${to_repo}"
@@ -120,6 +123,8 @@ move_packages() {
       "${tmp_dir}/tmp/${package}.to_repo"
     echo "${from_ending}" > \
       "${tmp_dir}/tmp/${package}.from_ending"
+    echo "${rm_ending}" > \
+      "${tmp_dir}/tmp/${package}.rm_ending"
     echo "${to_ending}" > \
       "${tmp_dir}/tmp/${package}.to_ending"
 
@@ -291,6 +296,9 @@ move_packages() {
     from_ending=$(
       cat "${tmp_dir}/tmp/${package}.from_ending"
     )
+    rm_ending=$(
+      cat "${tmp_dir}/tmp/${package}.rm_ending"
+    )
     to_ending=$(
       cat "${tmp_dir}/tmp/${package}.to_ending"
     )
@@ -299,10 +307,10 @@ move_packages() {
       ${dummynator} rm \
         "${work_dir}/package-states/${package}.${from_ending}"
     else
-      # remove old state files of $package with ending $to_ending
-      find "${work_dir}/package-states" -maxdepth 1 | \
-        grep "/$(str_to_regex "${package%.*.*.*}")\(\.[^.]\+\)\{3\}\.${to_ending}\$" | \
-        xargs -rn1 ${dummynator} rm
+      # remove old state files of $package with ending $rm_ending
+      find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
+        -regex ".*/$(str_to_regex "${package%.*.*.*}")\(\.[^.]\+\)\{3\}\.${rm_ending}" \
+        -execdir ${dummynator} rm {} \;
       ${dummynator} mv \
         "${work_dir}/package-states/${package}.${from_ending}" \
         "${work_dir}/package-states/${package}.${to_ending}"
