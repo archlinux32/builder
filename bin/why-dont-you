@@ -168,7 +168,16 @@ case "${action}" in
 
   ;;
 
-  'keep')
+  'keep'|'stubbornly_keep')
+
+    find '/var/lib/pacman/sync' -name '*.db' -execdir bsdtar -tf '{}' \; | \
+      sed -n '
+        s|-[^-]\+-[^-]\+/$||
+        T
+        p
+      ' | \
+      sort -u > \
+      "${tmp_dir}/upstream-packages"
 
     while read -r pkg; do
 
@@ -242,6 +251,13 @@ case "${action}" in
       if ! grep -qxF "${pkg}" "${work_dir}/deletion-list"; then
         printf 'Package "%s" is not on the deletion list.\n' "${pkg}"
         continue
+      fi
+
+      if ! grep -qxF "${pkg}" "${tmp_dir}/upstream-packages"; then
+        printf 'Package "%s" is not available upstream.\n' "${pkg}"
+        if [ "${action}" = 'keep' ]; then
+          continue
+        fi
       fi
 
       if git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
