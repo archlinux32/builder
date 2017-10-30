@@ -53,34 +53,42 @@ fi
 
 input_file="$1"
 
-if ! [ -r "${input_file}" ]; then
+if ! [ -r "${input_file}" ] || \
+  ! [ -w "${input_file}" ]; then
   >&2 printf \
     'Cannot open input file "%s".' \
     "${input_file}"
   exit 2
 fi
 
-err=0
-while read -r package reason; do
-  if ! tr ' ' '.' < \
-    "${work_dir}/build-list" | \
-    grep -qxF "${package}"; then
-    >&2 printf 'Package "%s" is not on the build-list.\n' "${package}"
-    err=2
-    continue
-  fi
-  if ${block}; then
-    if [ -z "${reason}" ]; then
-      >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
-      err=2
-    else
-      echo "${reason}" > \
-        "${work_dir}/package-states/${package}.blocked"
-    fi
-  else
-    rm -f "${work_dir}/package-states/${package}.blocked"
-  fi
-done < \
-  "${input_file}"
+sponge "${input_file}" | \
+  {
+    err=0
+    while read -r package reason; do
+      if ! tr ' ' '.' < \
+        "${work_dir}/build-list" | \
+        grep -qxF "${package}"; then
+        >&2 printf 'Package "%s" is not on the build-list.\n' "${package}"
+        err=2
+        continue
+      fi
+      if ${block}; then
+        if [ -z "${reason}" ]; then
+          >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
+          err=2
+        else
+          echo "${reason}" > \
+            "${work_dir}/package-states/${package}.blocked"
+          printf '%s %s\n' "${package}" "${reason}"
+        fi
+      else
+        if [ -f "${work_dir}/package-states/${package}.blocked" ]; then
+          rm "${work_dir}/package-states/${package}.blocked"
+          printf '%s\n' "${package}"
+        fi
+      fi
+    done > \
+      "${input_file}"
 
-exit ${err}
+    exit ${err}
+  }
