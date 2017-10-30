@@ -32,11 +32,9 @@ usage() {
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
   >&2 echo '  -s|--stabilize $package:'
-  >&2 echo '                    Stabilize package $package, even if it'
-  >&2 echo '                    would not be stabilized otherwise.'
+  >&2 echo '                    Assume, package $package can be stabilized.'
   >&2 echo '  -u|--unstage $package:'
-  >&2 echo '                    Unstage package $package, even if it'
-  >&2 echo '                    would not be unstaged otherwise.'
+  >&2 echo '                    Assume, package $package can be unstaged.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
@@ -388,16 +386,24 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 for package in ${packages_to_force_stabilize}; do
   # some sanity checks
-  if [ ! -f "${work_dir}/package-states/${package}.testing" ]; then
-    >&2 echo "Package '${package}' is not in testing!"
+  if [ ! -f "${work_dir}/package-states/${package}.tested" ] && \
+    [ ! -f "${work_dir}/package-states/${package}.testing" ] && \
+    [ ! -f "${work_dir}/package-states/${package}.done" ] && \
+    ! tr ' ' '.' < \
+      "${work_dir}/build-list" | \
+      grep -qxF "${package}"; then
+    >&2 printf 'Package "%s" is not in testing, staging or on the build list!\n' "${package}"
     exit 2
   fi
 done
 
 for package in ${packages_to_force_unstage}; do
   # some sanity checks
-  if [ ! -f "${work_dir}/package-states/${package}.done" ]; then
-    >&2 echo "Package '${package}' is not in staging!"
+  if [ ! -f "${work_dir}/package-states/${package}.done" ] && \
+    ! tr ' ' '.' < \
+      "${work_dir}/build-list" | \
+      grep -qxF "${package}"; then
+    >&2 printf 'Package "%s" is not in staging or on the build list!\n' "${package}"
     exit 2
   fi
 done
