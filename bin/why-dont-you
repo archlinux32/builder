@@ -59,15 +59,38 @@ case "${action}" in
 
   ;;
 
-  'unstage')
+  'stabilize'|'unstage')
+
+    if [ "${action}" = 'stabilize' ]; then
+      suffix='tested'
+    else
+      suffix='done'
+    fi
+
+    {
+      grep -vxF 'break_loops' "${work_dir}/build-list" | \
+        awk '{print $1 "." $2 "." $3 "." $4}'
+      if [ "${action}" = 'stabilize' ]; then
+        find "${work_dir}/package-states" -maxdepth 1 \( \
+          -name '*.done' -o \
+          -name '*.testing' \
+        \) -printf '%f\n' | \
+          sed 's|\.[^.]\+$||'
+      fi
+    } | \
+      sort -u > \
+      "${tmp_dir}/unmoveable-list"
 
     {
       tr ' ' '.' < \
         "${work_dir}/build-list"
-      find "${work_dir}/package-states" -maxdepth 1 -name '*.done' -printf '%f\n' | \
-        sed 's|\.done$||'
+      find "${work_dir}/package-states" -maxdepth 1 -name "*.${suffix}" -printf '%f\n' | \
+        sed 's|\.[^.]\+$||'
     } | \
-      sort -u | \
+      sort -u > \
+      "${tmp_dir}/moveable-list"
+
+    cat "${tmp_dir}/moveable-list" "${tmp_dir}/unmoveable-list" | \
       sed '
         s|^|'"${work_dir}/package-infos/"'|
         s|$|.run-depends|
@@ -81,22 +104,13 @@ case "${action}" in
       sort -k2,2 > \
       "${tmp_dir}/all-run-depends"
 
-    grep -vxF 'break_loops' "${work_dir}/build-list" | \
-      awk '{print $1 "." $2 "." $3 "." $4}' | \
-      sort -u > \
-      "${tmp_dir}/build-list"
-
     for pkg in "$@"; do
 
-      state_file=$(
-        find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-          -regex ".*/$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.done" \
-          -printf '%f\n' | \
-          sed 's|\.[^.]\+$||'
-      )
-      if [ -z "${state_file}" ] || \
-        [ ! -f "${work_dir}/package-states/${state_file}.done" ]; then
-        printf '"%s" is not in staging!\n' "${pkg}"
+      if ! state_file=$(
+          grep "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}$" "${tmp_dir}/moveable-list"
+        ) || \
+        [ ! -f "${work_dir}/package-states/${state_file}.${suffix}" ]; then
+        printf '"%s" is not %s yet!\n' "${pkg}" "${suffix}"
         continue
       fi
 
@@ -124,18 +138,31 @@ case "${action}" in
           sponge "${tmp_dir}/dependent.new"
       done
 
-      dependent_still_on_build_list=$(
-        join -1 1 -2 1 -o 2.1 "${tmp_dir}/build-list" "${tmp_dir}/dependent"
+      dependent_unmoveable=$(
+        join -1 1 -2 1 -o 2.1 "${tmp_dir}/unmoveable-list" "${tmp_dir}/dependent"
       )
 
-      if [ -n "${dependent_still_on_build_list}" ]; then
-        printf 'The following packages are dependent on "%s" and still on the build list:\n' "${pkg}"
-        echo "${dependent_still_on_build_list}"
+      if [ -n "${dependent_unmoveable}" ]; then
+        printf 'The following packages are dependent on "%s", but cannot be %sd:\n' "${pkg}" "${action}"
+        echo "${dependent_unmoveable}" | \
+          while read -r sf; do
+            printf '%s' "${sf}"
+            if [ -f "${work_dir}/package-states/${sf}.testing" ]; then
+              printf ' (not tested yet)'
+            elif [ -f "${work_dir}/package-states/${sf}.done" ]; then
+              printf ' (not unstaged yet)'
+            elif tr ' ' '.' < \
+              "${work_dir}/build-list" | \
+              grep -qxF "${sf}"; then
+              printf ' (not built yet)'
+            fi
+            printf '\n'
+          done
         printf '\n'
         continue
       fi
 
-      printf 'Package "%s" can be unstaged.\n' "${pkg}"
+      printf 'Package "%s" can be %sd.\n' "${pkg}" "${action}"
 
     done
 
