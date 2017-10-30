@@ -181,7 +181,9 @@ sed -n "$(
 
 if [ -s "${tmp_dir}/block" ]; then
   if run_and_log_on_error "${base_dir}/bin/block-package" "${tmp_dir}/block"; then
-    log 'Successfully blocked %s packages.\n' "$(wc -l < "${tmp_dir}/block")"
+    if [ -s "${tmp_dir}/block" ]; then
+      log 'Successfully blocked %s packages.\n' "$(wc -l < "${tmp_dir}/block")"
+    fi
   else
     log 'There was an error while blocking the packages - ignoring this message.\n'
   fi
@@ -198,12 +200,16 @@ if [ -s "${tmp_dir}/stabilize" ]; then
     while read -r sf; do
       mv "${sf}" "${sf%.testing}.tested"
     done
-  log 'Successfully stabilized %s packages.\n' "$(wc -l < "${tmp_dir}/stabilized")"
+  if [ -s "${tmp_dir}/stabilized" ]; then
+    log 'Successfully stabilized %s packages.\n' "$(wc -l < "${tmp_dir}/stabilized")"
+  fi
 fi
 
 if [ -s "${tmp_dir}/unblock" ]; then
   if run_and_log_on_error "${base_dir}/bin/block-package" -u "${tmp_dir}/unblock"; then
-    log 'Successfully unblocked %s packages.\n' "$(wc -l < "${tmp_dir}/unblock")"
+    if [ -s "${tmp_dir}/unblock" ]; then
+      log 'Successfully unblocked %s packages.\n' "$(wc -l < "${tmp_dir}/unblock")"
+    fi
   else
     log 'There was an error while unblocking the packages - ignoring this message.\n'
   fi
