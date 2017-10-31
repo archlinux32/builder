@@ -234,7 +234,7 @@ delete_old_metadata() {
   local current_metadata
 
   current_metadata=$(
-    find "${work_dir}/package-infos" -maxdepth 1 -printf '%f\n' | \
+    find "${work_dir}/package-infos" -mindepth 1 -maxdepth 1 -printf '%f\n' | \
       sed '
         s|\.[^.]\+$||
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
@@ -247,9 +247,9 @@ delete_old_metadata() {
     echo "${current_metadata}"
 
     # package-states should stay
-    find "${work_dir}/package-states" -maxdepth 1 -printf '%f\n' | \
+    find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -printf '%f\n' | \
       sed '
-        s|\.\([^.]\+\)\.\([^.]\+\)\(\.[^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
+        s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
       ' | \
       sort -u | \
       sed 'p'
