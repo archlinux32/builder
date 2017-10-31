@@ -195,8 +195,12 @@ generate_package_metadata() {
   {
     {
       printf 'all_depend = %s\n' 'base' 'base-devel'
-      sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
-      grep "$(printf '^\t\\(makedepends\\|checkdepends\\) = ')" "${file_prefix}.SRCINFO"
+      sed -n "$(
+        printf '/^\t%s = /p' \
+          'depends' \
+          'makedepends' \
+          'checkdepends'
+      )" "${file_prefix}.SRCINFO"
     } | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
@@ -211,7 +215,7 @@ generate_package_metadata() {
   {
     {
       printf 'all_depend = %s\n' 'base'
-      sed -n "$(printf '/^pkgname = /q;/^\tdepends = /p')" "${file_prefix}.SRCINFO"
+      sed -n "$(printf '/^\tdepends = /p')" "${file_prefix}.SRCINFO"
     } | \
       cut -d= -f2 | \
       sed 's|^\s\+||; s|[<>]$||' | \
