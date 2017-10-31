@@ -16,6 +16,8 @@
 
 # TODO: handle deletion of parts of a split package
 
+# TODO: Who deletes state files of packages too early???
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
