@@ -196,7 +196,7 @@ generate_package_metadata() {
     {
       printf 'all_depend = %s\n' 'base' 'base-devel'
       sed -n "$(
-        printf '/^\t%s = /p' \
+        printf '/^\t%s = /p\n' \
           'depends' \
           'makedepends' \
           'checkdepends'
