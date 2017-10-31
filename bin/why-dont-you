@@ -285,7 +285,8 @@ case "${action}" in
       fi
 
       build_depends=$(
-        sort -u "${build_depends}"
+        echo "${build_depends}" | \
+          sort -u
       )
 
       errors=$(
