@@ -81,12 +81,8 @@ case "${action}" in
       sort -u > \
       "${tmp_dir}/unmoveable-list"
 
-    {
-      tr ' ' '.' < \
-        "${work_dir}/build-list"
-      find "${work_dir}/package-states" -maxdepth 1 -name "*.${suffix}" -printf '%f\n' | \
-        sed 's|\.[^.]\+$||'
-    } | \
+    find "${work_dir}/package-states" -maxdepth 1 -name "*.${suffix}" -printf '%f\n' | \
+      sed 's|\.[^.]\+$||' | \
       sort -u > \
       "${tmp_dir}/moveable-list"
 
@@ -107,7 +103,7 @@ case "${action}" in
     for pkg in "$@"; do
 
       if ! state_file=$(
-          grep "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}$" "${tmp_dir}/moveable-list"
+          grep "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\$" "${tmp_dir}/moveable-list"
         ) || \
         [ ! -f "${work_dir}/package-states/${state_file}.${suffix}" ]; then
         printf '"%s" is not %s yet!\n' "${pkg}" "${suffix}"
