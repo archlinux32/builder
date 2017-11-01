@@ -23,10 +23,10 @@ if ! flock -s -n 8; then
   exit 1
 fi
 
-(
+{
   sed -n "/^$1/p" "${work_dir}/build-list"
   sed "/^$1/d" "${work_dir}/build-list"
-) | \
+} | \
   sponge "${work_dir}/build-list"
 
 # Remove the lock file

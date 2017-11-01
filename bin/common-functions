@@ -246,7 +246,7 @@ delete_old_metadata() {
       sort -u
   )
 
-  (
+  ( # the new shell is intentional
     # what we have
     echo "${current_metadata}"
 
@@ -269,7 +269,7 @@ delete_old_metadata() {
       "${tmp_dir}/current-metadata"
 
     # the newest of the following should stay:
-    (
+    {
       # deletion-list items
       cat "${work_dir}/deletion-list"
       # all packages in the repos
@@ -281,7 +281,7 @@ delete_old_metadata() {
             /\//d
           '
       done
-    ) | \
+    } | \
       sort -u | \
       join -j 1 -o 2.2,2.3,2.4,2.1 - "${tmp_dir}/current-metadata" | \
       sort -k4,4 > \
@@ -295,7 +295,7 @@ delete_old_metadata() {
     uniq -Df3 < \
       "${tmp_dir}/find-newest-revisions" | \
       uniq --group=append -f3 | \
-      (
+      {
         revs=''
         mod_revs=''
         opkg=''
@@ -338,7 +338,7 @@ delete_old_metadata() {
           orepo="${repo}"
           opkg="${pkg}"
         done
-      ) | \
+      } | \
       awk '{print $4 " " $1 " " $2 " " $3}' | \
       sed 'p'
   ) | \
@@ -475,7 +475,7 @@ remove_old_package_versions() {
 
   fi
 
-  (
+  ( # the new shell is intentional
     tmp_dir=$(mktemp -d)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
@@ -634,17 +634,18 @@ make_source_info() {
 
   find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
-  (
+  ( # the new shell is intentional
 
     tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
 
-    (
+    {
       cd "${tmp_dir}"
       makepkg --printsrcinfo
-    ) > \
+      cd ..
+    } > \
       "${output}"
 
   )
@@ -714,7 +715,7 @@ find_newest_of_git_revisions() {
 
   echo "${revisions}" | \
     xargs -rn1 git -C "${repo}" rev-parse | \
-    (
+    {
       newest=''
       while read -r current; do
         if [ -z "${newest}" ] || \
@@ -723,7 +724,7 @@ find_newest_of_git_revisions() {
           fi
       done
       echo "${newest}"
-    )
+    }
 }
 
 # find_package_repository_to_package $package $git_repository
@@ -810,7 +811,7 @@ find_dependencies_on_build_list() {
 
   generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
-  (
+  {
     cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
     awk '{print $1 "." $2 "." $3 "." $4}' < \
       "${work_dir}/build-list" | \
@@ -820,7 +821,7 @@ find_dependencies_on_build_list() {
       " | \
       xargs -r cat | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d
 
@@ -938,7 +939,7 @@ shrink_version() {
 
 find_biggest_subset_of_packages() {
 
-  (
+  ( # the new shell is intentional
     omega="$1"
     keep="$2"
     all_builds="$3"

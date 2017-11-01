@@ -168,11 +168,11 @@ while [ $# -gt 0 ]; do
       fi
 
       errors=$(
-        (
+        {
           cut -d' ' -f1 < \
             "${work_dir}/build-list"
           cat "${work_dir}/deletion-list"
-        ) | \
+        } | \
           sort | \
           uniq -d
       )
@@ -198,12 +198,12 @@ while [ $# -gt 0 ]; do
         "${tmp_dir}/messages"
 
       errors=$(
-        (
+        {
           # shellcheck disable=SC2086
           printf 'expected %s\n' ${repos}
           ls_master_mirror 'i686' | \
             sed 's|^|found |'
-        ) | \
+        } | \
           sort -k2 | \
           uniq -uf1
       )
@@ -263,7 +263,7 @@ while [ $# -gt 0 ]; do
           "${tmp_dir}/"
 
         errors=$(
-          (
+          {
             tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
               grep '/$' | \
               sed '
@@ -277,7 +277,7 @@ while [ $# -gt 0 ]; do
                 s|^|in_repository |
               ' | \
               sort -u
-          ) | \
+          } | \
             sort -k2 | \
             uniq -uf1
         )
@@ -292,7 +292,7 @@ while [ $# -gt 0 ]; do
         fi
 
         errors=$(
-          (
+          {
             tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
               grep '/$' | \
               sed '
@@ -306,7 +306,7 @@ while [ $# -gt 0 ]; do
                 s|^|in_repository |
               ' | \
               sort -u
-          ) | \
+          } | \
             sort -k2 | \
             uniq -uf1
         )
@@ -339,7 +339,7 @@ while [ $# -gt 0 ]; do
           "${tmp_dir}/messages"
 
         errors=$(
-          (
+          {
             if [ "${status}" = 'staging' ]; then
               find "${work_dir}/package-states" -name '*.done' \
                 -exec sed 's|^|package-state-file |' '{}' \;
@@ -354,7 +354,7 @@ while [ $# -gt 0 ]; do
               done | \
               grep '\.pkg\.tar\.xz$' | \
               sed 's|^|package-file |'
-          ) | \
+          } | \
             sort -k2 | \
             uniq -cf1 | \
             grep -v '^\s*2\s' | \

@@ -19,7 +19,7 @@ fi
 
 # remove blocked/broken/locked markes of packages not on the buildlist anymore
 
-(
+{
   find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' -o -name '*.blocked' \) -printf '%f\n' | \
     sed '
       s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$|state \0 \1 \2 \3 \4 \5|
@@ -29,7 +29,7 @@ fi
     print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4 " blocked"
     print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4 " locked"
   }' "${work_dir}/build-list"
-) | \
+} | \
   sort -k3 | \
   uniq -uf2 | \
   grep '^state ' | \
@@ -39,7 +39,7 @@ fi
 
 # remove logs where package is not broken/locked anymore
 
-(
+{
   find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
     sed 's|\.[^.]\+\.build-log\.gz$||' | \
     sort -u
@@ -48,7 +48,7 @@ fi
       s|\.[^.]\+$||
       p
     '
-) | \
+} | \
   sort | \
   uniq -u | \
   cut -d' ' -f1 | \
@@ -63,7 +63,7 @@ find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
   sort -k3,3 -k2r,2 | \
   uniq -f2 --group=prepend | \
   cut -d' ' -f1 | \
-  (
+  {
     count=0
     while read -r a; do
       if [ -z "${a}" ]; then
@@ -75,7 +75,7 @@ find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
       fi
       count=$((count+1))
     done
-  )
+  }
 
 # only keep namcap logs of last 2 weeks for succeeded packages
 find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 \

@@ -149,7 +149,7 @@ for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
   eval new_repo_revision='"${new_repo_revisions__'"${repo}"'}"'
-  (
+  {
     # if old revision unknown, mimic "git diff"-output
     # shellcheck disable=SC2154
     if [ "${old_repo_revision}" = "NONE" ]; then
@@ -159,7 +159,7 @@ for repo in ${repo_names}; do
     else
       git -C "${repo_path}" diff --no-renames --name-status "${old_repo_revision}" "${new_repo_revision}"
     fi
-  ) | \
+  } | \
     # only track changes in PKGBUILDs
     grep '/PKGBUILD$' | \
     if [ "${repo}" = "archlinux32" ]; then
@@ -260,7 +260,7 @@ echo 'apply blacklisting'
 
 black_listed=''
 black_listed_new=$(
-  (
+  {
     git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision.new")" -- 'blacklist' | \
       tar -Ox 'blacklist' | \
       sed '
@@ -270,7 +270,7 @@ black_listed_new=$(
     find "${work_dir}/package-infos" -maxdepth 1 -name 'lib32-*' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       uniq
-  ) | \
+  } | \
     sort -u
 )
 
@@ -360,7 +360,7 @@ while [ -n "${black_listed_new}" ]; do
       sort -u
   )
   black_listed_new=$(
-    (
+    {
       # shellcheck disable=SC2086
       printf '%s\n' ${black_listed} | \
         sort -k1,1 | \
@@ -373,7 +373,7 @@ while [ -n "${black_listed_new}" ]; do
         sort | \
         uniq -c
       cat "${work_dir}/built-packages"
-    ) | \
+    } | \
       sort | \
       uniq -d | \
       awk '{print $2}' | \
@@ -417,14 +417,14 @@ fi
 
 echo 'Now actually sort it.'
 
-(
+{
   # this part will have the correct build order, but all the infos are missing
   tsort "${work_dir}/build-order" 2> "${work_dir}/tsort.error" | \
     nl -ba | \
     awk '{print $1 " not-git also-not-git whatever " $2}'
   # this part has all the infos, but possibly the wrong order
   awk '{print "0 " $2 " " $3 " " $4 " " $1}' "${work_dir}/build-list.new"
-) | \
+} | \
   sort -k5,5 -k1nr | \
   # now, we have the correct order and the infos, but in adjacent lines
   uniq -f4 -D | \

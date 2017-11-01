@@ -189,7 +189,7 @@ packages=$(
   find . -maxdepth 1 -name '*.pkg.tar.xz' -printf '%f\n'
 )
 package_errors=$(
-  (
+  {
     # shellcheck disable=SC2086
     printf '%s\n' ${packages} | \
       sed '
@@ -203,7 +203,7 @@ package_errors=$(
       s|$| i686|
       s|^|expected: |
     ' "${work_dir}/package-infos/$1.$2.$3.$4.packages"
-  ) | \
+  } | \
     sort -k2 | \
     uniq -u -f1
 )

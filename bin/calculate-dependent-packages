@@ -43,10 +43,10 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
     sha512sum "${tmp_dir}/dependent-count"
   )
 
-  (
+  {
     sed 's|^|? |' "${tmp_dir}/build-list"
     sed 'p' "${tmp_dir}/dependent-count"
-  ) | \
+  } | \
     sort -k2,2 | \
     uniq -uf1 | \
     cut -d' ' -f2 | \
@@ -77,10 +77,10 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
 
   while read -r sf; do
     if [ -n "$(
-        (
+        {
           sort -u "${work_dir}/package-infos/${sf}.builds"
           cat "${tmp_dir}/build-list.build-depends"
-        ) | \
+        } | \
           sort | \
           uniq -d
       )" ]; then
@@ -113,17 +113,17 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
         continue
       fi
       if [ -n "$(
-          (
+          {
             sed '
               s|^|'"${work_dir}"'/package-infos/|
               s|$|.builds|
             ' "${loop}" | \
               xargs -r cat | \
               sort -u
-            (
+            {
               sed 'p' "${loop}"
               cat "${tmp_dir}/build-list"
-            ) | \
+            } | \
               sort | \
               uniq -u | \
               sed '
@@ -132,7 +132,7 @@ while [ -s "${tmp_dir}/build-list" ] && [ "${sums}" != "$(sha512sum "${tmp_dir}/
               ' | \
               xargs -r grep -hvx 'base\|base-devel' | \
               sort -u
-          ) | \
+          } | \
             sort | \
             uniq -d
         )" ]; then

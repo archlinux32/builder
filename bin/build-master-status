@@ -78,14 +78,14 @@ pending_packages=$(
     wc -l
 )
 next_tasks=$(
-  (
+  {
     cat "${work_dir}/build-list"
     find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed '
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
         p
       '
-  ) | \
+  } | \
     sort | \
     uniq -u | \
     while read -r package git_revision mod_git_revision repository; do
@@ -111,7 +111,7 @@ testing=$(
     done | \
     grep -c '\.pkg\.tar\.xz$'
 ) || true
-(
+{
   find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
     sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
     while read -r pkg rev mod_rev repo; do
@@ -119,7 +119,7 @@ testing=$(
         echo "${pkg}"
       fi
     done
-  (
+  {
     find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
       -regex '.*/loop_[0-9]\+' \
       -exec cat '{}' \; | \
@@ -127,10 +127,10 @@ testing=$(
     find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}||' | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d
-) | \
+} | \
   sort -u > \
   "${tmp_dir}/broken-packages-names"
 broken=$(
@@ -196,7 +196,7 @@ looped_packages=$(
 
 if ${web}; then
   "${base_dir}/bin/calculate-dependent-packages"
-  (
+  {
     printf '%s\n' \
       '<html>' \
       '<head>' \
@@ -232,10 +232,10 @@ if ${web}; then
       '</table>' \
       '</body>' \
       '</html>'
-  ) | \
+  } | \
     sponge "${tmp_dir}/build-master-status.html"
   end=$(($(date +%s)-7*24*60*60))
-  (
+  {
     [ -f "${webserver_directory}/statistics" ] && \
       cat "${webserver_directory}/statistics"
     printf '%s ' \
@@ -253,7 +253,7 @@ if ${web}; then
       "${next_tasks}" | \
       sed 's| $|\n|'
     echo "${end}"
-  ) | \
+  } | \
     sort -k1nr,1 | \
     sed -n "
       /^${end}\$/q
@@ -340,10 +340,10 @@ if ${web}; then
               grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
           )" \
           "$(
-            (
+            {
               grep -m1 "^$(str_to_regex "${sf}") " "${work_dir}/dependent-count" || \
                 echo 'x &nbsp;'
-            ) | \
+            } | \
               cut -d' ' -f2
           )" \
           "${build_error}"

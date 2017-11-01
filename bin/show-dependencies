@@ -30,28 +30,28 @@ if [ $# -eq 0 ]; then
       sort > \
       "${tmp_dir}/broken"
     broken=$(
-      (
+      {
         find "${work_dir}/package-infos" -maxdepth 1 -name '*.build-depends' | \
           sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
           sort -k1,1 | \
           join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \
           xargs -r cat
-      ) | \
+      } | \
         sort -u | \
         join -1 1 -2 2 -o 2.1 - "${tmp_dir}/builds"
     )
     broken=$(
-      (
-        (
+      {
+        {
           # shellcheck disable=SC2086
           printf '%s\n' ${broken}
           cat "${tmp_dir}/broken"
-        ) | \
+        } | \
           sort -u
         cut -d' ' -f1 < \
           "${work_dir}/build-list" | \
           sort -u
-      ) | \
+      } | \
         sort | \
         uniq -d
     )
@@ -65,31 +65,31 @@ if [ $# -eq 0 ]; then
   rm -rf --one-file-system "${tmp_dir}"
   trap - EXIT
   broken=$(
-    (
+    {
       # shellcheck disable=SC2086
       printf '%s\n' ${broken}
-      (
+      {
         find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png' -printf '%f\n' | \
           sed 's|\.png$||'
-        (
+        {
           cut -d' ' -f1 < \
             "${work_dir}/build-list"
           cat "${work_dir}/deletion-list"
-        ) | \
+        } | \
           sort -u
-      ) | \
+      } | \
         sort | \
         uniq -d
-    ) | \
+    } | \
       sort -u
   )
   # shellcheck disable=SC2086
   "$0" 'ALL' ${broken}
-  (
+  {
     find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png'
     # shellcheck disable=SC2086
     printf "${webserver_directory}"'/graphs/%s.png\n' ${broken} ${broken} 'ALL' 'ALL'
-  ) | \
+  } | \
     sort | \
     uniq -u | \
     xargs -r rm
@@ -128,12 +128,12 @@ sort -u "${work_dir}/build-order" | \
 sort -k1,1 "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.sorted-by-package"
 
-(
+{
   sort -k1,1 "${tmp_dir}/original-build-order" | \
     join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
   sort -k2,2 "${tmp_dir}/original-build-order" | \
     join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
-) | \
+} | \
   sort -u | \
   sponge "${tmp_dir}/original-build-order"
 
@@ -169,13 +169,13 @@ for target_package in "$@"; do
       sort -u > \
       "${tmp_dir}/relevant-stuff"
 
-    (
+    {
       # groups and split packages built by jobs on the build list - which are also dependencies of packages on the build-list
       sort -k1,1 "${tmp_dir}/original-build-order" | \
         join -1 1 -2 1 -o 2.1 - "${tmp_dir}/relevant-stuff"
       # build list jobs themself
       cut -d' ' -f1 < "${work_dir}/build-list"
-    ) | \
+    } | \
       sort -u | \
       sponge "${tmp_dir}/relevant-stuff"
 
@@ -207,13 +207,12 @@ for target_package in "$@"; do
       awk '{print $1}' "${tmp_dir}/build-order" | \
         sort -u > \
         "${tmp_dir}/new"
-      (
+      {
         cat \
           "${tmp_dir}/original-build-order" \
           "${tmp_dir}/known-split-packages"
-        grep -v ' base\(-devel\)\?$' "${tmp_dir}/known-groups" || \
-          true
-      ) | \
+        sed '/ base\(-devel\)\?$/d' "${tmp_dir}/known-groups"
+      } | \
         sort -k2,2 | \
         join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/new" | \
         sponge -a "${tmp_dir}/build-order"
@@ -246,47 +245,47 @@ for target_package in "$@"; do
     done >> \
     "${tmp_dir}/knots"
 
-  (
+  {
     sort -u "${work_dir}/deletion-list"
     tr ' ' '\n' < \
       "${tmp_dir}/build-order" | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d | \
     xargs -r printf '3 deletion-list-package %s\n' >> \
     "${tmp_dir}/knots"
 
-  (
+  {
     awk '{print $2}' "${tmp_dir}/known-split-packages" | \
       sort -u
     tr ' ' '\n' < \
       "${tmp_dir}/build-order" | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d | \
     xargs -r printf '4 split-package %s\n' >> \
     "${tmp_dir}/knots"
 
-  (
+  {
     cat "${tmp_dir}/known-packages"
     tr ' ' '\n' < \
       "${tmp_dir}/build-order" | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d | \
     xargs -r printf '5 package %s\n' >> \
     "${tmp_dir}/knots"
 
-  (
+  {
     awk '{print $2}' "${tmp_dir}/known-groups" | \
       sort -u
     tr ' ' '\n' < \
       "${tmp_dir}/build-order" | \
       sort -u
-  ) | \
+  } | \
     sort | \
     uniq -d | \
     xargs -r printf '6 group %s\n' >> \

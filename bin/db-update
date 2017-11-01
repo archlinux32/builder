@@ -243,7 +243,7 @@ move_packages() {
 
   # move the packages remotely via sftp
 
-  (
+  {
     while read -r package; do
 
       if [ -z "${package}" ]; then
@@ -264,7 +264,7 @@ move_packages() {
     done < \
       "${tmp_dir}/tmp/packages"
     echo 'quit'
-  ) | \
+  } | \
     if ${no_action}; then
       sed 's|^|sftp: |'
     else

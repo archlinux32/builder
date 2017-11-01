@@ -151,7 +151,7 @@ while read -r mirror; do
   if [ -z "${mirror}" ]; then
     continue
   fi
-  (
+  {
     # theirs
     for repo in ${repos}; do
       curl -sS "${mirror}/${repo}/os/x86_64/${repo}.db.tar.gz" | \
@@ -172,7 +172,7 @@ while read -r mirror; do
       sed '
         s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
       '
-  ) | \
+  } | \
     expand_version 3 | \
     sort -k4,4 -k3Vr,3 -k1,1 | \
     shrink_version 3 | \
@@ -190,10 +190,10 @@ sort -k1,1 -u "${tmp_dir}/delta-packages" | \
 join -1 1 -2 5 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/delta-packages" "${tmp_dir}/known-packages" >> \
   "${tmp_dir}/append-packages"
 
-(
+{
   awk '{print $5}' "${tmp_dir}/append-packages"
   cat "${tmp_dir}/delta-packages"
-) | \
+} | \
   sort | \
   uniq -u | \
   sponge "${tmp_dir}/delta-packages"
