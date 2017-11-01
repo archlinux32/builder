@@ -79,7 +79,7 @@ pending_packages=$(
 )
 next_tasks=$(
   (
-    grep -vxF 'break_loops' "${work_dir}/build-list"
+    cat "${work_dir}/build-list"
     find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
       sed '
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|

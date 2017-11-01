@@ -237,8 +237,8 @@ fi
   awk '{print $2 " " $3 " " $4 " " $1}' "${tmp_dir}/build-list.append"
 
   # ignore packages on the build-list
-  grep -vxF 'break_loops' "${work_dir}/build-list" | \
-    awk '{print $2 " " $3 " " $4 " " $1}' | \
+  awk '{print $2 " " $3 " " $4 " " $1}' < \
+    "${work_dir}/build-list" | \
     sed 'p'
 
   # ignore packages on the deletion-list

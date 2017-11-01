@@ -87,11 +87,6 @@ pending_packages=false
 
 while read -r package git_revision mod_git_revision repository; do
 
-  if [ -z "${git_revision}${mod_git_revision}${repository}" ] && \
-    [ "${package}" = 'break_loops' ]; then
-    continue
-  fi
-
   generate_package_metadata "${package}.${git_revision}.${mod_git_revision}.${repository}"
 
   if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
@@ -133,7 +128,7 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
       hand_out_broken=false
       hand_out_loop=false
       {
-        grep -vxF 'break_loops' "${work_dir}/build-list"
+        cat "${work_dir}/build-list"
         find "${work_dir}/package-states" -name '*.broken' -printf '%f\n' | \
           sed '
             s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
@@ -160,15 +155,14 @@ for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
       hand_out_blocked=false
       hand_out_broken=true
       hand_out_loop=true
-      grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        cut -d' ' -f1 | \
+      cut -d' ' -f1 < \
+        "${work_dir}/build-list" | \
         sort -u > \
         "${tmp_dir}/hand-out-only-these-packages"
     ;;
   esac
 
-  grep -vxF 'break_loops' "${work_dir}/build-list" | \
-    cat -n | \
+  cat -n "${work_dir}/build-list" | \
     sort -k2,2 | \
     join -1 1 -2 2 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/hand-out-only-these-packages" - | \
     sort -k1,1 | \

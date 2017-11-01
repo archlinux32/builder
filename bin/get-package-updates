@@ -141,10 +141,9 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 # If a new package is added, then ensure that it's not on the deletion list.
 
-grep -vxF 'break_loops' \
-  "${work_dir}/build-list" > \
-  "${work_dir}/build-list.new" || \
-  true
+cp \
+  "${work_dir}/build-list" \
+  "${work_dir}/build-list.new"
 cp \
   "${work_dir}/deletion-list" \
   "${work_dir}/deletion-list.new"

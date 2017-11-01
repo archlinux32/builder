@@ -11,8 +11,7 @@ fi
 tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  sort -k1,1 -u > \
+sort -k1,1 -u "${work_dir}/build-list" > \
   "${tmp_dir}/build-list"
 
 while read -r pkg rev mod_rev repo; do

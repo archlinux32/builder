@@ -48,8 +48,8 @@ if [ $# -eq 0 ]; then
           cat "${tmp_dir}/broken"
         ) | \
           sort -u
-        grep -vxF 'break_loops' "${work_dir}/build-list" | \
-          awk '{print $1}' | \
+        cut -d' ' -f1 < \
+          "${work_dir}/build-list" | \
           sort -u
       ) | \
         sort | \
@@ -72,8 +72,8 @@ if [ $# -eq 0 ]; then
         find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png' -printf '%f\n' | \
           sed 's|\.png$||'
         (
-          grep -vxF 'break_loops' "${work_dir}/build-list" | \
-            awk '{print $1}'
+          cut -d' ' -f1 < \
+            "${work_dir}/build-list"
           cat "${work_dir}/deletion-list"
         ) | \
           sort -u
@@ -125,8 +125,7 @@ sort -u "${work_dir}/build-order" | \
   grep '^\S\+ \S\+$' > \
   "${tmp_dir}/original-build-order"
 
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  sort -k1,1 > \
+sort -k1,1 "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.sorted-by-package"
 
 (
@@ -175,8 +174,7 @@ for target_package in "$@"; do
       sort -k1,1 "${tmp_dir}/original-build-order" | \
         join -1 1 -2 1 -o 2.1 - "${tmp_dir}/relevant-stuff"
       # build list jobs themself
-      grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        awk '{print $1}'
+      cut -d' ' -f1 < "${work_dir}/build-list"
     ) | \
       sort -u | \
       sponge "${tmp_dir}/relevant-stuff"

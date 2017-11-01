@@ -266,12 +266,6 @@ find "${work_dir}/build-list.loops" -maxdepth 1 \
   -exec grep -qxF "$1" '{}' \; \
   -exec rm '{}' '{}.locked' \;
 
-if ! find "${work_dir}/build-list.loops" -maxdepth 1 -printf '%f\n' | \
-  grep -q '^loop_[0-9]\+$'; then
-  # no loops left
-  sed -i '/^break_loops$/d' "${work_dir}/build-list"
-fi
-
 # remove package from build list
 sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 

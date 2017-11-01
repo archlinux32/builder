@@ -141,7 +141,7 @@ while [ $# -gt 0 ]; do
         "${tmp_dir}/messages"
 
       errors=$(
-        grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$\|^break_loops$' "${work_dir}/build-list"
+        grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$' "${work_dir}/build-list"
       ) || true
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
@@ -153,8 +153,8 @@ while [ $# -gt 0 ]; do
       fi
 
       errors=$(
-        grep -vxF 'break_loops' "${work_dir}/build-list" | \
-          awk '{print $1}' | \
+        cut -d' ' -f1 < \
+          "${work_dir}/build-list" | \
           sort | \
           uniq -d
       )
@@ -169,8 +169,8 @@ while [ $# -gt 0 ]; do
 
       errors=$(
         (
-          grep -vxF 'break_loops' "${work_dir}/build-list" | \
-            awk '{print $1}'
+          cut -d' ' -f1 < \
+            "${work_dir}/build-list"
           cat "${work_dir}/deletion-list"
         ) | \
           sort | \

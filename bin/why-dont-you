@@ -68,8 +68,8 @@ case "${action}" in
     fi
 
     {
-      grep -vxF 'break_loops' "${work_dir}/build-list" | \
-        awk '{print $1 "." $2 "." $3 "." $4}'
+      awk '{print $1 "." $2 "." $3 "." $4}' < \
+        "${work_dir}/build-list"
       if [ "${action}" = 'stabilize' ]; then
         find "${work_dir}/package-states" -maxdepth 1 \( \
           -name '*.done' -o \

@@ -812,8 +812,8 @@ find_dependencies_on_build_list() {
 
   (
     cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
-    grep -vxF 'break_loops' "${work_dir}/build-list" | \
-      awk '{print $1 "." $2 "." $3 "." $4}' | \
+    awk '{print $1 "." $2 "." $3 "." $4}' < \
+      "${work_dir}/build-list" | \
       sed "
         s|^|${work_dir}/package-infos/|
         s|\$|\.builds|

@@ -210,8 +210,8 @@ exit 42
 #
 # # packages still on the build-list
 #
-# grep -vxF 'break_loops' "${work_dir}/build-list" | \
-#   tr ' ' '.' | \
+# tr ' ' '.' < \
+#   "${work_dir}/build-list" | \
 #   sort -u > \
 #   "${tmp_dir}/keep-packages"
 #
