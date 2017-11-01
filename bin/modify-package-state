@@ -152,6 +152,7 @@ fi
         fi
       ;;
       'tested')
+        # TODO: check in bugtracker if package is faulty
         if [ -f "${work_dir}/package-states/${package}.testing" ]; then
           mv \
             "${work_dir}/package-states/${package}.testing" \
