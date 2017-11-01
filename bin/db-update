@@ -16,6 +16,8 @@
 
 # TODO: handle deletion of parts of a split package
 
+# TODO: handle dependencies of parts of a split package separately
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"

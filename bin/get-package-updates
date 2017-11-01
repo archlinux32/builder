@@ -148,9 +148,8 @@ cp \
   "${work_dir}/deletion-list" \
   "${work_dir}/deletion-list.new"
 
-# TODO:
-# Only tracking PKGBUILDs is ineffective if some error outside of the PKGBUILD (e.g. a missing source file)
-# is corrected upstream on the other hand, changing files next to a PKGBUILD should not trigger a rebuild
+# TODO: Only tracking PKGBUILDs is ineffective if some error outside of the PKGBUILD (e.g. a missing source file)
+# is corrected upstream. On the other hand, changing files next to a PKGBUILD should not trigger a rebuild
 # if the package was already built successfully.
 
 for repo in ${repo_names}; do
