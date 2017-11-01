@@ -233,11 +233,11 @@ case "${action}" in
 
       fi
 
-      sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.${prepo}.builds" >> \
-        "${tmp_dir}/deleted.builds"
+      sed "s|^|${pkg} builds |" "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.${prepo}.builds"
 
     done < \
-      "${work_dir}/deletion-list"
+      "${work_dir}/deletion-list" > \
+      "${tmp_dir}/deleted.builds"
 
     sort -k3,3 "${tmp_dir}/deleted.builds" | \
       sponge "${tmp_dir}/deleted.builds"
@@ -273,7 +273,7 @@ case "${action}" in
       fi
 
       build_depends=$(
-        find "${work_dir}/package-infos" -maxdepth 1 -name "${pkg}.*.build-depends"
+        find "${work_dir}/package-infos" -maxdepth 1 -name "${pkg}.*.build-depends" -exec cat {} \;
       )
       if [ -z "${build_depends}" ]; then
         printf 'Package "%s" was deleted in the git repositories.\n' "${pkg}"
