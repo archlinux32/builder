@@ -20,8 +20,8 @@ done < \
   "${tmp_dir}/build-list"
 
 mkdir "${tmp_dir}/loops"
-find "${work_dir}/build-list.loops" -maxdepth 1 | \
-  grep '/loop_[0-9]\+$' | \
+find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+  -regex '.*/loop_[0-9]\+' | \
   while read -r loop; do
     sort -u "${loop}" | \
       join -j 1 - "${tmp_dir}/build-list" | \

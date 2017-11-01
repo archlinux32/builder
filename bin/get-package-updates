@@ -4,13 +4,6 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
-# TODO: be more secure in case of update while build(s) is/are still in
-# progress -> (stale) lock files, moving (or changing content of) loop
-# lock files
-
-# TODO: (might be connected to above): find out who deletes loop-files which
-# should not be deleted
-
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
@@ -461,20 +454,18 @@ if [ -s "${work_dir}/tsort.error" ]; then
     ' "${work_dir}/tsort.error"
 
   # remove lines from loop files which are no packages
-  find "${work_dir}/build-list.loops.new" -maxdepth 1 -printf '%f\n' | \
-    grep '^loop_[0-9]\+$' | \
+  find "${work_dir}/build-list.loops.new" -maxdepth 1 -regextype grep \
+    -regex '.*/loop_[0-9]\+' \
+    -printf '%p\n' | \
     while read -r loop; do
-      (
-        sort -u "${work_dir}/build-list.loops.new/${loop}"
+      {
+        sort -u "${loop}"
         cut -d' ' -f1 "${work_dir}/build-list.new.new" | \
           sort -u
-      ) | \
+      } | \
         sort | \
-        uniq -d > \
-        "${work_dir}/build-list.loops.new/${loop}.new"
-      mv \
-        "${work_dir}/build-list.loops.new/${loop}.new" \
-        "${work_dir}/build-list.loops.new/${loop}"
+        uniq -d | \
+        sponge "${loop}"
     done
 else
   rm "${work_dir}/tsort.error"
@@ -483,11 +474,11 @@ fi
 # Move the .new-files to the actual files
 
 rm -rf --one-file-system "${work_dir}/build-list.loops"
-(
+{
   printf '%s\n' "build-list.loops" "build-list.new" "build-list" "deletion-list"
   # shellcheck disable=SC2086
   printf '%s.revision\n' ${repo_names}
-) | \
+} | \
   while read -r file; do
     mv "${work_dir}/${file}.new" "${work_dir}/${file}"
   done
