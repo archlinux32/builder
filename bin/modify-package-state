@@ -1,0 +1,177 @@
+#!/bin/sh
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# shellcheck disable=SC2016
+usage() {
+  >&2 echo ''
+  >&2 echo 'modify-package-state [options] packages-file:'
+  >&2 echo ' modify state (file) of package(s).'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -b|--block:       Block package(s).'
+  >&2 echo '  -h|--help:        Show this help and exit.'
+  >&2 echo '  -n|--no-report:   Do not report what packages were modified.'
+  >&2 echo '  -t|--tested:      Mark package(s) as tested.'
+  >&2 echo '  -u|--unblock:     Unblock package(s).'
+  >&2 echo ''
+  >&2 echo 'Exactly one of -b|-t|-u is needed for actual operation.'
+  [ -z "$1" ] && exit 1 || exit "$1"
+}
+
+eval set -- "$(
+  getopt -o bhntu \
+    --long block \
+    --long help \
+    --long no-report \
+    --long tested \
+    --long unblock \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+action=''
+report=true
+
+while true
+do
+  case "$1" in
+    -b|--block)
+      if [ -n "${action}" ]; then
+        >&2 echo 'Conflicting/redundand arguments.'
+        usage
+      fi
+      action='block'
+    ;;
+    -h|--help)
+      usage 0
+    ;;
+    -n|--no-report)
+      report=false
+    ;;
+    -t|--tested)
+      if [ -n "${action}" ]; then
+        >&2 echo 'Conflicting/redundand arguments.'
+        usage
+      fi
+      action='tested'
+    ;;
+    -u|--unblock)
+      if [ -n "${action}" ]; then
+        >&2 echo 'Conflicting/redundand arguments.'
+        usage
+      fi
+      action='unblock'
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ -z "${action}" ]; then
+  >&2 echo 'Expected -b|-t|-u.'
+  usage
+fi
+
+if [ $# -ne 1 ]; then
+  >&2 echo 'Too few or too many arguments.'
+  usage
+fi
+
+input_file="$1"
+if ${report}; then
+  if ! [ -w "${output_file}" ]; then
+    >&2 printf \
+      'Cannot open file "%s" for writing.' \
+      "${output_file}"
+    exit 2
+  fi
+  move_output() {
+    cat "${output_file}" > "${input_file}"
+    rm "${output_file}"
+  }
+  output_file=$(mktemp)
+  trap 'move_output' EXIT
+else
+  output_file='/dev/null'
+fi
+
+if ! [ -r "${input_file}" ]; then
+  >&2 printf \
+    'Cannot open file "%s" for reading.' \
+    "${input_file}"
+  exit 2
+fi
+
+{
+  err=0
+  while read -r package reason; do
+    if echo "${package}" | \
+      grep -q '\.pkg\.tar\.xz$'; then
+    echo "'$package'" >&2
+      package=$(
+        find "${work_dir}/package-states" -maxdepth 1 \( -name '*.tested' -o -name '*.testing' \) \
+          -exec grep -qxF "${package}" '{}' \; \
+          -printf '%f\n' | \
+          sed 's|\.[^.]\+$||' | \
+          sort -u
+      )
+    echo "'$package'" >&2
+      if [ -z "${package}" ]; then
+        continue
+      fi
+    fi
+    if [ "${action}" = 'block' ] || \
+      [ "${action}" = 'unblock' ]; then
+      # these packages need to be on the build list
+      if ! tr ' ' '.' < \
+        "${work_dir}/build-list" | \
+        grep -qxF "${package}"; then
+        >&2 printf 'Package "%s" is not on the build-list.\n' "${package}"
+        err=2
+        continue
+      fi
+    fi
+    case "${action}" in
+      'block')
+        if [ -z "${reason}" ]; then
+          >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
+          err=2
+        else
+          echo "${reason}" > \
+            "${work_dir}/package-states/${package}.blocked"
+          printf '%s %s\n' "${package}" "${reason}"
+        fi
+      ;;
+      'tested')
+        if [ -f "${work_dir}/package-states/${package}.testing" ]; then
+          mv \
+            "${work_dir}/package-states/${package}.testing" \
+            "${work_dir}/package-states/${package}.tested"
+        fi
+      ;;
+      'unblock')
+        if [ -f "${work_dir}/package-states/${package}.blocked" ]; then
+          rm "${work_dir}/package-states/${package}.blocked"
+          printf '%s\n' "${package}"
+        fi
+      ;;
+      *)
+        >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
+        exit 42
+      ;;
+    esac
+  done > \
+    "${output_file}"
+
+  exit ${err}
+} < \
+  "${input_file}"

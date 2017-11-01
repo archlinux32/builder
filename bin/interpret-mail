@@ -180,7 +180,7 @@ sed -n "$(
 )" "${tmp_dir}/raw-content"
 
 if [ -s "${tmp_dir}/block" ]; then
-  if run_and_log_on_error "${base_dir}/bin/block-package" "${tmp_dir}/block"; then
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --block "${tmp_dir}/block"; then
     if [ -s "${tmp_dir}/block" ]; then
       log 'Successfully blocked %s packages.\n' "$(wc -l < "${tmp_dir}/block")"
     fi
@@ -193,20 +193,17 @@ if [ -s "${tmp_dir}/stabilize" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/stabilize"
-  find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' \
-    -exec grep -qxF -f "${tmp_dir}/stabilize" '{}' \; \
-    -printf '%p\n' | \
-    tee "${tmp_dir}/stabilized" | \
-    while read -r sf; do
-      mv "${sf}" "${sf%.testing}.tested"
-    done
-  if [ -s "${tmp_dir}/stabilized" ]; then
-    log 'Successfully stabilized %s packages.\n' "$(wc -l < "${tmp_dir}/stabilized")"
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --tested "${tmp_dir}/stabilize"; then
+    if [ -s "${tmp_dir}/stabilize" ]; then
+      log 'Successfully marked %s packages as tested.\n' "$(wc -l < "${tmp_dir}/stabilize")"
+    fi
+  else
+    log 'There was an error while marking the packages as tested - ignoring this message.\n'
   fi
 fi
 
 if [ -s "${tmp_dir}/unblock" ]; then
-  if run_and_log_on_error "${base_dir}/bin/block-package" -u "${tmp_dir}/unblock"; then
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --unblock "${tmp_dir}/unblock"; then
     if [ -s "${tmp_dir}/unblock" ]; then
       log 'Successfully unblocked %s packages.\n' "$(wc -l < "${tmp_dir}/unblock")"
     fi
