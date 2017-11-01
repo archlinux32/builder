@@ -144,9 +144,9 @@ case "${action}" in
           while read -r sf; do
             printf '%s' "${sf}"
             if [ -f "${work_dir}/package-states/${sf}.testing" ]; then
-              printf ' (not tested yet)'
+              printf ' (not tested yet for %s days)' "$(( ($(date '+%s') - $(stat -c '%Y' "${work_dir}/package-states/${sf}.testing")) / 3600 / 24 ))"
             elif [ -f "${work_dir}/package-states/${sf}.done" ]; then
-              printf ' (not unstaged yet)'
+              printf ' (not unstaged yet for %s days)' "$(( ($(date '+%s') - $(stat -c '%Y' "${work_dir}/package-states/${sf}.done")) / 3600 / 24 ))"
             elif tr ' ' '.' < \
               "${work_dir}/build-list" | \
               grep -qxF "${sf}"; then
