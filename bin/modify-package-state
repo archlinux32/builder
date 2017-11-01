@@ -88,10 +88,10 @@ fi
 
 input_file="$1"
 if ${report}; then
-  if ! [ -w "${output_file}" ]; then
+  if ! [ -w "${input_file}" ]; then
     >&2 printf \
       'Cannot open file "%s" for writing.' \
-      "${output_file}"
+      "${input_file}"
     exit 2
   fi
   move_output() {
