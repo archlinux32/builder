@@ -10,8 +10,6 @@
 #   b) no done package B (in a not-more stable repository) which is
 #      not being moved run-depends on A
 
-# TODO: be (even?) more atomic
-
 # TODO: separate locks for staging, testing (and stable)
 
 # TODO: handle deletion of parts of a split package
