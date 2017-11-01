@@ -47,7 +47,8 @@ trap clean_up_lock_file EXIT
 if [ "$5" = 'ERROR' ]; then
 # the build failed on the build slave
 
-  if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+  if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
+    ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
     # too late, package already outdated -> ignore error report
     exit 0
   fi
