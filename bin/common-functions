@@ -2,6 +2,10 @@
 
 # contains functions used by more than one script
 
+# TODO: prosody-1:0.10.0-2-i686.pkg.tar.xz vs.
+# prosody-1:0.10.r7198+.2fd20f372cb1+-2-i686.pkg.tar.xz
+# was not recognized?
+
 # shellcheck disable=SC2039
 
 if [ -z "${base_dir}" ]; then
