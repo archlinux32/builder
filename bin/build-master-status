@@ -2,6 +2,8 @@
 
 # report about status of build master
 
+# TODO: silence crontab if buildmaster is not sane
+
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
