@@ -922,6 +922,8 @@ shrink_version() {
   '
 }
 
+# TODO: also consider dependencies in the other direction (?)
+
 # find_biggest_subset_of_packages $omega $keep $all_builds [ $force ]
 
 # Return (to stdout) the biggest subset A of the packages in $omega whose
