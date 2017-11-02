@@ -111,6 +111,12 @@ if ! [ -r "${input_file}" ]; then
   exit 2
 fi
 
+exec 9> "${sanity_check_lock_file}"
+if ! flock -s -n 9; then
+  >&2 echo 'Cannot get sanity-check lock.'
+  exit
+fi
+
 {
   err=0
   while read -r package reason; do
