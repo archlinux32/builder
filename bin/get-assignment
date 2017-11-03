@@ -14,6 +14,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: hand out blocked packages if they are a prefered package
+
 mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
