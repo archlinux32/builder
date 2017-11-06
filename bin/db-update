@@ -490,27 +490,24 @@ printf '%s\n' ${packages_to_force_unstage} > \
 
 # calculate what packages should be unstaged:
 
-find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-unstage-packages" > \
+find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-unstage-packages" > \
   "${tmp_dir}/unstage-packages"
 
-# no base / base-devel packages on the build list anymore?
+# no base packages on the build list anymore?
 if [ -z "$(
     join -j 1 \
       "${tmp_dir}/base-packages" \
       "${tmp_dir}/build-list-packages"
   )" ]; then
+  >&2 echo 'db-update unstage: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
+  for s in "${tmp_dir}/all-builds" "${tmp_dir}/all-depends"; do
+    grep -v ' base$' "${s}" > \
+      "${s}.no-base" || \
+      true
+  done
 
-  # we pretend, the group "base" does not exist, so we only fetch 'direct' dependencies on base-packages
-
-  mv "${tmp_dir}/all-builds" "${tmp_dir}/really-all-builds"
-  grep -v ' base$' "${tmp_dir}/really-all-builds" > \
-    "${tmp_dir}/all-builds" || \
-    true
-
-  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-unstage-packages" > \
+  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
-
-  mv "${tmp_dir}/really-all-builds" "${tmp_dir}/all-builds"
 fi
 
 # shellcheck disable=SC2086
@@ -531,8 +528,23 @@ find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.tested' -printf '
     sed 's|\.tested$||' > \
   "${tmp_dir}/stabilize-packages"
 
-find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds" "${tmp_dir}/force-stabilize-packages" | \
-  sponge "${tmp_dir}/stabilize-packages"
+# no base packages on the build list or in staging anymore?
+if [ -z "$(
+    cat \
+      "${tmp_dir}/build-list-packages" \
+      "${tmp_dir}/done-packages" | \
+      sort -u | \
+      join -j 1 \
+        "${tmp_dir}/base-packages" \
+        -
+  )" ]; then
+  >&2 echo 'db-update stabilize: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
+  find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-stabilize-packages" | \
+    sponge "${tmp_dir}/stabilize-packages"
+else
+  find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-stabilize-packages" | \
+    sponge "${tmp_dir}/stabilize-packages"
+fi
 
 # unlock build list
 

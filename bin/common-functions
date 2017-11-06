@@ -922,15 +922,13 @@ shrink_version() {
   '
 }
 
-# TODO: also consider dependencies in the other direction (?)
-
-# find_biggest_subset_of_packages $omega $keep $all_builds [ $force ]
+# find_biggest_subset_of_packages $omega $keep $all_builds $all_depends [ $force ]
 
 # Return (to stdout) the biggest subset A of the packages in $omega whose
 # runtime dependencies in $omega \cup $keep are also in A
 
-# $all_builds either points to an empty file - then it will get filled
-# with cached data for subsequent calls - or to the same file of a previous
+# $all_builds and $all_depends either point to an empty file - then they will get
+# filled with cached data for subsequent calls - or to the same files of a previous
 # call
 
 # If non-empty, $force contains packages which are assumed to match the above
@@ -945,12 +943,13 @@ find_biggest_subset_of_packages() {
     omega="$1"
     keep="$2"
     all_builds="$3"
-    if [ $# -eq 3 ]; then
+    all_depends="$4"
+    if [ $# -eq 4 ]; then
       force='/dev/null'
-    elif [ $# -eq 4 ]; then
-      force="$4"
+    elif [ $# -eq 5 ]; then
+      force="$5"
     else
-      >&2 printf 'find_biggest_subset_of_packages: Wrong number of arguments: %s given, 3 or 4 expected.' "$#"
+      >&2 printf 'find_biggest_subset_of_packages: Wrong number of arguments: %s given, 4 or 5 expected.' "$#"
       return 2
     fi
 
@@ -963,6 +962,18 @@ find_biggest_subset_of_packages() {
         ' {} \; | \
         sort -k2,2 > \
         "${all_builds}"
+    fi
+
+    if [ ! -s "${all_depends}" ]; then
+      find "${work_dir}/package-infos/" -maxdepth 1 -name '*.run-depends' \
+        -exec sed '
+          s|^|{} |
+          s|^\S\+/||
+          s|\.run-depends | |
+        ' {} \; | \
+        grep -v ' base$' | \
+        sort -k2,2 > \
+        "${all_depends}"
     fi
 
     sort -u "${omega}" | \
@@ -985,19 +996,39 @@ find_biggest_subset_of_packages() {
         sort -u | \
         sponge "${temp_dir}/keep"
 
-      sed '
-        s|^|'"${work_dir}"'/package-infos/|
-        s|$|.run-depends|
-      ' "${temp_dir}/keep" | \
-        xargs -r grep -HF '' | \
+      {
+        # we append all packages which are run-dependencies of keep-packages
+        # to the keep-list
         sed '
-          s|^.*/||
-          s|\.run-depends:| |
-        ' | \
-        sort -u | \
-        sort -k2,2 | \
-        uniq -f1 | \
-        join -1 2 -2 2 -o 2.1 - "${all_builds}" | \
+          s|^|'"${work_dir}"'/package-infos/|
+          s|$|.run-depends|
+        ' "${temp_dir}/keep" | \
+          xargs -r grep -HF '' | \
+          sed '
+            s|^.*/||
+            s|\.run-depends:| |
+          ' | \
+          sort -u | \
+          sort -k2,2 | \
+          uniq -f1 | \
+          join -1 2 -2 2 -o 2.1 - "${all_builds}"
+
+        # we append all packages with run-dependencies on the keep-list
+        # to the keep-list
+        sed '
+          s|^|'"${work_dir}"'/package-infos/|
+          s|$|.builds|
+        ' "${temp_dir}/keep" | \
+          xargs -r grep -HF '' | \
+          sed '
+            s|^.*/||
+            s|\.builds:| |
+          ' | \
+          sort -u | \
+          sort -k2,2 | \
+          uniq -f1 | \
+          join -1 2 -2 2 -o 2.1 - "${all_depends}"
+      } | \
         sort -u | \
         join -1 1 -2 1 -o 2.1 - "${omega}" | \
         sort -u > \
