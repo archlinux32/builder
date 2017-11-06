@@ -100,6 +100,20 @@ case "${action}" in
       sort -k2,2 > \
       "${tmp_dir}/all-run-depends"
 
+    cat "${tmp_dir}/moveable-list" "${tmp_dir}/unmoveable-list" | \
+      sed '
+        s|^|'"${work_dir}/package-infos/"'|
+        s|$|.builds|
+      ' | \
+      # base is boring, so we ignore it (might give result "... can be unstaged" although it _will_not_ be unstaged!
+      xargs -r grep -vHxF 'base' | \
+      sed '
+        s|^[^:]*/||
+        s|\.builds:| |
+      ' | \
+      sort -k2,2 > \
+      "${tmp_dir}/all-builds"
+
     for pkg in "$@"; do
 
       if ! state_file=$(
@@ -118,13 +132,22 @@ case "${action}" in
           sort -u | \
           sponge "${tmp_dir}/dependent"
 
-        sed '
-          s|^|'"${work_dir}"'/package-infos/|
-          s|$|.builds|
-        ' "${tmp_dir}/dependent.new" | \
-          xargs -r cat | \
-          sort -u | \
-          join -1 1 -2 2 -o 2.1 - "${tmp_dir}/all-run-depends" | \
+        {
+          sed '
+            s|^|'"${work_dir}"'/package-infos/|
+            s|$|.builds|
+          ' "${tmp_dir}/dependent.new" | \
+            xargs -r cat | \
+            sort -u | \
+            join -1 1 -2 2 -o 2.1 - "${tmp_dir}/all-run-depends"
+          sed '
+            s|^|'"${work_dir}"'/package-infos/|
+            s|$|.run-depends|
+          ' "${tmp_dir}/dependent.new" | \
+            xargs -r cat | \
+            sort -u | \
+            join -1 1 -2 2 -o 2.1 - "${tmp_dir}/all-builds"
+        } | \
           sort -u | \
           sponge "${tmp_dir}/dependent.new"
 
