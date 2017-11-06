@@ -484,8 +484,11 @@ find "${work_dir}/package-infos" -name '*.groups' \
   sort -u > \
   "${tmp_dir}/base-packages"
 
-# shellcheck disable=SC2086
-printf '%s\n' ${packages_to_force_unstage} > \
+{
+  # shellcheck disable=SC2086
+  printf '%s\n' ${packages_to_force_unstage}
+  print_list_of_archaic_packages 'build-list'
+} > \
   "${tmp_dir}/force-unstage-packages"
 
 # calculate what packages should be unstaged:
@@ -501,17 +504,19 @@ if [ -z "$(
   )" ]; then
   >&2 echo 'db-update unstage: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
   for s in "${tmp_dir}/all-builds" "${tmp_dir}/all-depends"; do
-    grep -v ' base$' "${s}" > \
-      "${s}.no-base" || \
-      true
+    sed '/ base$/d' "${s}" > \
+      "${s}.no-base"
   done
 
   find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
 fi
 
-# shellcheck disable=SC2086
-printf '%s\n' ${packages_to_force_stabilize} > \
+{
+  # shellcheck disable=SC2086
+  printf '%s\n' ${packages_to_force_stabilize}
+  print_list_of_archaic_packages 'build-list' 'staging' 'testing'
+} > \
   "${tmp_dir}/force-stabilize-packages"
 
 # calculate what packages should be stabilized

@@ -1120,3 +1120,57 @@ smoothen_namcap_log() {
     sort | \
     sponge "${file}"
 }
+
+# print_list_of_archaic_packages $source1 $source2 ...
+# print a list of packages which have not been touched for a while,
+# but which are still in the pipeline, e.g. in $source1, $source2 or ...
+
+print_list_of_archaic_packages() {
+  for source in "$@"; do
+    case "${source}" in
+      'testing')
+        # packages remaining longer than 7 days in testing
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime +7 \
+          -exec head -n1 {} \; | \
+          modify-package-state -n --tested /dev/stdin
+      ;;
+      'build-list')
+        while read -r pkg rev mod_rev repo; do
+          git_repo=$(
+            find_repository_with_commit "${rev}"
+          )
+          eval repo_path='"${repo_paths__'"${git_repo}"'}"'
+          commit_date=$(
+            git -C "${repo_path}" show -s --format=%ct "${rev}"
+          )
+          mod_commit_date=$(
+            git -C "${repo_paths__archlinux32}" show -s --format=%ct "${mod_rev}"
+          )
+          if [ "${mod_commit_date}" -gt "${commit_date}" ]; then
+            commit_date="${mod_commit_date}"
+          fi
+          # packages remaining longer than 7 days on the build list
+          if [ "$((commit_date + 24*60*60*7))" -lt "$(date '+%s')" ]; then
+            printf '%s %s %s %s\n' \
+              "${pkg}" \
+              "${rev}" \
+              "${mod_rev}" \
+              "${repo}"
+          fi
+        done < \
+          "${work_dir}/build-list"
+      ;;
+      'staging')
+        # packages remaining longer than 2 days in staging
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.done' -mtime +2 -printf '%f\n' | \
+          sed '
+            s|\.done$||
+          '
+      ;;
+      *)
+        >&2 printf 'unknown archaic-source "%s" - skipped.\n' "${source}"
+      ;;
+    esac
+  done | \
+    sort -u
+}
