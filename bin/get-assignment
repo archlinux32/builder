@@ -92,7 +92,7 @@ while read -r package git_revision mod_git_revision repository; do
     if grep -qxF "${slave}" "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" || \
       printf ',%s,' "$1" | \
         grep -qF ",${package},"; then
-      hand_out_assignment "${package} ${git_revision} ${mod_git_revision} ${repository}"
+      hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
     fi
   elif [ ! -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
     pending_packages=true
