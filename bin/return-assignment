@@ -54,8 +54,8 @@ if [ "$5" = 'ERROR' ]; then
   fi
 
   # shellcheck disable=SC2154
-  if [ "${slave}" != "$(head -n1 "${work_dir}/package-states/$1.$2.$3.$4.locked")" ]; then
-    # whoops, this package is built by someone else
+  if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
+    # whoops, this package is not built by this slave
     exit 0
   fi
 
@@ -67,31 +67,38 @@ if [ "$5" = 'ERROR' ]; then
     --transform="s|^|$1.$2.$3.$4.|" \
     '*.build-log.gz'
 
-  head -n1 \
-    "${work_dir}/package-states/$1.$2.$3.$4.locked" >> \
+  # shellcheck disable=SC2154
+  echo "${slave}" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
 
-  rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
+  # shellcheck disable=SC2154
+  sed -i '
+    /^'"$(str_to_regex "${slave}")"'$/d
+  ' "${work_dir}/package-states/$1.$2.$3.$4.locked"
+  if [ ! -s "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+    rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
-  # unlock every loop this package would have broken and which is not
-  # broken by another locked package
-  locked_packages=$(
-    find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' -printf '%f\n' | \
-      sed 's@^\(.\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
-  )
-  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' \
-    -exec grep -qxF "$1" '{}' \; \
-    -not -exec grep -qxF "${locked_packages}" '{}' \; \
-    -exec rm '{}.locked' \;
+    # unlock every loop this package would have broken and which is not
+    # broken by another locked package
+    locked_packages=$(
+      find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' -printf '%f\n' | \
+        sed 's@^\(.\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
+    )
+    find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
+      -regex '.*/loop_[0-9]\+' \
+      -exec grep -qxF "$1" '{}' \; \
+      -not -exec grep -qxF "${locked_packages}" '{}' \; \
+      -exec rm '{}.locked' \;
 
-  # move build order to end of build list
-
-  sed -i \
-    "/^$(str_to_regex "$1 $2 $3 $4")\$/d" \
-    "${work_dir}/build-list"
-  echo "$1 $2 $3 $4" >> \
-    "${work_dir}/build-list"
+    # move that build order to the end of the build-list
+    sed -i '
+      /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
+        $ b
+        d
+      }
+      $ a '"$1 $2 $3 $4"'
+    ' "${work_dir}/build-list"
+  fi
 
   exit 0
 
@@ -115,6 +122,12 @@ clean_up_lock_file() {
 if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
   ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
   >&2 echo 'Sorry, the sent package is outdated.'
+  exit 2
+fi
+
+# shellcheck disable=SC2154
+if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
+  >&2 echo 'Whoops, this package is not built by this slave.'
   exit 2
 fi
 
