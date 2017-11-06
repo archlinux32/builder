@@ -96,8 +96,8 @@ if [ "$5" = 'ERROR' ]; then
         $ b
         d
       }
-      $ a '"$1 $2 $3 $4"'
-    ' "${work_dir}/build-list"
+      $ a '"$1 $2 $3 $4" \
+      "${work_dir}/build-list"
   fi
 
   exit 0

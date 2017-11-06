@@ -32,8 +32,8 @@ hand_out_assignment() {
       $ b
       d
     }
-    $ a '"$1 $2 $3 $4"'
-  ' "${work_dir}/build-list"
+    $ a '"$1 $2 $3 $4" \
+    "${work_dir}/build-list"
 
   echo "$1 $2 $3 $4"
   # shellcheck disable=SC2154
