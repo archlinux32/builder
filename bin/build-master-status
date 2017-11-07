@@ -367,6 +367,10 @@ if ${web}; then
                       printf '<a href="https://bugs.archlinux.org/task/%s">%s</a>' \
                         "${reason#FS#}" \
                         "${reason}"
+                    elif [ "FS32#${reason#FS32#}" = "${reason}" ]; then
+                      printf '<a href="https://bugs.archlinux32.org/index.php?do=details&task_id=%s">%s</a>' \
+                        "${reason#FS32#}" \
+                        "${reason}"
                     elif grep -q "^$(str_to_regex "${reason}") " "${work_dir}/build-list"; then
                       printf '<a href="graphs/%s.png">%s</a>' \
                         "${reason}" \
@@ -483,6 +487,7 @@ if ${web}; then
       tar -Ox | \
       sed '
         s@FS#\([0-9]\+\)@<a href="https://bugs.archlinux.org/task/\1">\0</a>@
+        s@FS32#\([0-9]\+\)@<a href="https://bugs.archlinux32.org/index.php?do=details&task_id=\1">\0</a>@
         /.#/!s/$/#/
         s|\(.\)#|\1</td><td>|
         /^\s*#/{
