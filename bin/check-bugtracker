@@ -11,8 +11,7 @@
 tmp_dir=$(mktemp -d)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-receive_buglist | \
-  grep '<\(community-\)\?testing>' | \
+receive_buglist 'Testing' | \
   tr ' ,;' '\n' | \
   sed -n '
     s/^\[//

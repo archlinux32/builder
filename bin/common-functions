@@ -1177,26 +1177,19 @@ print_list_of_archaic_packages() {
     sort -u
 }
 
-# receive_buglist
-# receive the buglist from bugs.archlinux32.org and print it to stdout
+# receive_buglist $category
+# receive the buglist from bugs.archlinux32.org for $category (e.g. 'Testing')
+# and print it to stdout
 
 receive_buglist() {
+  local category
+  category="$1"
   curl -Ss 'http://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
     sed '
       1 d
-      /^[^,]\+,Packages,/ ! d
+      /^[^,]\+,"Packages: '"${category}"'",/ ! d
       s/^\([^,]\+,\)\{3\}//
-      s/^"[^"]\+","//
+      s/^\("[^"]\+"\|[^"][^,]*\),"//
       s/".*$//
     '
-}
-
-# package_has_bug ${package}
-# check if there is an open bug report on ${package} in testing or community-testing
-# the bug list is read from stdin
-
-package_has_bug() {
-  local package
-  package="$1"
-  grep -q "$(str_to_regex "[${package}]").*<\(community-\)\?testing>"
 }
