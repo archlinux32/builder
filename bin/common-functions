@@ -608,7 +608,9 @@ wait_some_time() {
 
 str_to_regex() {
   echo "$1" | \
-    sed 's|\.|\\.|g'
+    sed '
+      s|[.[]|\\\0|g
+    '
 }
 
 # make_source_info $package $repository $git_revision $mod_git_revision $output
@@ -1173,4 +1175,28 @@ print_list_of_archaic_packages() {
     esac
   done | \
     sort -u
+}
+
+# receive_buglist
+# receive the buglist from bugs.archlinux32.org and print it to stdout
+
+receive_buglist() {
+  curl -Ss 'http://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
+    sed '
+      1 d
+      /^[^,]\+,Packages,/ ! d
+      s/^\([^,]\+,\)\{3\}//
+      s/^"[^"]\+","//
+      s/".*$//
+    '
+}
+
+# package_has_bug ${package}
+# check if there is an open bug report on ${package} in testing or community-testing
+# the bug list is read from stdin
+
+package_has_bug() {
+  local package
+  package="$1"
+  grep -q "$(str_to_regex "[${package}]").*<\(community-\)\?testing>"
 }

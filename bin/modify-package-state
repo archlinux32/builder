@@ -86,6 +86,12 @@ if [ $# -ne 1 ]; then
   usage
 fi
 
+clean_up() {
+  rm -rf --one-file-system "${tmp_dir}"
+}
+tmp_dir=$(mktemp -d)
+trap clean_up EXIT
+
 input_file="$1"
 if ${report}; then
   if ! [ -w "${input_file}" ]; then
@@ -96,9 +102,10 @@ if ${report}; then
   fi
   move_output() {
     cat "${output_file}" > "${input_file}"
-    rm "${output_file}"
+    clean_up
   }
-  output_file=$(mktemp)
+  output_file="${tmp_dir}/output-file"
+  touch "${output_file}"
   trap 'move_output' EXIT
 else
   output_file='/dev/null'
@@ -115,6 +122,11 @@ exec 9> "${sanity_check_lock_file}"
 if ! flock -s -n 9; then
   >&2 echo 'Cannot get sanity-check lock.'
   exit
+fi
+
+if [ "${action}" = 'tested' ]; then
+  receive_buglist > \
+    "${tmp_dir}/package-bug-titles"
 fi
 
 {
@@ -158,8 +170,8 @@ fi
         fi
       ;;
       'tested')
-        # TODO: check in bugtracker if package is faulty
-        if [ -f "${work_dir}/package-states/${package}.testing" ]; then
+        if [ -f "${work_dir}/package-states/${package}.testing" ] && \
+          ! package_has_bug "${package}" < "${tmp_dir}/package-bug-titles"; then
           mv \
             "${work_dir}/package-states/${package}.testing" \
             "${work_dir}/package-states/${package}.tested"
