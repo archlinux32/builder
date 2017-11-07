@@ -134,7 +134,6 @@ fi
   while read -r package reason; do
     if echo "${package}" | \
       grep -q '\.pkg\.tar\.xz$'; then
-    echo "'$package'" >&2
       package=$(
         find "${work_dir}/package-states" -maxdepth 1 \( -name '*.tested' -o -name '*.testing' \) \
           -exec grep -qxF "${package}" '{}' \; \
@@ -142,7 +141,6 @@ fi
           sed 's|\.[^.]\+$||' | \
           sort -u
       )
-    echo "'$package'" >&2
       if [ -z "${package}" ]; then
         continue
       fi
