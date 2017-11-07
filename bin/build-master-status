@@ -350,41 +350,43 @@ if ${web}; then
           )" \
           "${build_error}"
         if [ -f "${work_dir}/package-states/${sf}.blocked" ]; then
-          while read -r blocked_reason; do
-            if echo "${blocked_reason}" | \
-              grep -q '^wait for '; then
-              printf 'wait for '
-              echo "${blocked_reason}" | \
-                sed '
-                  s|^wait for ||
-                  s@\( and \| or \)@\n\1\n@
-                ' | \
-                while read -r reason; do
-                  if [ "FS#${reason#FS#}" = "${reason}" ]; then
-                    printf '<a href="https://bugs.archlinux.org/task/%s">%s</a>' \
-                      "${reason#FS#}" \
-                      "${reason}"
-                  elif grep -q "^$(str_to_regex "${reason}") " "${work_dir}/build-list"; then
-                    printf '<a href="graphs/%s.png">%s</a>' \
-                      "${reason}" \
-                      "${reason}"
-                  elif [ "${reason% *}" != "${reason}" ]; then
-                    printf '%s' \
-                      "${reason}"
-                  else
-                    printf '<font color="red">%s</font>' \
-                      "${reason}"
-                  fi
-                  if read -r operator; then
-                    printf ' %s ' "${operator}"
-                  fi
-                done
-            else
-              echo "${blocked_reason}"
-            fi
-          done < \
-            "${work_dir}/package-states/${sf}.blocked" | \
-            tr '\n' ' '
+          sed '
+            s|\s\(wait for \)|\n\1|g
+          ' "${work_dir}/package-states/${sf}.blocked" | \
+            while read -r blocked_reason; do
+              if echo "${blocked_reason}" | \
+                grep -q '^wait for '; then
+                printf 'wait for '
+                echo "${blocked_reason}" | \
+                  sed '
+                    s|^wait for ||
+                    s@\( and \| or \)@\n\1\n@
+                  ' | \
+                  while read -r reason; do
+                    if [ "FS#${reason#FS#}" = "${reason}" ]; then
+                      printf '<a href="https://bugs.archlinux.org/task/%s">%s</a>' \
+                        "${reason#FS#}" \
+                        "${reason}"
+                    elif grep -q "^$(str_to_regex "${reason}") " "${work_dir}/build-list"; then
+                      printf '<a href="graphs/%s.png">%s</a>' \
+                        "${reason}" \
+                        "${reason}"
+                    elif [ "${reason% *}" != "${reason}" ]; then
+                      printf '%s' \
+                        "${reason}"
+                    else
+                      printf '<font color="red">%s</font>' \
+                        "${reason}"
+                    fi
+                    if read -r operator; then
+                      printf ' %s ' "${operator}"
+                    fi
+                  done
+              else
+                echo "${blocked_reason}"
+              fi
+            done | \
+              tr '\n' ' '
         else
           printf '&nbsp;'
         fi
