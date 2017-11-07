@@ -186,7 +186,7 @@ fi
       ;;
       'tested')
         if [ -f "${work_dir}/package-states/${package}.testing" ] && \
-          ! grep -qF "[${package}]" "${tmp_dir}/package-bug-titles"; then
+          ! grep -qF "[${package%.*.*.*}]" "${tmp_dir}/package-bug-titles"; then
           mv \
             "${work_dir}/package-states/${package}.testing" \
             "${work_dir}/package-states/${package}.tested"
