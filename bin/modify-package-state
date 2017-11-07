@@ -11,6 +11,7 @@ usage() {
   >&2 echo ''
   >&2 echo 'possible options:'
   >&2 echo '  -b|--block:       Block package(s).'
+  >&2 echo '  -f|--faulty:      Mark testing/tested package(s) as faulty.'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-report:   Do not report what packages were modified.'
   >&2 echo '  -t|--tested:      Mark package(s) as tested.'
@@ -21,8 +22,9 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o bhntu \
+  getopt -o bfhntu \
     --long block \
+    --long faulty \
     --long help \
     --long no-report \
     --long tested \
@@ -43,6 +45,13 @@ do
         usage
       fi
       action='block'
+    ;;
+    -f|--faulty)
+      if [ -n "${action}" ]; then
+        >&2 echo 'Conflicting/redundand arguments.'
+        usage
+      fi
+      action='faulty'
     ;;
     -h|--help)
       usage 0
@@ -77,7 +86,7 @@ do
 done
 
 if [ -z "${action}" ]; then
-  >&2 echo 'Expected -b|-t|-u.'
+  >&2 echo 'Expected -b|-f|-t|-u.'
   usage
 fi
 
@@ -167,12 +176,21 @@ fi
           printf '%s %s\n' "${package}" "${reason}"
         fi
       ;;
+      'faulty')
+        if [ -f "${work_dir}/package-states/${package}.tested" ]; then
+          mv \
+            "${work_dir}/package-states/${package}.tested" \
+            "${work_dir}/package-states/${package}.testing"
+          printf '%s\n' "${package}"
+        fi
+      ;;
       'tested')
         if [ -f "${work_dir}/package-states/${package}.testing" ] && \
           ! package_has_bug "${package}" < "${tmp_dir}/package-bug-titles"; then
           mv \
             "${work_dir}/package-states/${package}.testing" \
             "${work_dir}/package-states/${package}.tested"
+          printf '%s\n' "${package}"
         fi
       ;;
       'unblock')

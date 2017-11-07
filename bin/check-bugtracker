@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# check the bug tracker for packages in testing and community-testing
+# with issues and mark these packages as "testing" if they are currently
+# marked as "tested"
+
+# shellcheck disable=SC2039
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+receive_buglist | \
+  grep '<\(community-\)\?testing>' | \
+  tr ' ,;' '\n' | \
+  sed -n '
+    s/^\[//
+    T
+    s/]$//
+    T
+    p
+  ' | \
+  sort -u > \
+  "${tmp_dir}/faulty-packages"
+
+find "${work_dir}/package-states" -name '*.tested' -printf '%f\n' | \
+  sed '
+    s|\.[^.]\+$||
+    s|^\(.*\)\(\.[^.]\+\)\{3\}$|\1 \0|
+  ' | \
+  sort -k1,1 | \
+  join -1 1 -2 1 -o 1.2 - "${tmp_dir}/faulty-packages" | \
+  "${base_dir}/bin/modify-package-state" -n --faulty /dev/stdin
