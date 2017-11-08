@@ -67,7 +67,7 @@ if [ $# -eq 0 ]; then
   broken=$(
     {
       # shellcheck disable=SC2086
-      printf '%s\n' ${broken}
+      printf '%s\n' ${broken} 'ALL-build-list'
       {
         find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png' -printf '%f\n' | \
           sed 's|\.png$||'
@@ -84,11 +84,11 @@ if [ $# -eq 0 ]; then
       sort -u
   )
   # shellcheck disable=SC2086
-  "$0" 'ALL' ${broken}
+  "$0" ${broken}
   {
     find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png'
     # shellcheck disable=SC2086
-    printf "${webserver_directory}"'/graphs/%s.png\n' ${broken} ${broken} 'ALL' 'ALL'
+    printf "${webserver_directory}"'/graphs/%s.png\n' ${broken} ${broken}
   } | \
     sort | \
     uniq -u | \
@@ -160,7 +160,7 @@ for target_package in "$@"; do
 
   output="${webserver_directory}/graphs/${target_package}.png"
 
-  if [ "${target_package}" = 'ALL' ]; then
+  if [ "${target_package}" = 'ALL-build-list' ]; then
 
     # groups and split packages built by jobs on the build list
     cat "${tmp_dir}/known-groups" "${tmp_dir}/known-split-packages" | \
@@ -303,7 +303,7 @@ for target_package in "$@"; do
     sort -k2,3 | \
     sponge "${tmp_dir}/knots"
 
-  if [ "${target_package}" != 'ALL' ]; then
+  if [ "${target_package}" != 'ALL-build-list' ]; then
 
     mkdir "${tmp_dir}/neighbours"
     cat "${tmp_dir}/knots" "${tmp_dir}/build-order" | \
@@ -398,7 +398,7 @@ for target_package in "$@"; do
   ' "${tmp_dir}/input"
 
   line_count=$(wc -l < "${tmp_dir}/input")
-  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL' ]; then
+  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL-build-list' ]; then
     sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
     line_count=$(wc -l < "${tmp_dir}/input")
     if [ "${line_count}" -gt 700 ]; then
