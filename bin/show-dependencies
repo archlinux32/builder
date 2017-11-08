@@ -67,7 +67,7 @@ if [ $# -eq 0 ]; then
   broken=$(
     {
       # shellcheck disable=SC2086
-      printf '%s\n' ${broken} 'ALL-build-list'
+      printf '%s\n' ${broken} 'ALL'
       {
         find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png' -printf '%f\n' | \
           sed 's|\.png$||'
@@ -156,11 +156,18 @@ find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f %p\n
   done > \
   "${tmp_dir}/known-split-packages"
 
+find "${work_dir}/package-infos" -maxdepth 1 -name '*.run-depends' -printf '%f %p\n' | \
+  while read -r name pf; do
+    xargs -r printf "%s ${name%.*.*.*.*}\n" < \
+      "${pf}"
+  done > \
+  "${tmp_dir}/known-run-depends"
+
 for target_package in "$@"; do
 
   output="${webserver_directory}/graphs/${target_package}.png"
 
-  if [ "${target_package}" = 'ALL-build-list' ]; then
+  if [ "${target_package}" = 'ALL' ]; then
 
     # groups and split packages built by jobs on the build list
     cat "${tmp_dir}/known-groups" "${tmp_dir}/known-split-packages" | \
@@ -189,6 +196,69 @@ for target_package in "$@"; do
       "${tmp_dir}/build-order"
 
     rm "${tmp_dir}/relevant-stuff"
+
+    find "${work_dir}/package-states" -name '*.done' -printf '%f\n' | \
+      sed 's|\(\.[^.]\+\)\{4\}||' | \
+      sort -u | \
+      tee "${tmp_dir}/done-packages" | \
+      sed 's|^|0 staging-package |' > \
+      "${tmp_dir}/knots"
+
+    {
+      cat \
+        "${tmp_dir}/known-groups" \
+        "${tmp_dir}/known-run-depends" \
+        "${tmp_dir}/known-split-packages"
+      awk '{print $1 " " $1}' < \
+        "${tmp_dir}/known-packages"
+    } | \
+      sort -k1,1 > \
+      "${tmp_dir}/known-connections.sorted.1"
+
+    sort -k2,2 \
+      "${tmp_dir}/known-connections.sorted.1" > \
+      "${tmp_dir}/known-connections.sorted.2"
+
+    {
+      # staging -> something -> build-list
+      join -1 1 -2 1 -o 1.1,1.2 \
+        "${tmp_dir}/known-connections.sorted.1" \
+        "${tmp_dir}/done-packages" | \
+        sort -k2,2 | \
+        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
+        - \
+        "${tmp_dir}/known-connections.sorted.1" | \
+        sort -k4,4 | \
+        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
+        - \
+        "${tmp_dir}/build-list.sorted-by-package" | \
+        sed '
+          s|^\(\S\+ \S\+\) |\1\n|
+        '
+      # build-list -> something -> staging
+      join -1 1 -2 1 -o 1.1,1.2 \
+        "${tmp_dir}/known-connections.sorted.1" \
+        "${tmp_dir}/build-list.sorted-by-package" | \
+        sort -k2,2 | \
+        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
+        - \
+        "${tmp_dir}/known-connections.sorted.1" | \
+        sort -k4,4 | \
+        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
+        - \
+        "${tmp_dir}/done-packages" | \
+        sed '
+          s|^\(\S\+ \S\+\) |\1\n|
+        '
+      cat "${tmp_dir}/build-order"
+    } | \
+      sort -u | \
+      sponge "${tmp_dir}/build-order"
+
+    rm \
+      "${tmp_dir}/done-packages" \
+      "${tmp_dir}/known-connections.sorted.1" \
+      "${tmp_dir}/known-connections.sorted.2"
 
   else
 
@@ -364,16 +434,18 @@ for target_package in "$@"; do
           color='#ff0000'
         elif [ "${what}" = 'build-list-package' ]; then
           color='#800000'
-        elif [ "${what}" = 'target-package' ]; then
-          color='#00ff00'
+        elif [ "${what}" = 'deletion-list-package' ]; then
+          color='#808080'
+        elif [ "${what}" = 'group' ]; then
+          color='#0000ff'
         elif [ "${what}" = 'package' ]; then
           color='#000000'
         elif [ "${what}" = 'split-package' ]; then
           color='#8080ff'
-        elif [ "${what}" = 'group' ]; then
-          color='#0000ff'
-        elif [ "${what}" = 'deletion-list-package' ]; then
-          color='#808080'
+        elif [ "${what}" = 'staging-package' ]; then
+          color='#008000'
+        elif [ "${what}" = 'target-package' ]; then
+          color='#00ff00'
         else
           color='#ff80ff'
         fi
@@ -396,7 +468,7 @@ for target_package in "$@"; do
   ' "${tmp_dir}/input"
 
   line_count=$(wc -l < "${tmp_dir}/input")
-  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL-build-list' ]; then
+  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL' ]; then
     sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
     line_count=$(wc -l < "${tmp_dir}/input")
     if [ "${line_count}" -gt 700 ]; then
