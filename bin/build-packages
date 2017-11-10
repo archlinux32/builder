@@ -306,7 +306,8 @@ while [ "${count}" -ne 0 ]; do
           "${straw}"
         # by piping the log, we don't see anything in the terminal,
         # but all ways to duplicate the logs seem pretty elaborate
-        if "${build_command}" ${parameters} > \
+        # shellcheck disable=SC2024
+        if sudo "${build_command}" ${parameters} > \
           "$(
             date -u --iso-8601=seconds | \
               cut -d+ -f1
@@ -353,8 +354,8 @@ while [ "${count}" -ne 0 ]; do
           fi
           # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
           # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
-          "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
-            "${x86_64_build_command}" -c -- -- --version > /dev/null 2>&1 || \
+          sudo "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
+            sudo "${x86_64_build_command}" -c -- -- --version > /dev/null 2>&1 || \
             true
           # now we generate diffs from the namcap.logs
           find . "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%p\n' | \
