@@ -197,6 +197,26 @@ if [ -n "${missing_files}" ]; then
   exit 3
 fi
 
+# check if the signatures are valid
+signatures=$(
+  find . -maxdepth 1 -name '*.pkg.tar.xz' \
+    -printf 'package file %f\n' \
+    -exec gpg --batch --status-fd 1 -q --homedir /etc/pacman.d/gnupg --verify '{}.sig' '{}' \; 2> /dev/null
+)
+if [ -z "$(
+  echo "${signatures}" | \
+    cut -d' ' -f2 | \
+    grep -x 'file\|TRUST_FULLY' | \
+    sort | \
+    uniq -c | \
+    awk '{print $1}' | \
+    uniq -d
+)" ]; then
+  >&2 echo 'Signature(s) is/are not fully trusted:'
+  >&2 echo "${signatures}"
+  exit 3
+fi
+
 # check if the sent packages are the expected ones
 packages=$(
   find . -maxdepth 1 -name '*.pkg.tar.xz' -printf '%f\n'
