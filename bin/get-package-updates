@@ -62,7 +62,7 @@ fi
 
 if [ -s "${work_dir}/build-master-sanity" ]; then
   >&2 echo 'Build master is not sane.'
-  exit 1
+  exit
 fi
 
 # delete_package package
