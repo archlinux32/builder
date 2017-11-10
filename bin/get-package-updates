@@ -474,6 +474,16 @@ else
   rm "${work_dir}/tsort.error"
 fi
 
+deletion_list_count=$(
+  wc -l < \
+    "${work_dir}/deletion-list.new"
+)
+if [ "${deletion_list_count}" -gt 1000 ]; then
+  >&2 printf 'There are %s > 1000 packages on the deletion-list. This does not seem right.\n' \
+    "${deletion_list_count}"
+  exit 3
+fi
+
 # Move the .new-files to the actual files
 
 rm -rf --one-file-system "${work_dir}/build-list.loops"
