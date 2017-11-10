@@ -11,6 +11,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 * `bc`
 ### build slave only
 * some ssh-client
+* `wget`
 * `sudo` rights for `staging-with-build-support-i686-build`, `staging-i686-build`, `multilib-build`, `extra-x86_64-build`
 * `devtools32`
 
