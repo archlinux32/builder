@@ -920,6 +920,8 @@ shrink_version() {
 
 # TODO: If a & b provide c, unmoveable a will block b, but it should not.
 # Same, if a & b depend on c (not in omega).
+# -- actually it looks alright from a source code point of view, but on the other
+# hand something behaves "conservative" :-/
 
 # find_biggest_subset_of_packages $omega $keep $all_builds $all_depends [ $force ]
 
