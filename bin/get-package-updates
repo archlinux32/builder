@@ -254,6 +254,9 @@ while read -r package git_revision mod_git_revision repository; do
 
 done < "${work_dir}/build-list.new"
 
+# TODO: Add "emergency break" if all / too many packages are getting on
+# the deletion-list
+
 echo 'apply blacklisting'
 # ignore blacklisted packages and dependent packages
 # this is the first time when all the information is available and up to date
