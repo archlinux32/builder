@@ -3,16 +3,16 @@ tools for building 32-bit archlinux packages from archlinux.org's official, 64-b
 This includes scripts to be run on the build master as well as scripts to be run on the build slaves (both residing in `bin`).
 
 ## requirements
-* `git`
 * `moreutils`
 ### build master only
 * some ssh-server
+* `git`
 * `pkgbuild-introspection`
 * `bc`
 ### build slave only
 * some ssh-client
+* `sudo` rights for `staging-with-build-support-i686-build`, `staging-i686-build`, `multilib-build`, `extra-x86_64-build`
 * `devtools32`
-* `mercurial`
 
 ## configuration
 The standard configuration in `conf/default.conf` can be locally overwritten by `conf/local.conf`.
