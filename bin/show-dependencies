@@ -234,6 +234,21 @@ for target_package in "$@"; do
         sed '
           s|^\(\S\+ \S\+\) |\1\n|
         '
+      # staging -> something -> staging
+      join -1 1 -2 1 -o 1.1,1.2 \
+        "${tmp_dir}/known-connections.sorted.1" \
+        "${tmp_dir}/done-packages" | \
+        sort -k2,2 | \
+        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
+        - \
+        "${tmp_dir}/known-connections.sorted.1" | \
+        sort -k4,4 | \
+        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
+        - \
+        "${tmp_dir}/done-packages" | \
+        sed '
+          s|^\(\S\+ \S\+\) |\1\n|
+        '
       # build-list -> something -> staging
       join -1 1 -2 1 -o 1.1,1.2 \
         "${tmp_dir}/known-connections.sorted.1" \
