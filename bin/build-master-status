@@ -464,7 +464,7 @@ if ${web}; then
         :a
         N
         /\n$/!ba
-        s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n\([0-9]\+\)\n|TODO #\3 - \1 (line \2):\n|
+        s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n\([0-9]\+\)\n|<a href="#TODO\3" name="TODO\3">TODO #\3</a> - <a href="https://github.com/archlinux32/builder/blob/master/\1#L\2">\1 (line \2)</a>:\n|
       ' | \
       sed '
         s|$|<br>|
