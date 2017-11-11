@@ -442,18 +442,18 @@ if ${web}; then
       '<body>'
     find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
       -exec sed -n '
-        /^\s*#\s*TODO:/{
-          s/^\s*#\s*TODO:\s*//
-          :a
-            N
-            s/\s*\n\s*#/\n/
-            ta
-          s/\n\n\+/\n/g
-          s/\n[^\n]*$/\n/
-          i {}
-          =
-          p
-        }' {} \; | \
+        s/^\s*#\s*TODO:\s*//
+        T
+        :a
+          N
+          s/\s*\n\s*#/\n/
+          ta
+        s/\n\n\+/\n/g
+        s/\n[^\n]*$/\n/
+        i {}
+        =
+        p
+      ' {} \; | \
       sed '
         :a
         N
