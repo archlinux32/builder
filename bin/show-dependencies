@@ -32,7 +32,7 @@ if [ $# -eq 0 ]; then
     broken=$(
       {
         find "${work_dir}/package-infos" -maxdepth 1 -name '*.build-depends' | \
-          sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}|\1 \0|' | \
+          sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}$|\1 \0|' | \
           sort -k1,1 | \
           join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \
           xargs -r cat
@@ -197,7 +197,7 @@ for target_package in "$@"; do
     rm "${tmp_dir}/relevant-stuff"
 
     find "${work_dir}/package-states" -name '*.done' -printf '%f\n' | \
-      sed 's|\(\.[^.]\+\)\{4\}||' | \
+      sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort -u | \
       tee "${tmp_dir}/done-packages" | \
       sed 's|^|0 staging-package |' > \
