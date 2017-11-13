@@ -2,9 +2,6 @@
 
 # contains functions used by more than one script
 
-# TODO: libreoffice-fresh-i18n should run-depend on libreoffice-fresh,
-# but it's not recognized.
-
 # shellcheck disable=SC2039
 
 if [ -z "${base_dir}" ]; then
