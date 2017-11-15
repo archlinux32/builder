@@ -87,11 +87,14 @@ pending_packages=$(
 next_tasks=$(
   {
     cat "${work_dir}/build-list"
-    find "${work_dir}/package-states" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
+    find "${work_dir}/package-states" -maxdepth 1 \
+      \( -name '*.broken' -o -name '*.blocked' \) \
+      -printf '%f\n' | \
       sed '
         s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
         p
-      '
+      ' | \
+      sort -u
   } | \
     sort | \
     uniq -u | \
