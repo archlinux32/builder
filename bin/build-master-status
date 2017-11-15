@@ -504,7 +504,7 @@ if ${web}; then
       tar -Ox | \
       sed '
         s@FS#\([0-9]\+\)@<a href="https://bugs.archlinux.org/task/\1">\0</a>@
-        s@FS32#\([0-9]\+\)@<a href="https://bugs.archlinux32.org/index.php?do=details&task_id=\1">\0</a>@
+        s@FS32#\([0-9]\+\)@<a href="https://bugs.archlinux32.org/index.php?do=details\&task_id=\1">\0</a>@
         /.#/!s/$/#/
         s|\(.\)#|\1</td><td>|
         /^\s*#/{
