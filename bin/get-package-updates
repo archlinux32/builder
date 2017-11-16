@@ -141,10 +141,6 @@ cp \
   "${work_dir}/deletion-list" \
   "${work_dir}/deletion-list.new"
 
-# TODO: Only tracking PKGBUILDs is ineffective if some error outside of the PKGBUILD (e.g. a missing source file)
-# is corrected upstream. On the other hand, changing files next to a PKGBUILD should not trigger a rebuild
-# if the package was already built successfully.
-
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
@@ -160,6 +156,25 @@ for repo in ${repo_names}; do
       git -C "${repo_path}" diff --no-renames --name-status "${old_repo_revision}" "${new_repo_revision}"
     fi
   } | \
+    # Packages which are already on the build list should receive a git_revision bump if _any_ file changed.
+    # Thus, we rename any file "PKGBUILD" to trigger the successive logic.
+    if [ "${repo}" = 'archlinux32' ]; then
+      sed "$(
+        sed '
+          s/ .*$//
+          s|^|\\@^.\\t[^/]\\+/|
+          s|$|/@ s@/[^/]*$@/PKGBUILD@|
+        ' "${work_dir}/build-list"
+      )"
+    else
+      sed "$(
+        sed '
+          s/ .*$//
+          s|^|\\@^.\\t|
+          s|$|/@ s@/[^/]*$@/PKGBUILD@|
+        ' "${work_dir}/build-list"
+      )"
+    fi | \
     # only track changes in PKGBUILDs
     grep '/PKGBUILD$' | \
     if [ "${repo}" = "archlinux32" ]; then
