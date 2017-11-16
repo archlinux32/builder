@@ -50,7 +50,7 @@ if [ "$5" = 'ERROR' ]; then
   if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
     ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
     # too late, package already outdated -> ignore error report
-    exit 0
+    exit 2
   fi
 
   # shellcheck disable=SC2154
