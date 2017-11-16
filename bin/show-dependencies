@@ -323,8 +323,10 @@ for target_package in "$@"; do
     while read -r pkg rev mod_rev repo; do
       if [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.broken" ]; then
         printf '1 broken-build-list-package %s\n' "${pkg}"
+      elif [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.blocked" ]; then
+        printf '2 blocked-build-list-package %s\n' "${pkg}"
       else
-        printf '2 build-list-package %s\n' "${pkg}"
+        printf '3 build-list-package %s\n' "${pkg}"
       fi
     done >> \
     "${tmp_dir}/knots"
@@ -337,7 +339,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '3 deletion-list-package %s\n' >> \
+    xargs -r printf '4 deletion-list-package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -349,7 +351,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '4 split-package %s\n' >> \
+    xargs -r printf '5 split-package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -360,7 +362,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '5 package %s\n' >> \
+    xargs -r printf '6 package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -372,7 +374,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '6 group %s\n' >> \
+    xargs -r printf '7 group %s\n' >> \
     "${tmp_dir}/knots"
 
   tr ' ' '\n' < \
@@ -446,6 +448,8 @@ for target_package in "$@"; do
       while read -r who what; do
         if [ "${what}" = 'broken-build-list-package' ]; then
           color='#ff0000'
+        elif [ "${what}" = 'blocked-build-list-package' ]; then
+          color='#d00000'
         elif [ "${what}" = 'build-list-package' ]; then
           color='#800000'
         elif [ "${what}" = 'deletion-list-package' ]; then
