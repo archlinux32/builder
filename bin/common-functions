@@ -1137,8 +1137,8 @@ print_list_of_archaic_packages() {
   for source in "$@"; do
     case "${source}" in
       'testing')
-        # packages remaining longer than 7 days in testing
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime +7 \
+        # packages remaining longer than $max_package_age_testing days in testing will be marked tested if no bug for them exists on FS32
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_testing}" \
           -exec head -n1 {} \; | \
           "${base_dir}/bin/modify-package-state" -n --tested /dev/stdin
       ;;
@@ -1157,8 +1157,8 @@ print_list_of_archaic_packages() {
           if [ "${mod_commit_date}" -gt "${commit_date}" ]; then
             commit_date="${mod_commit_date}"
           fi
-          # packages remaining longer than 7 days on the build list
-          if [ "$((commit_date + 24*60*60*7))" -lt "$(date '+%s')" ]; then
+          # packages remaining longer than $max_package_age_build_list days on the build list
+          if [ "$((commit_date + 24*60*60*max_package_age_build_list))" -lt "$(date '+%s')" ]; then
             printf '%s %s %s %s\n' \
               "${pkg}" \
               "${rev}" \
@@ -1169,8 +1169,8 @@ print_list_of_archaic_packages() {
           "${work_dir}/build-list"
       ;;
       'staging')
-        # packages remaining longer than 2 days in staging
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.done' -mtime +2 -printf '%f\n' | \
+        # packages remaining longer than $max_package_age_staging days in staging
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.done' -mtime "+${max_package_age_staging}" -printf '%f\n' | \
           sed '
             s|\.done$||
           '
