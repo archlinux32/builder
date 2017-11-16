@@ -730,7 +730,7 @@ find_newest_of_git_revisions() {
     }
 }
 
-# find_package_repository_to_package $package $git_repository
+# find_package_repository_to_package $package $git_repository $git_commit
 # find the package repository a package from a given git repository
 # belongs to
 
@@ -738,13 +738,14 @@ find_package_repository_to_package() {
 
   local package="$1"
   local git_repository="$2"
+  local git_commit="$3"
   local repo_path
   local repo
 
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
   repo=$(
-    git -C "${repo_path}" archive "$(cat "${work_dir}/${git_repository}.revision")" -- "${package}/repos" 2> /dev/null | \
+    git -C "${repo_path}" archive "${git_commit}" -- "${package}/repos" 2> /dev/null | \
       tar -t | \
       cut -d/ -f3 | \
       grep -vxF '' | \

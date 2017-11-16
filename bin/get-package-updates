@@ -236,7 +236,7 @@ done | \
       if ${found_package}; then
         mode='M'
         repository=$(
-          find_package_repository_to_package "${package}" "${repository}"
+          find_package_repository_to_package "${package}" "${repository}" "${git_revision}"
         )
       else
         delete_package "${package}"
