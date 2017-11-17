@@ -281,6 +281,9 @@ if ${web}; then
       -exec zgrep -q '^==> ERROR: A failure occurred in prepare()\.$' {} \; \
       -printf '%f prepare()\n' \
     \) -o \
+      -exec zgrep -q '^==> ERROR: A failure occurred in package()\.$' {} \; \
+      -printf '%f package()\n' \
+    \) -o \
     \( \
     \( \
       -exec zgrep -q '^==> ERROR: Could not download sources\.$' {} \; \
