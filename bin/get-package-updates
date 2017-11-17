@@ -234,8 +234,7 @@ done | \
         fi
       done
       if ${found_package}; then
-# TODO: moving packages between community64 and packages64 is currently broken
-# (See wpa_actiond a99f6cf159b14c971fcd2a9763e1e300998926c5)
+# TODO: moving packages between community64 and packages64 is currently broken (?)
         mode='M'
         repository=$(
           find_package_repository_to_package "${package}" "${repository}" "${git_revision}"
