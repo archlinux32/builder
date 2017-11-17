@@ -7,6 +7,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: Find out, why sometimes package updates are missed.
+
 usage() {
   >&2 echo ''
   >&2 echo 'get-package-updates: check for packages that need to be built,'
