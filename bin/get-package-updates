@@ -219,7 +219,7 @@ done | \
         if [ "${repository}" = "archlinux32" ]; then
           if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision.new")" 2> /dev/null | \
             tar -t 2> /dev/null | \
-            grep -q "$(str_to_regex "${package}")/PKGBUILD$"; then
+            grep -q "/$(str_to_regex "${package}")/PKGBUILD$"; then
             found_package=true
             break;
           fi
