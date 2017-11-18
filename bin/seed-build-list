@@ -5,6 +5,9 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: seed-build-list sometimes gives _too_many_ packages.
+# How can this happen?
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
