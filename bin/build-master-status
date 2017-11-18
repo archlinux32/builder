@@ -234,9 +234,9 @@ if ${web}; then
         s|^\S\+ ||
         s|$|</td></tr>|
         s|\.locked |</td><td>|
-        s|\.\([^.]\+\)$|</td><td>\1|
-        s|\.\([^.]\+\)$|</td><td>\1|
-        s|\.\([^.]\+\)$|</td><td>\1|
+        s|\.\([^.]\+\)$|</p></td><td>\1|
+        s|\.\([^.]\+\)$|</p></td><td><p style=\"font-size:8px\">\1|
+        s|\.\([^.]\+\)$|</td><td><p style=\"font-size:8px\">\1|
       '
     printf '%s\n' \
       '</table>' \
