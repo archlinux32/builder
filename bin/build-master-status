@@ -5,9 +5,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: Do not extract infos available on the buildmaster from
-# the master mirror
-
 # TODO: Count tested packages.
 
 usage() {
@@ -108,21 +105,17 @@ next_tasks=$(
     wc -l
 )
 staging=$(
-  ls_master_mirror 'i686' | \
-    grep 'staging$' | \
-    while read -r dir; do
-      ls_master_mirror "i686/${dir}"
-    done | \
-    grep -c '\.pkg\.tar\.xz$'
-) || true
+  find "${work_dir}/package-states" -name '*.done' \
+    -exec cat '{}' \; | \
+    sort -u | \
+    wc -l
+)
 testing=$(
-  ls_master_mirror 'i686' | \
-    grep 'testing$' | \
-    while read -r dir; do
-      ls_master_mirror "i686/${dir}"
-    done | \
-    grep -c '\.pkg\.tar\.xz$'
-) || true
+  find "${work_dir}/package-states" \( -name '*.testing' -o -name '*.tested' \) \
+    -exec cat '{}' \; | \
+    sort -u | \
+    wc -l
+)
 {
   find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
     sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
