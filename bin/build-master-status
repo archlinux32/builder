@@ -5,6 +5,11 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: Do not extract infos available on the buildmaster from
+# the master mirror
+
+# TODO: Count tested packages.
+
 usage() {
   >&2 echo ''
   >&2 echo 'build-master-status: report about status of build master'
