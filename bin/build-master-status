@@ -5,8 +5,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: Count tested packages.
-
 usage() {
   >&2 echo ''
   >&2 echo 'build-master-status: report about status of build master'
@@ -111,7 +109,13 @@ staging=$(
     wc -l
 )
 testing=$(
-  find "${work_dir}/package-states" \( -name '*.testing' -o -name '*.tested' \) \
+  find "${work_dir}/package-states" -name '*.testing' \
+    -exec cat '{}' \; | \
+    sort -u | \
+    wc -l
+)
+tested=$(
+  find "${work_dir}/package-states" -name '*.tested' \
     -exec cat '{}' \; | \
     sort -u | \
     wc -l
@@ -166,14 +170,15 @@ looped_packages=$(
 {
   printf 'The mirror master contains %d stable packages (vs. ca. %d planned).\n' \
     "${stable}" \
-    "$((staging+testing+pending_packages))"
+    "$((staging+testing+tested+pending_packages))"
   printf 'The build list contains %d tasks (incl. broken: %d, leading to %d packages), of which %s can be built immediately.\n' \
     "$((tasks-broken))" \
     "${tasks}" \
     "${pending_packages}" \
     "${next_tasks}"
-  printf 'There are %d testing and %d staging packages.\n' \
-    "${testing}" \
+  printf 'There are %d testing (of which are %s tested) and %d staging packages.\n' \
+    "$((testing+tested))" \
+    "${tested}" \
     "${staging}"
   printf 'There are %d broken package builds.\n' \
     "${broken}"
@@ -182,17 +187,17 @@ looped_packages=$(
       "${loops}" \
       "${looped_packages}"
   fi
-  if [ $((broken+testing+staging)) -ne 0 ]; then
+  if [ $((broken+testing+tested+staging)) -ne 0 ]; then
     printf '%.1f%% of all packages are broken.\n' \
       "$(
-        echo "scale=10; 100*${broken}/(${broken}+${testing}+${staging})" | \
+        echo "scale=10; 100*${broken}/(${broken}+${testing}+${tested}+${staging})" | \
           bc
       )"
   fi
-  if [ $((testing+staging+pending_packages-broken)) -ne 0 ]; then
+  if [ $((testing+tested+staging+pending_packages-broken)) -ne 0 ]; then
     printf '%.1f%% of the planned work has been done.\n' \
       "$(
-        echo "scale=10; 100*(${testing}+${staging})/(${testing}+${staging}+${pending_packages}-${broken})" | \
+        echo "scale=10; 100*(${testing}+${staging})/(${testing}+${tested}+${staging}+${pending_packages}-${broken})" | \
           bc
       )"
   fi
@@ -255,7 +260,8 @@ if ${web}; then
       "${looped_packages}" \
       "${locked}" \
       "${blocked}" \
-      "${next_tasks}" | \
+      "${next_tasks}" \
+      "${tested}" | \
       sed 's| $|\n|'
     echo "${end}"
   } | \
