@@ -16,6 +16,9 @@
 
 # TODO: sign database
 
+# TODO: use decimal pkgrels to indicate recurring builds of identical
+# package versions
+
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
