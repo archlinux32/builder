@@ -1195,7 +1195,7 @@ print_list_of_archaic_packages() {
 receive_buglist() {
   local category
   category="$1"
-  curl -Ss 'http://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
+  curl -LSs 'https://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
     sed '
       1 d
       /^[^,]\+,"Packages: '"${category}"'",/ ! d
