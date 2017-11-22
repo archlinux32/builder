@@ -3,6 +3,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: enable email interface to reschedule builds
+
 if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo 'usage: interpret-mail'
