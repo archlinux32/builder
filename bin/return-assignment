@@ -123,7 +123,8 @@ clean_up_lock_file() {
 }
 
 if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
-  ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+  ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] ||
+  ! [ "$5" = "$(next_sub_pkgrel "$1" "$2" "$3" "$4")" ]; then
   >&2 echo 'Sorry, the sent package is outdated.'
   exit 2
 fi

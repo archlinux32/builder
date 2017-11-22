@@ -19,6 +19,11 @@ mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
+  # find out the sub_pkgrel
+  sub_pkgrel=$(
+    next_sub_pkgrel "$1" "$2" "$3" "$4"
+  )
+
   # we don't care anymore if an older version of this package was
   # "locked" or "broken"
   find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
@@ -35,7 +40,7 @@ hand_out_assignment() {
     $ a '"$1 $2 $3 $4" \
     "${work_dir}/build-list"
 
-  echo "$1 $2 $3 $4"
+  echo "$1 $2 $3 $4 ${sub_pkgrel}"
   # shellcheck disable=SC2154
   echo "${slave}" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.locked"

@@ -406,7 +406,7 @@ while [ "${count}" -ne 0 ]; do
               -i "${master_build_server_identity}" \
               -p "${master_build_server_port}" \
               "${master_build_server_user}@${master_build_server}" \
-              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" \
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" "${sub_pkgrel}" \
               < 'package.tar' || \
               err=$?
             case ${err} in
