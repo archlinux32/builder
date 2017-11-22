@@ -414,10 +414,6 @@ ls_master_mirror() {
 
 # this ensures an any package may replace arch-specific packages of the same version and vice versa
 
-# TODO: It looks, like epoch is not considered correctly:
-# Moving kstars-1:2.8.8-1-i686.pkg.tar.xz to community-testing
-# did not remove kstars-17.08.3-1-i686.pkg.tar.xz from testing.
-
 remove_old_package_versions() {
 
   local arch="$1"
