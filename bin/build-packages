@@ -253,7 +253,7 @@ while [ "${count}" -ne 0 ]; do
                 s|^pkgbase = \(.*\)$|0 \1-|
                 s|^epoch = \(.*\)$|1 \1:|
                 s|^pkgver = \(.*\)$|2 \1-|
-                s|^pkgrel = \(.*\)$|3 \1.src.tar.gz|
+                s|^pkgrel = \([^.]*\)\(\..*\)\?$|3 \1.src.tar.gz|
               ' | \
               sort -k1n,1 | \
               sed '
