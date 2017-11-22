@@ -180,12 +180,22 @@ while [ "${count}" -ne 0 ]; do
     0)
       [ ${count} -gt 0 ] && \
         count=$((count-1))
+      sub_pkgrel="${package##* }"
+      package="${package% *}"
       repository="${package##* }"
       package="${package% *}"
       mod_git_revision="${package##* }"
       package="${package% *}"
       git_revision="${package##* }"
-      package="${package% *}"
+      if [ "${git_revision}" = "${package}" ]; then
+        # build master did not tell us a sub_pkgrel
+        git_revision="${mod_git_revision}"
+        mod_git_revision="${repository}"
+        repository="${sub_pkgrel}"
+        sub_pkgrel='0'
+      else
+        package="${package% *}"
+      fi
 
       if [ "${git_revision##*-}" = 'HEAD' ]; then
         git_revision=$(
@@ -233,7 +243,7 @@ while [ "${count}" -ne 0 ]; do
       tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
       trap bail_out EXIT
 
-      extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
+      extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}" "${sub_pkgrel}"
 
       cd "${tmp_dir}"
       success=false

@@ -635,7 +635,7 @@ make_source_info() {
     tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-    extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}"
+    extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}" '0'
 
     {
       cd "${tmp_dir}"
@@ -675,15 +675,23 @@ recursively_umount_and_rm() {
   rm -rf --one-file-system "${dir}"
 }
 
-# append_architectures $PKGBUILD
+# mangle_pkgbuild $PKGBUILD [$sub_pkgrel]
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
+#  append $sub_pkgrel to the pkgrel
 
-append_architectures() {
+mangle_pkgbuild() {
   local PKGBUILD="$1"
+  local sub_pkgrel="$2"
+
+  if [ -n "${sub_pkgrel}" ]; then
+    sub_pkgrel=".${sub_pkgrel}"
+  fi
+
   sed -i '
     /^arch=[^#]*any/!{
       /^arch=(/s/(/(i686 /
     }
+    s/^\(\s*pkgrel=\)['"'"'"]\?\([0-9.]\+\)['"'"'"]\?\s*\(#.*\)\?$/\1"\2'"${sub_pkgrel}"'"/
   ' "${PKGBUILD}"
 }
 
@@ -770,7 +778,7 @@ find_package_repository_to_package() {
 
 }
 
-# extract_source_directory $git_repo $rev $mod_rev $output
+# extract_source_directory $git_repo $rev $mod_rev $output $sub_pkgrel
 # extract files found in the svn/git source directories
 # $PKGBUILD and $PKGBUILD_mod are expected to be set correctly
 
@@ -780,6 +788,7 @@ extract_source_directory() {
   local rev="$2"
   local mod_rev="$3"
   local output="$4"
+  local sub_pkgrel="$5"
 
   if [ -n "${PKGBUILD}" ]; then
     eval 'git -C "${repo_paths__'"${git_repo}"'}" archive "${rev}" -- "${PKGBUILD%/*}"' | \
@@ -795,7 +804,7 @@ extract_source_directory() {
       "${output}/PKGBUILD"
   fi
 
-  append_architectures "${output}/PKGBUILD"
+  mangle_pkgbuild "${output}/PKGBUILD" "${sub_pkgrel}"
 
   # shellcheck disable=SC2016
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
