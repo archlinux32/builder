@@ -907,7 +907,8 @@ download_sources_by_hash() {
 }
 
 # expand_version $column_num
-# add "+0" to version in $colum_num-th column if no "+" is there
+# add "0:" to version in $colum_num-th column if no ":" is there (epoch)
+# add "+0" to version in $colum_num-th column if no "+" is there (git count/hash)
 
 expand_version() {
   local column_num
@@ -915,11 +916,13 @@ expand_version() {
 
   sed '
     /^\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*+/! s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*\)-/\1+0-/
+    /^\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*:/! s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\)/\10:/
   '
 }
 
 # shrink_version $column_num
-# remove "+0" from version in $colum_num-th column
+# remove "0:" from version in $colum_num-th column (epoch)
+# remove "+0" from version in $colum_num-th column (git count/hash)
 
 shrink_version() {
   local column_num
@@ -927,6 +930,7 @@ shrink_version() {
 
   sed '
     s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\S*\)+0-/\1-/
+    s/^\(\(\S\+\s\+\)\{'"$((column_num-1))"'\}\)0:/\1/
   '
 }
 
