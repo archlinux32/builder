@@ -5,6 +5,8 @@
 
 # TODO: enable email interface to reschedule builds
 
+# TODO: enable email interface to delete packages
+
 if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo 'usage: interpret-mail'
