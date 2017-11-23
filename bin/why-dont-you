@@ -24,8 +24,31 @@ case "${action}" in
       } | \
         while read -r package git_revision mod_git_revision repository; do
 
-          if package_locked_or_blocked "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"; then
-            printf '"%s" is locked or blocked\n' "${pkg}"
+          if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+            printf '"%s" is locked by ' "$1"
+            sort -u < \
+              "${work_dir}/package-states/$1.$2.$3.$4.locked" \
+              sed '
+                :a
+                  $!{
+                    N
+                    s/\n/, /
+                    ba
+                  }
+                s/$/./
+              '
+            continue
+          fi
+          if [ -f "${work_dir}/package-states/$1.$2.$3.$4.blocked" ]; then
+            printf '"%s" is blocked: "' "${pkg}"
+            tr '[:space:]' ' ' < \
+              "${work_dir}/package-states/$1.$2.$3.$4.blocked" | \
+              sed '
+                s|  \+| |
+                s|^ ||
+                s| $||
+              '
+            printf '"\n'
             continue
           fi
 
