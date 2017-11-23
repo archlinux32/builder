@@ -108,14 +108,6 @@ find_git_repository_to_package_repository() {
 
 }
 
-# package_locked_or_blocked package git_revision mod_git_revision repository
-# return if package - of given repository and revisions - is [locked or blocked]
-
-package_locked_or_blocked() {
-  [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] || \
-    [ -f "${work_dir}/package-states/$1.$2.$3.$4.blocked" ]
-}
-
 # generate_package_metadata $package $git_revision $mod_git_revision $repository
 # or
 # generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
