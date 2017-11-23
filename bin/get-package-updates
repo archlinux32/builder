@@ -9,6 +9,7 @@
 
 # TODO: Find out, why sometimes package updates are missed.
 
+# shellcheck disable=SC2016
 usage() {
   >&2 echo ''
   >&2 echo 'get-package-updates: check for packages that need to be built,'
@@ -18,19 +19,24 @@ usage() {
   >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
   >&2 echo '  -h|--help:    Show this help and exit.'
   >&2 echo '  -n|--no-pull: Do not pull git repos, merely reorder build list.'
+  >&2 echo '  -x|--test-exclusion $package:'
+  >&2 echo '                Print additionally deleted/excluded packages if'
+  >&2 echo '                "$package" would be black listed.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bhn \
+  getopt -o bhnx: \
     --long block \
     --long help \
     --long no-pull \
+    --long test-exclusion: \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 block_flag='-n'
+test_exclusion=''
 pull=true
 
 while true
@@ -44,6 +50,15 @@ do
     ;;
     -n|--no-pull)
       pull=false
+    ;;
+    -x|--test-exclusion)
+      shift
+      if [ -n "${test_exclusion}" ]; then
+        >&2 printf 'I already have --test-exlusion=%s and you gave me another one.\n' "${test_exclusion}"
+        >&2 printf 'But I can only handle one exclusion test at a time.\n'
+        exit 2
+      fi
+      test_exclusion="$1"
     ;;
     --)
       shift
@@ -288,6 +303,9 @@ black_listed_new=$(
         s/\s*#.*$//
         /^\s*$/d
       '
+    if [ -n "${test_exclusion}" ]; then
+      echo "${test_exclusion}"
+    fi
     find "${work_dir}/package-infos" -maxdepth 1 -name 'lib32-*' -printf '%f\n' | \
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       uniq
@@ -417,6 +435,15 @@ echo "${black_listed}" | \
 
 sort -u "${work_dir}/deletion-list.new" | \
   sponge "${work_dir}/deletion-list.new"
+
+
+if [ -n "${test_exclusion}" ]; then
+  # we should not actually update the build-list et. al, but solely print this difference:
+  if diff --color -u "${work_dir}/deletion-list" "${work_dir}/deletion-list.new"; then
+    printf 'If you put "%s" on the blacklist, no additional packages will end up on the deletion list.\n' "${test_exclusion}"
+  fi
+  exit 0
+fi
 
 # Now we create the partial order.
 
