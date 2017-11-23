@@ -1263,3 +1263,23 @@ next_sub_pkgrel() {
     fi
   )
 }
+
+# modification_revision_link "${mod_rev}" "${repo}" "${pkg}"
+# print the given modification revision possibly with a html link to github
+
+modification_revision_link() {
+  local mod_rev="$1"
+  local repo="$2"
+  local pkg="$3"
+
+  if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
+    printf '<a href="https://github.com/archlinux32/packages/tree/%s/%s/%s">%s</a>\n' \
+      "${mod_rev}" \
+      "${repo}" \
+      "${pkg}" \
+      "${mod_rev}"
+  else
+    printf '%s\n' \
+      "${mod_rev}"
+  fi
+}

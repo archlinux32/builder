@@ -229,7 +229,7 @@ if ${web}; then
       'build slave'
     printf '</tr>'
     find "${work_dir}/package-states" -maxdepth 1 -name '*.locked' \
-      -printf '%T@ <tr><td>%TY-%Tm-%Td %TH:%TM</td><td>%f ' \
+      -printf '%T@ %TY-%Tm-%Td %TH:%TM %f ' \
       -execdir sed '
         :a
           $!{
@@ -241,12 +241,22 @@ if ${web}; then
       sort -k1n,1 | \
       sed '
         s|^\S\+ ||
-        s|$|</td></tr>|
-        s|\.locked |</td><td>|
-        s|\.\([^.]\+\)$|</p></td><td>\1|
-        s|\.\([^.]\+\)$|</p></td><td><p style=\"font-size:8px\">\1|
-        s|\.\([^.]\+\)$|</td><td><p style=\"font-size:8px\">\1|
-      '
+        s|\.locked | |
+        s|\.\([^.]\+\)$| \1|
+        s|\.\([^.]\+\)$| \1|
+        s|\.\([^.]\+\)$| \1|
+      ' | \
+      while read -r date time pkg rev mod_rev repo slaves; do
+        printf '<tr>'
+        printf '<td>%s</td>' \
+          "${date} ${time}" \
+          "${pkg}" \
+          "<p style=\"font-size:8px\">${rev}</p>" \
+          "<p style=\"font-size:8px\">$(modification_revision_link "${mod_rev}" "${repo}" "${pkg}")</p>" \
+          "${repo}" \
+          "${slaves}"
+        printf '</tr>\n'
+      done
     printf '%s\n' \
       '</table>' \
       '</body>' \
@@ -432,9 +442,9 @@ if ${web}; then
           unset right
         fi
         printf '<tr>'
-        if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
-          mod_rev="<a href=\"https://github.com/archlinux32/packages/tree/${mod_rev}/${repo}/${pkg}\">${mod_rev}</a>"
-        fi
+        mod_rev=$(
+          modification_revision_link "${mod_rev}" "${repo}" "${pkg}"
+        )
         build_error=$(
           echo "${build_error}" | \
             sed 's|,|, |g'
