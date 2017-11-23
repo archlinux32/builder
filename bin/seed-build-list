@@ -89,6 +89,12 @@ if [ $# -ne 0 ]; then
   usage 1
 fi
 
+if [ ! -s "${tmp_dir}/mirrors" ] && \
+  [ ! -s "${tmp_dir}/package-regexes" ]; then
+  # nothing to do
+  exit 0
+fi
+
 repos="${stable_package_repositories}"
 
 find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f\n' | \
@@ -273,8 +279,8 @@ fi
 
 if ${update}; then
   awk '{print $4 " " $1 " " $2 " " $3}' \
-    "${tmp_dir}/build-list.new" >> \
-    "${work_dir}/build-list"
+    "${tmp_dir}/build-list.new" | \
+    tee -a "${work_dir}/build-list"
 
   # Remove the lock file
 

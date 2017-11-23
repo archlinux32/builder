@@ -29,6 +29,9 @@ if [ $# -ne 0 ]; then
   >&2 echo '  - "unblock: <state-file>":'
   >&2 echo '    Unblock the given packge.'
   >&2 echo ''
+  >&2 echo '  - "schedule: <pkgname>":'
+  >&2 echo '    Put the given package on the build list (again).'
+  >&2 echo ''
   >&2 echo '  - ALL: all of the above (only valid in'
   >&2 echo '    "conf/admin-gpg-keys")'
   >&2 echo ''
@@ -213,5 +216,21 @@ if [ -s "${tmp_dir}/unblock" ]; then
     fi
   else
     log 'There was an error while unblocking the packages - ignoring this message.\n'
+  fi
+fi
+
+if [ -s "${tmp_dir}/schedule" ]; then
+  # shellcheck disable=SC2046
+  "${base_dir}/bin/seed-build-list" $(
+    tr '[:space:]' '\n' < \
+      "${tmp_dir}/schedule" | \
+      grep -vxF '' | \
+      while read -r package; do
+        printf -- '-p ^%s$\n' "$(str_to_regex "${package}")"
+      done
+  ) | \
+    sponge "${tmp_dir}/schedule"
+  if [ -s "${tmp_dir}/schedule" ]; then
+    log 'Successfully (re)scheduled %s packages.\n' "$(wc -l < "${tmp_dir}/schedule")"
   fi
 fi
