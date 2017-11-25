@@ -432,7 +432,7 @@ while [ "${count}" -ne 0 ]; do
               ;;
               *)
                 >&2 echo "unknown return code ${err} from 'return-assignment'"
-                bail_out 1
+                wait_some_time 60
             esac
           done
           success=true
