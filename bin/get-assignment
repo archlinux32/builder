@@ -44,7 +44,9 @@ hand_out_assignment() {
   {
     # shellcheck disable=SC2154
     echo "${slave}"
-    cat "${work_dir}/package-states/$1.$2.$3.$4.locked"
+    if [ -r "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
+      cat "${work_dir}/package-states/$1.$2.$3.$4.locked"
+    fi
   } | \
     sort -u | \
     sponge "${work_dir}/package-states/$1.$2.$3.$4.locked"
