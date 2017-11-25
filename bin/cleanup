@@ -39,13 +39,17 @@ fi
 
 # remove logs where package is not broken/locked anymore
 
-# TODO: keep logs of staging and testing packages, too
 
 {
   find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
     sed 's|\.[^.]\+\.build-log\.gz$||' | \
     sort -u
-  find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' \) -printf '%f\n' | \
+  find "${work_dir}/package-states" -maxdepth 1 \( \
+    -name '*.broken' -o \
+    -name '*.done' -o \
+    -name '*.locked' -o \
+    -name '*.testing' \
+  \) -printf '%f\n' | \
     sed '
       s|\.[^.]\+$||
       p
