@@ -454,14 +454,33 @@ while [ "${count}" -ne 0 ]; do
         if ${upload_to_build_master} && \
           tar -cf 'build-logs.gz.tar' \
           -- *'.build-log.gz'; then
-          while ! ssh \
-            -i "${master_build_server_identity}" \
-            -p "${master_build_server_port}" \
-            "${master_build_server_user}@${master_build_server}" \
-            'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' < \
-            'build-logs.gz.tar'; do
-            >&2 echo 'There was an error during the upload of the package, I will try again.'
-            wait_some_time 15
+          while true; do
+            err=0
+            # shellcheck disable=SC2029
+            ssh \
+              -i "${master_build_server_identity}" \
+              -p "${master_build_server_port}" \
+              "${master_build_server_user}@${master_build_server}" \
+              'return-assignment' "${package}" "${git_revision}" "${mod_git_revision}" "${repository}" 'ERROR' \
+              < 'build-logs.gz.tar' || \
+              err=$?
+            case ${err} in
+              0)
+                # upload successful
+                break
+              ;;
+              1)
+                >&2 echo '"return-assignment" was running already.'
+                wait_some_time 15
+              ;;
+              2)
+                >&2 echo 'I was too slow, the package is outdated. I will continue ...'
+                break
+              ;;
+              *)
+                >&2 echo "unknown return code ${err} from 'return-assignment'"
+                wait_some_time 60
+            esac
           done
         fi
         if ${exit_after_failure}; then
