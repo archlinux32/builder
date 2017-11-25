@@ -545,6 +545,40 @@ if ${web}; then
   } > \
     "${tmp_dir}/blacklist.html"
 
+  {
+    printf '%s\n' \
+      '<html>' \
+      '<head>' \
+      '<title>log of ssh connections from build slaves</title>' \
+      '</head>' \
+      '<body>' \
+      '<table>'
+    printf '<tr>'
+    printf '<th>%s</th>' \
+      'time' \
+      'build slave' \
+      'command' \
+      'arguments'
+    printf '</tr>\n'
+    if [ -r "${work_dir}/ssh-log" ]; then
+      while read -r date time slave command arguments; do
+        printf '<tr>'
+        printf '<td>%s</td>' \
+          "${date} ${time}" \
+          "${slave}" \
+          "${command}" \
+          "${arguments}"
+        printf '</tr>\n'
+      done < \
+        "${work_dir}/ssh-log"
+    fi
+    printf '%s\n' \
+      '</table>' \
+      '</body>' \
+      '</html>'
+  } > \
+    "${tmp_dir}/ssh-log.html"
+
   find "${tmp_dir}" -maxdepth 1 -type f | \
     while read -r file; do
       cat "${file}" > \
