@@ -15,7 +15,7 @@ if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
 
   fi
 
-  printf '%s %s %s' "$(date '+%F %T')" "$1" "${SSH_ORIGINAL_COMMAND}" >> \
+  printf '%s %s %s\n' "$(date '+%F %T')" "$1" "${SSH_ORIGINAL_COMMAND}" >> \
     "${work_dir}/ssh-log"
 
   slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
