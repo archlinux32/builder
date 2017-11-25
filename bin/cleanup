@@ -85,6 +85,10 @@ find "${build_log_directory}/error" -maxdepth 1 -type f -printf '%f\n' | \
     done
   }
 
+# only keep last 50 lines of ssh-log
+tail -n50 "${work_dir}/ssh-log" | \
+  sponge "${work_dir}/ssh-log"
+
 # only keep namcap logs of last 2 weeks for succeeded packages
 find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 \
   -not -exec zgrep -q '^+.*ELF file .* has text relocations' '{}' \; \
