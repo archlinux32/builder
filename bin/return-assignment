@@ -49,14 +49,14 @@ if [ "$5" = 'ERROR' ]; then
 
   if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
     ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-    # too late, package already outdated -> ignore error report
+    >&2 echo 'Too late, package already outdated, I ignore this error report.'
     exit 2
   fi
 
   # shellcheck disable=SC2154
   if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
-    # whoops, this package is not built by this slave
-    exit 0
+    >&2 echo 'You do not build this package - move on.'
+    exit 2
   fi
 
   # save sent build logs
