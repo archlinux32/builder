@@ -2,6 +2,8 @@
 
 # contains functions used by more than one script
 
+# TODO: include link depenendencies in run-depends metadata
+
 # shellcheck disable=SC2039
 
 if [ -z "${base_dir}" ]; then
