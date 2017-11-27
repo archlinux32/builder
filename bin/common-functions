@@ -746,16 +746,25 @@ find_package_repository_to_package() {
 
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
-  repo=$(
-    git -C "${repo_path}" archive "${git_commit}" -- "${package}/repos" 2> /dev/null | \
-      tar -t | \
-      cut -d/ -f3 | \
-      grep -vxF '' | \
-      grep -v 'staging\|testing\|-unstable' | \
-      grep -v -- '-i686$' | \
-      sed 's|-[^-]\+$||' | \
-      sort -u
-  )
+  if [ "${git_repository}" = 'archlinux32' ]; then
+    repo=$(
+      git -C "${repo_path}" archive "${git_commit}" -- | \
+        tar -t --wildcards "*/${package}/" | \
+        cut -d/ -f1 | \
+        sort -u
+    )
+  else
+    repo=$(
+      git -C "${repo_path}" archive "${git_commit}" -- "${package}/repos" 2> /dev/null | \
+        tar -t | \
+        cut -d/ -f3 | \
+        grep -vxF '' | \
+        grep -v 'staging\|testing\|-unstable' | \
+        grep -v -- '-i686$' | \
+        sed 's|-[^-]\+$||' | \
+        sort -u
+    )
+  fi
 
   if [ -z "${repo}" ]; then
     return 1
