@@ -99,3 +99,12 @@ find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 \
 
 # remove old package meta data
 delete_old_metadata
+
+# remove dependency graphs of packages on the deletion list
+sed '
+  s|^|'"${webserver_directory}"'/graphs/|
+  s|$|.png|
+' "${work_dir}/deletion-list" | \
+  xargs -rn1 rm -f
+
+exit 0
