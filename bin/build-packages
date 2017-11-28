@@ -331,7 +331,7 @@ while [ "${count}" -ne 0 ]; do
           >&2 printf ' ok.\n'
           tar_content_dir=$(mktemp -d "${tmp_dir}/tar-content.XXXXXX")
           find . -maxdepth 1 -type f -name '*-debug-*.pkg.tar.xz*' -delete
-          >&2 printf 'generating namcap-log for x86_64 package(s) ...'
+          >&2 printf 'signing package(s)\n'
           find . -maxdepth 1 -type f -name '*.pkg.tar.xz' \
             -execdir gpg --local-user="${package_key}" --detach-sign '{}' \; \
             -execdir mv '{}' '{}.sig' '{}-namcap.log' "${tar_content_dir}/" \; \
@@ -357,9 +357,12 @@ while [ "${count}" -ne 0 ]; do
                   s/-i686\(\.pkg\.tar\.xz\)$/-x86_64\1/
                 ' | \
                 while read -r url; do
+                  >&2 printf 'downloading "%s" ...' "${url}"
                   if wget -q -nd "${url}"; then
+                    >&2 printf ' ok.\n'
                     break;
                   fi
+                  >&2 printf ' failed. Next ...\n'
                 done
             done
           if [ "${repository}" = 'multilib' ]; then
@@ -367,11 +370,14 @@ while [ "${count}" -ne 0 ]; do
           else
             x86_64_build_command='extra-x86_64-build'
           fi
+          >&2 printf 'running namcap ...'
           # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
           # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
           sudo "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
             sudo "${x86_64_build_command}" -c -- -- --version > /dev/null 2>&1 || \
             true
+          >&2 printf ' ok.\n'
+          >&2 printf 'smoothen namcap log ...'
           # now we generate diffs from the namcap.logs
           find . "${tar_content_dir}/" -maxdepth 1 -type f -name '*.pkg.tar.xz-namcap.log' -printf '%p\n' | \
             while read -r log; do
@@ -394,7 +400,7 @@ while [ "${count}" -ne 0 ]; do
                 sed -i 's|^|*|' "${tar_content_dir}/${log}"
               fi
             done
-          >&2 printf ' done.\n'
+          >&2 printf ' ok.\n'
           if ${upload_to_build_master}; then
             find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
           else
