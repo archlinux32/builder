@@ -421,19 +421,19 @@ done
 exec 9> "${build_list_lock_file}"
 if ! flock ${block_flag} 9; then
   >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit 1
+  exit 0
 fi
 
 exec 8> "${package_database_lock_file}"
 if ! flock ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - I cannot lock package database.'
-  exit 1
+  exit 0
 fi
 
 exec 7> "${sanity_check_lock_file}"
 if ! flock -s ${block_flag} 7; then
   >&2 echo 'come back (shortly) later - sanity-check currently running.'
-  exit 1
+  exit 0
 fi
 
 clean_up_lock_file() {
