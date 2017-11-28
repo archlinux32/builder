@@ -1155,7 +1155,7 @@ print_list_of_archaic_packages() {
           "${base_dir}/bin/modify-package-state" -n --tested /dev/stdin
         # packages remaining longer than $max_package_age_broken_testing days in testing (w/o being tested!) will be considered outdated
         # and no longer block other packages from being moved
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_broken_testing}" -printf '%f\n' \
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_broken_testing}" -printf '%f\n' | \
           sed '
             s|\.testing$||
           '
