@@ -80,3 +80,43 @@ add_binary_package() {
       '
   )"
 }
+
+# show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
+
+# shellcheck disable=SC2016,SC2086,SC2154
+show_binary_package() {
+  local names='pkgname pkgver pkgrel sub_pkgrel'
+  local name
+  for name in ${names}; do
+    eval 'local '"${name}"
+    eval "${name}"'=$(
+      printf "%s" "$1" |
+        base64 -w0
+    )'
+    shift
+  done
+
+  local joint
+  ${mysql_command} "$(
+    printf 'SELECT * FROM `binary_packages`'
+    for joint in 'architectures:binary_packages:architecture' 'package_sources:binary_packages:package_source'; do
+      printf ' JOIN `%s` ON `%s`.`id` =' \
+        "${joint%%:*}" "${joint%%:*}"
+      joint="${joint#*:}"
+      printf ' `%s`.`%s`' \
+        "${joint%:*}" "${joint#*:}"
+    done
+    printf ' WHERE'
+    {
+      printf ' `%s`.`%s` = from_base64("%s") AND' \
+        'binary_packages' 'pkgname' "${pkgname}" \
+        'binary_packages' 'sub_pkgrel' "${sub_pkgrel}" \
+        'package_sources' 'pkgver' "${pkgver}" \
+        'package_sources' 'pkgrel' "${pkgrel}"
+      printf ';'
+    } | \
+      sed '
+        s|AND;|;|g
+      '
+  )"
+}
