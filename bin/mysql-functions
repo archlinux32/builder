@@ -6,10 +6,10 @@
 
 mysql_command='mysql buildmaster -e'
 
-# add_package_source $pkgbase $pkgver $pkgrel $git_revision $mod_git_revision $upstream_package_repository
+# mysql_add_package_source $pkgbase $pkgver $pkgrel $git_revision $mod_git_revision $upstream_package_repository
 
 # shellcheck disable=SC2016,SC2086
-add_package_source() {
+mysql_add_package_source() {
   local names='pkgbase pkgver pkgrel git_revision mod_git_revision upstream_package_repository'
   local values;
   for _ in ${names}; do
@@ -37,10 +37,10 @@ add_package_source() {
   )"
 }
 
-#add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
+# mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
 
 # shellcheck disable=SC2016,SC2086,SC2154
-add_binary_package() {
+mysql_add_binary_package() {
   local names='pkgbase git_revision mod_git_revision upstream_package_repository pkgname sub_pkgrel architecture repository'
   local name
   for name in ${names}; do
@@ -81,10 +81,10 @@ add_binary_package() {
   )"
 }
 
-# show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
+# mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
 
 # shellcheck disable=SC2016,SC2086,SC2154
-show_binary_package() {
+mysql_show_binary_package() {
   local names='pkgname pkgver pkgrel sub_pkgrel'
   local name
   for name in ${names}; do
