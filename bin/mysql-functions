@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# contains functions used to access mysql db
+
+# shellcheck disable=SC2039
+
+mysql_command='mysql buildmaster -e'
+
+# add_package_source $pkgbase $pkgver $pkgrel $git_revision $mod_git_revision $upstream_package_repository
+
+# shellcheck disable=SC2016,SC2086
+add_package_source() {
+  local names='pkgbase pkgver pkgrel git_revision mod_git_revision upstream_package_repository'
+  local values;
+  for _ in ${names}; do
+    values="${values}$(
+      printf '%s' "$1" | \
+        base64 -w0
+    ) "
+    shift
+  done
+  values="${values% }"
+
+  ${mysql_command} "$(
+    printf 'INSERT IGNORE INTO package_sources'
+    {
+      printf ' ('
+      printf '`%s`, ' ${names}
+      printf ') SELECT'
+      printf ' from_base64("%s"), ' ${values% *}
+      printf ' `upstream_repositories`.`id`'
+      printf ' FROM `upstream_repositories`'
+      printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
+        "${values##* }"
+    } | \
+      sed 's|, )|)|g'
+  )"
+
+  ${mysql_command} "$(
+    printf 'SELECT * FROM package_sources'
+    printf ' LEFT JOIN upstream_repositories'
+    printf ' ON package_sources.upstream_package_repository = upstream_repositories.id;'
+  )"
+}
