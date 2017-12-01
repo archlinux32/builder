@@ -36,3 +36,47 @@ add_package_source() {
       sed 's|, )|)|g'
   )"
 }
+
+#add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
+
+# shellcheck disable=SC2016,SC2086,SC2154
+add_binary_package() {
+  local names='pkgbase git_revision mod_git_revision upstream_package_repository pkgname sub_pkgrel architecture repository'
+  local name
+  for name in ${names}; do
+    eval 'local '"${name}"
+    eval "${name}"'=$(
+      printf "%s" "$1" |
+        base64 -w0
+    )'
+    shift
+  done
+
+  ${mysql_command} "$(
+    printf 'INSERT IGNORE INTO binary_packages'
+    {
+      printf ' ('
+      printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture'
+      printf ') SELECT'
+      printf ' from_base64("%s"), ' "${sub_pkgrel}" "${pkgname}"
+      printf ' `%s`.`id`,' 'package_sources' 'repositories' 'architectures'
+      printf ' FROM'
+      printf ' `%s` JOIN' 'package_sources' 'repositories' 'architectures'
+      printf ' `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
+      printf ' WHERE'
+      printf ' `%s`.`name` = from_base64("%s") AND' \
+        'repositories' "${repository}" \
+        'architectures' "${architecture}"
+      printf ' `package_sources`.`%s` = from_base64("%s") AND' \
+        'pkgbase' "${pkgbase}" \
+        'git_revision' "${git_revision}" \
+        'mod_git_revision' "${mod_git_revision}"
+      printf ' `upstream_repositories`.`name` = from_base64("%s")' \
+        "${upstream_package_repository}"
+    } | \
+      sed '
+        s|, )|)|g
+        s|, FROM| FROM|g
+      '
+  )"
+}
