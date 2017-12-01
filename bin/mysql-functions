@@ -98,16 +98,32 @@ show_binary_package() {
 
   local joint
   ${mysql_command} "$(
-    printf 'SELECT * FROM `binary_packages`'
-    for joint in 'architectures:binary_packages:architecture' 'package_sources:binary_packages:package_source'; do
-      printf ' JOIN `%s` ON `%s`.`id` =' \
-        "${joint%%:*}" "${joint%%:*}"
-      joint="${joint#*:}"
-      printf ' `%s`.`%s`' \
-        "${joint%:*}" "${joint#*:}"
-    done
-    printf ' WHERE'
     {
+      printf 'SELECT'
+      printf ' `%s`.`%s`,' \
+        'repositories' 'name' \
+        'binary_packages' 'pkgname' \
+        'package_sources' 'pkgver' \
+        'package_sources' 'pkgrel' \
+        'binary_packages' 'sub_pkgrel' \
+        'architectures' 'name' \
+        'package_sources' 'pkgbase' \
+        'package_sources' 'git_revision' \
+        'package_sources' 'mod_git_revision' \
+        'upstream_repositories' 'name'
+      printf ' FROM `binary_packages`'
+      for joint in \
+        'architectures:binary_packages:architecture' \
+        'package_sources:binary_packages:package_source' \
+        'repositories:binary_packages:repository' \
+        'upstream_repositories:package_sources:upstream_package_repository'; do
+        printf ' JOIN `%s` ON `%s`.`id` =' \
+          "${joint%%:*}" "${joint%%:*}"
+        joint="${joint#*:}"
+        printf ' `%s`.`%s`' \
+          "${joint%:*}" "${joint#*:}"
+      done
+      printf ' WHERE'
       printf ' `%s`.`%s` = from_base64("%s") AND' \
         'binary_packages' 'pkgname' "${pkgname}" \
         'binary_packages' 'sub_pkgrel' "${sub_pkgrel}" \
@@ -116,7 +132,8 @@ show_binary_package() {
       printf ';'
     } | \
       sed '
+        s|, FROM| FROM|g
         s|AND;|;|g
       '
-  )"
+  )" --html
 }
