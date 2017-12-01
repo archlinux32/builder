@@ -35,10 +35,4 @@ add_package_source() {
     } | \
       sed 's|, )|)|g'
   )"
-
-  ${mysql_command} "$(
-    printf 'SELECT * FROM package_sources'
-    printf ' LEFT JOIN upstream_repositories'
-    printf ' ON package_sources.upstream_package_repository = upstream_repositories.id;'
-  )"
 }
