@@ -137,3 +137,21 @@ mysql_show_binary_package() {
       '
   )" --html
 }
+
+# mysql_add_install_target $install_target
+
+# shellcheck disable=SC2016,2086
+mysql_add_install_target() {
+  local install_target
+  install_target=$(
+    printf "%s" "$1" | \
+      base64 -w0
+  )
+
+  ${mysql_command} "$(
+    printf 'INSERT IGNORE INTO `install_targets` (`name`)'
+    printf ' VALUES (from_base64("%s"))' \
+      "${install_target}"
+    printf '\n'
+  )"
+}
