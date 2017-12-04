@@ -339,7 +339,10 @@ while [ "${count}" -ne 0 ]; do
             sponge | \
             while read -r pkg_file; do
               {
-                pacman -Spdd --print-format '%l' --noconfirm "${pkg_file%-*-*-*}"
+                pacman -Spdd --print-format '%l' --noconfirm "${pkg_file%-*-*-*}" | \
+                  sed '
+                    s|/[^/]\+\.pkg\.tar\.xz$||
+                  '
                 # shellcheck disable=SC2016
                 curl -Ss 'https://www.archlinux.org/mirrorlist/?country=all&protocol=https&tier=1&use_mirror_status=on' | \
                   sed -n '
@@ -352,8 +355,8 @@ while [ "${count}" -ne 0 ]; do
                   shuf
               } | \
                 sed '
-                  s|/[^/]\+\.pkg\.tar\.xz$||
                   s|$|/'"${pkg_file}"'|
+                  s/\.[0-9]\+\(-[^-]\+\)$/\1/
                   s/-i686\(\.pkg\.tar\.xz\)$/-x86_64\1/
                 ' | \
                 while read -r url; do
