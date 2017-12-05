@@ -306,7 +306,7 @@ if ${web}; then
       -printf '%f prepare()\n' \
     \) -o \
     \( \
-      -exec zgrep -q '^==> ERROR: A failure occurred in package()\.$' {} \; \
+      -exec zgrep -q '^==> ERROR: A failure occurred in package\(_\S\+\)\?()\.$' {} \; \
       -printf '%f package()\n' \
     \) -o \
     \( \
