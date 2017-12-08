@@ -7,6 +7,9 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: report back in regular intervals, so the build master can
+# abort if the package is outdated and/or someone else finished it.
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
