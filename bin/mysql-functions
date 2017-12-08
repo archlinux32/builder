@@ -6,6 +6,15 @@
 
 mysql_command='mysql buildmaster -e'
 
+# base64_encode_each encode each line of stdin with base64
+
+base64_encode_each() {
+  parallel -N1 -l1 --pipe '
+    base64 -w0
+    printf "\n"
+  '
+}
+
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
 
 # shellcheck disable=SC2016,SC2086
