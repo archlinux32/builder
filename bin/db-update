@@ -508,13 +508,17 @@ if [ -z "$(
       "${s}.no-base"
   done
 
+  >&2 printf 'calculate what packages should be unstaged ...'
   find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
+  >&2 printf ' ok.\n'
 
 else
 
+  >&2 printf 'calculate what packages should be unstaged ...'
   find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
+  >&2 printf ' ok.\n'
 
 fi
 
@@ -549,12 +553,20 @@ if [ -z "$(
         "${tmp_dir}/base-packages" \
         -
   )" ]; then
+
   >&2 echo 'db-update stabilize: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
+  >&2 printf 'calculate what packages should be stabilized ...'
   find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-stabilize-packages" | \
     sponge "${tmp_dir}/stabilize-packages"
+  >&2 printf ' ok.\n'
+
 else
+
+  >&2 printf 'calculate what packages should be stabilized ...'
   find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-stabilize-packages" | \
     sponge "${tmp_dir}/stabilize-packages"
+  >&2 printf ' ok.\n'
+
 fi
 
 # unlock build list
@@ -595,14 +607,16 @@ done < \
   "${tmp_dir}/unstage-packages" | \
   sponge "${tmp_dir}/unstage-packages"
 
-# move packages in packages_to_stabilize from *testing/ to the stable repos
 if [ -s "${tmp_dir}/stabilize-packages" ]; then
+  >&2 printf 'move packages from *testing/ to the stable repos ...'
   move_packages "${tmp_dir}/stabilize-packages"
+  >&2 printf ' ok.\n'
 fi
 
-# move packages from *staging to *testing
 if [ -s "${tmp_dir}/unstage-packages" ]; then
+  >&2 printf 'move packages from *staging to *testing ...'
   move_packages "${tmp_dir}/unstage-packages"
+  >&2 printf ' ok.\n'
 fi
 
 clean_up_lock_file
