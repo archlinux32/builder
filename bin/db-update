@@ -495,17 +495,13 @@ find "${work_dir}/package-infos" -name '*.groups' \
 } > \
   "${tmp_dir}/force-unstage-packages"
 
-# calculate what packages should be unstaged:
-
-find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-unstage-packages" > \
-  "${tmp_dir}/unstage-packages"
-
 # no base packages on the build list anymore?
 if [ -z "$(
     join -j 1 \
       "${tmp_dir}/base-packages" \
       "${tmp_dir}/build-list-packages"
   )" ]; then
+
   >&2 echo 'db-update unstage: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
   for s in "${tmp_dir}/all-builds" "${tmp_dir}/all-depends"; do
     sed '/ base$/d' "${s}" > \
@@ -514,6 +510,12 @@ if [ -z "$(
 
   find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-unstage-packages" > \
     "${tmp_dir}/unstage-packages"
+
+else
+
+  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-unstage-packages" > \
+    "${tmp_dir}/unstage-packages"
+
 fi
 
 {
