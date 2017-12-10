@@ -10,7 +10,7 @@ mysql_command='mysql buildmaster -e'
 
 base64_encode_each() {
   parallel -N1 -l1 --pipe '
-    base64 -w0
+    tr -d "\n" | base64 -w0
     printf "\n"
   '
 }
@@ -163,4 +163,383 @@ mysql_add_install_target() {
       "${install_target}"
     printf '\n'
   )"
+}
+
+# mysql_generate_package_metadata $package $git_revision $mod_git_revision $repository
+# or
+# mysql_generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
+# generate the meta data of a package (dependencies, built packages, ...) in the database
+
+# shellcheck disable=SC2016
+mysql_generate_package_metadata() {
+
+  ( # new shell is intentional
+    package="$1"
+    git_revision="$2"
+    mod_git_revision="$3"
+    repository="$4"
+    temp_dir=$(mktemp -d)
+    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
+
+    if [ $# -eq 1 ]; then
+      # second form
+      repository="${package##*.}"
+      package="${package%.*}"
+      mod_git_revision="${package##*.}"
+      package="${package%.*}"
+      git_revision="${package##*.}"
+      package="${package%.*}"
+    fi
+
+    printf '.' >&2
+    if ! make_source_info "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${temp_dir}/SRCINFO"; then
+      printf '"make_source_info %s %s %s %s %s" failed.\n' "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${temp_dir}/SRCINFO"
+      exit 2
+    fi
+    # remove empty lines and unsupported architectures
+    sed -i '
+      /^[^=]*=\s*$/d
+      /^\s*arch = /{
+        / \(i686\|any\)$/!d
+      }
+    ' "${temp_dir}/SRCINFO"
+
+    if [ ! -s "${temp_dir}/SRCINFO" ]; then
+      >&2 printf '"make_source_info" had empty output - eh, what?\n'
+      exit 2
+    fi
+    printf '\n\n' >> "${temp_dir}/SRCINFO"
+
+    printf '.' >&2
+    pkgbase=$(
+      grep '^pkgbase = ' "${temp_dir}/SRCINFO" | \
+        cut -d' ' -f3
+    )
+    if [ -z "${pkgbase}" ]; then
+      >&2 printf '"make_source_info" did not return a "pkgbase" - eh, what?\n'
+      exit 2
+    fi
+
+    # add the package source
+    mysql_add_package_source "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
+    printf '.' >&2
+
+    # now we encode everything in base64
+    pkgbase=$(
+      printf '%s' "${pkgbase}" | \
+        base64 -w0
+    )
+    git_revision=$(
+      printf '%s' "${git_revision}" | \
+        base64 -w0
+    )
+    mod_git_revision=$(
+      printf '%s' "${mod_git_revision}" | \
+        base64 -w0
+    )
+    repository=$(
+      printf '%s' "${repository}" | \
+        base64 -w0
+    )
+
+    # add the build assignment(s)
+    {
+      archs=$(
+        sed -n '
+          s/^\tarch = //
+          T
+          p
+        ' "${temp_dir}/SRCINFO" | \
+          grep -vxF 'any' | \
+          sort -u
+      )
+      if [ -z "${archs}" ]; then
+        echo 'any'
+      else
+        printf '%s\n' "${archs}"
+      fi
+    } | \
+      while read -r arch; do
+        printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`)'
+        printf ' SELECT `package_sources`.`id`,`architectures`.`id`'
+        printf ' FROM `architectures` JOIN `package_sources`'
+        printf ' WHERE `architectures`.`name` = from_base64("%s")' \
+          "$(
+            printf '%s' "${arch}" | \
+              base64 -w0
+          )"
+        printf ' AND `package_sources`.`%s` = from_base64("%s")' \
+          'pkgbase' "${pkgbase}" \
+          'git_revision' "${git_revision}" \
+          'mod_git_revision' "${mod_git_revision}"
+        printf ';\n'
+      done > \
+      "${temp_dir}/add-build-assignments-command"
+
+    # TODO: correctly link between binary_packages and build_assignments using any_arch
+    # shellcheck disable=SC2034
+    # select any specific arch (which will be building the 'any' part of a split package)
+    any_arch=$(
+      {
+        sed -n '
+          s/^\tarch = //
+          T
+          p
+        ' "${temp_dir}/SRCINFO" | \
+          sort -r | \
+          grep -vxFm 1 'any' || \
+          echo 'any'
+      } | \
+        base64_encode_each
+    )
+
+    grep '^pkgname = ' "${temp_dir}/SRCINFO" | \
+      cut -d' ' -f3 | \
+      while read -r pkgname; do
+        pkgname64=$(
+          printf '%s' "${pkgname}" | \
+            base64 -w0
+        )
+        sed -n '
+          /^pkgbase = \|^pkgname = '"$(str_to_regex "${pkgname}")"'$/{
+            :a
+              N
+              /\n$/{
+                p
+                T
+              }
+              ba
+          }
+        ' "${temp_dir}/SRCINFO" | \
+          sed '
+            /^\S/d
+            s/^\s*//
+          ' > \
+          "${temp_dir}/BINARYINFO.${pkgname64}"
+
+        grep '^arch = ' "${temp_dir}/BINARYINFO.${pkgname64}" | \
+          cut -d' ' -f3 | \
+          while read -r arch; do
+            arch64=$(
+              printf '%s' "${arch}" | \
+                base64 -w0
+            )
+            sed '
+              s/^\(\S\+\)_'"${arch}"' = /\1 = /
+            ' "${temp_dir}/BINARYINFO.${pkgname64}" > \
+              "${temp_dir}/ARCHINFO ${pkgname64} ${arch64}"
+          done
+      done
+    find "${temp_dir}" -mindepth 1 -maxdepth 1 -name 'ARCHINFO * *' -printf '%f\n' | \
+      while read -r _ pkgname arch; do
+        pkgver=$(
+          grep '^pkgver = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            base64_encode_each
+        )
+        pkgrel=$(
+          grep '^pkgrel = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            base64_encode_each
+        )
+        epoch=$(
+          {
+            grep '^epoch = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" || \
+              echo 'epoch = 0'
+          } | \
+            cut -d' ' -f3 | \
+            base64_encode_each
+        )
+        provides=$(
+          grep '^\(groups\|provides\) = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            sed 's/[<>=].*$//' | \
+            base64_encode_each
+        )
+        builddepends=$(
+          grep '^\(checkdepends\|makedepends\) = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            sed 's/[<>=].*$//' | \
+            base64_encode_each
+        )
+        rundepends=$(
+          grep '^depends = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            sed 's/[<>=].*$//' | \
+            base64_encode_each
+        )
+        sub_pkgrel=$(
+          ${mysql_command} "$(
+            printf 'SELECT count(*) FROM `binary_packages` JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` WHERE'
+            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+              'epoch' "${epoch}" \
+              'pkgver' "${pkgver}" \
+              'pkgrel' "${pkgrel}" \
+              'pkgname' "${pkgname}"
+            if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
+              # 'any' gets higher sub_pkgrel than any architecture
+              printf ' 1'
+            else
+              # not-'any' gets higher sub_pkgrel than same or 'any' architecture
+              printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
+                "${arch}"
+            fi
+          )" | \
+            tail -n1 | \
+            base64_encode_each
+        )
+        {
+          printf 'INSERT IGNORE INTO `binary_packages` ('
+          printf '`%s`,' \
+            'build_assignment' \
+            'repository' \
+            'architecture' \
+            'epoch' \
+            'pkgver' \
+            'pkgrel' \
+            'sub_pkgrel' \
+            'pkgname' \
+            'has_issues' \
+            'is_blocked' \
+            'is_tested'
+          printf ') SELECT '
+          printf '`%s`.`id`,' \
+            'build_assignments' \
+            'repositories' \
+            'architectures'
+          printf 'from_base64("%s"),' \
+            "${epoch}" \
+            "${pkgver}" \
+            "${pkgrel}" \
+            "${sub_pkgrel}" \
+            "${pkgname}"
+          printf '0,0,0 FROM'
+          printf ' `%s` JOIN' \
+            'repositories' \
+            'architectures' \
+            'build_assignments' \
+            'package_sources'
+          printf ' ON `build_assignments`.`package_source` = `package_sources`.`id`'
+          printf ' JOIN `upstream_repositories`'
+          printf ' ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
+          printf ' WHERE'
+          printf ' `%s`.`%s` = from_base64("%s") AND' \
+            'repositories' 'name' "$(printf 'build-list' | base64 -w0)" \
+            'architectures' 'name' "${arch}" \
+            'package_sources' 'pkgbase' "${pkgbase}" \
+            'package_sources' 'git_revision' "${git_revision}" \
+            'package_sources' 'mod_git_revision' "${mod_git_revision}" \
+            'upstream_repositories' 'name' "${repository}"
+          printf ';\n'
+        } | \
+          sed '
+            s|,)|)|g
+            s|JOIN ON|ON|g
+            s| AND;$|;|
+          ' >> \
+          "${temp_dir}/add-binary-packages-command"
+        {
+          printf 'CREATE TEMPORARY TABLE `%s` (`name` VARCHAR(64));\n' \
+            'provides' \
+            'builddepends' \
+            'rundepends'
+
+          printf 'INSERT INTO `provides` VALUES\n'
+          echo "${provides}" | \
+            sort -u | \
+            grep -vxF '' | \
+            sed '
+              s|^| (from_base64("|
+              s|$|")),|
+            '
+          printf ' (from_base64("%s"));\n' \
+            "${pkgname}"
+
+          printf 'INSERT INTO `rundepends` VALUES\n'
+          echo "${rundepends}" | \
+            sort -u | \
+            grep -vxF '' | \
+            sed '
+              s|^| (from_base64("|
+              s|$|")),|
+            '
+          printf ' ("base");\n'
+
+          printf 'INSERT INTO `builddepends` VALUES\n'
+          echo "${builddepends}" | \
+            sort -u | \
+            grep -vxF '' | \
+            sed '
+              s|^| (from_base64("|
+              s|$|")),|
+            '
+          printf ' ("base-devel");\n'
+
+          printf 'INSERT IGNORE INTO `install_targets` (`name`)'
+          printf ' SELECT (`name`) FROM `%s` UNION' \
+            'provides' \
+            'builddepends' \
+            'rundepends' | \
+            sed 's| UNION$|;\n|'
+
+          for link in 'provides' 'builddepends' 'rundepends'; do
+            case "${link}" in
+              'provides')
+                printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`) SELECT'
+                printf ' `binary_packages`.`id`,`install_targets`.`id` FROM'
+              ;;
+              'builddepends'|'rundepends')
+                printf 'INSERT IGNORE INTO `dependencies` (`dependent`,`depending_on`,`dependency_type`) SELECT'
+                printf ' `binary_packages`.`id`,`install_targets`.`id`,`dependency_types`.`id` FROM'
+                printf ' `dependency_types` JOIN'
+              ;;
+            esac
+            printf ' `binary_packages`'
+            printf ' JOIN `architectures`'
+            printf ' ON `binary_packages`.`architecture` = `architectures`.`id`'
+            printf ' JOIN `repositories`'
+            printf ' ON `binary_packages`.`repository` = `repositories`.`id`'
+            printf ' JOIN `install_targets`'
+            printf ' JOIN `%s`' "${link}"
+            printf ' ON `%s`.`name` = `install_targets`.`name`' "${link}"
+            printf ' WHERE'
+            if [ "${link}" = 'builddepends' ] || \
+              [ "${link}" = 'rundepends' ]; then
+              printf ' `dependency_types`.`name` = "%s" AND' \
+                "${link%depends}"
+            fi
+            printf ' `binary_packages`.`%s` = from_base64("%s") AND' \
+              'epoch' "${epoch}" \
+              'pkgver' "${pkgver}" \
+              'pkgrel' "${pkgrel}" \
+              'sub_pkgrel' "${sub_pkgrel}" \
+              'pkgname' "${pkgname}"
+            printf ' `architectures`.`name` = from_base64("%s") AND' \
+              "${arch}"
+            printf ' `repositories`.`name` = "build-list";\n'
+          done
+
+          printf 'DROP TABLE `%s`;\n' \
+            'provides' \
+            'builddepends' \
+            'rundepends'
+        } >> \
+          "${temp_dir}/add-install-targets-command"
+      done
+    printf '.' >&2
+
+    ${mysql_command} "$(
+      if [ -s "${temp_dir}/add-build-assignments-command" ]; then
+        cat "${temp_dir}/add-build-assignments-command"
+      fi
+      if [ -s "${temp_dir}/add-binary-packages-command" ]; then
+        cat "${temp_dir}/add-binary-packages-command"
+      fi
+      if [ -s "${temp_dir}/add-install-targets-command" ]; then
+        cat "${temp_dir}/add-install-targets-command"
+      fi
+    )"
+    printf '.' >&2
+
+  )
 }
