@@ -375,7 +375,7 @@ if ${web}; then
           "$(
             # shellcheck disable=SC2010
             ls -t "${webserver_directory}/build-logs/error" | \
-              grep -m1 "^$(str_to_regex "${sf}.")[^.]\+\.build-log\.gz\$"
+              grep -m1 '^'"$(str_to_regex "${sf}.")"'[^.]\+\.build-log\.gz$'
           )" \
           "$(
             {

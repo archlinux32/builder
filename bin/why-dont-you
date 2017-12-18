@@ -140,7 +140,7 @@ case "${action}" in
     for pkg in "$@"; do
 
       if ! state_file=$(
-          grep "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\$" "${tmp_dir}/moveable-list"
+          grep '^'"$(str_to_regex "${pkg}")"'\(\.[^.]\+\)\{3\}$' "${tmp_dir}/moveable-list"
         ) || \
         [ ! -f "${work_dir}/package-states/${state_file}.${suffix}" ]; then
         printf '"%s" is not %s yet!\n' "${pkg}" "${suffix}"
@@ -225,7 +225,7 @@ case "${action}" in
 
       if builds_file=$(
         find "${work_dir}/package-infos" -maxdepth 1 -printf '%f\n' | \
-          grep -m1 "^$(str_to_regex "${pkg}")\(\.[^.]\+\)\{3\}\.builds\$"
+          grep -m1 '^'"$(str_to_regex "${pkg}")"'\(\.[^.]\+\)\{3\}\.builds$'
         ); then
 
         builds_file="${builds_file%.*}"
@@ -244,10 +244,10 @@ case "${action}" in
           rev=$(cat "${work_dir}/${repo}.revision")
           if [ "${repo}" = 'archlinux32' ]; then
             if git -C "${repo_path}" archive "${mod_rev}" | \
-              grep -q "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$"; then
+              grep -q '^[^/]\+/'"$(str_to_regex "${pkg}")"'/PKGBUILD$'; then
               prepo=$(
                 git -C "${repo_path}" archive "${mod_rev}" | \
-                  grep "^[^/]\+/$(str_to_regex "${pkg}")/PKGBUILD\$" | \
+                  grep '^[^/]\+/'"$(str_to_regex "${pkg}")"'/PKGBUILD$' | \
                   cut -d/ -f1
               )
               found_PKGBUILD=true

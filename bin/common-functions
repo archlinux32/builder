@@ -831,10 +831,10 @@ find_dependencies_on_build_list() {
     cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
     awk '{print $1 "." $2 "." $3 "." $4}' < \
       "${work_dir}/build-list" | \
-      sed "
-        s|^|${work_dir}/package-infos/|
-        s|\$|\.builds|
-      " | \
+      sed '
+        s|^|'"${work_dir}"'/package-infos/|
+        s|$|\.builds|
+      ' | \
       xargs -r cat | \
       sort -u
   } | \
@@ -875,11 +875,11 @@ download_sources_by_hash() {
 
   for arch_suffix in '' '_i686'; do
     for sum_type in 'sha256sum' 'sha512sum'; do
-      grep "^\s*${sum_type}s${arch_suffix} = " "${tmp_dir}/.SRCINFO" | \
+      grep '^\s*'"${sum_type}s${arch_suffix}"' = ' "${tmp_dir}/.SRCINFO" | \
         sed 's|^.* = ||' | \
         cat -n > \
         "${tmp_dir}/sums"
-      grep "^\s*source${arch_suffix} = " "${tmp_dir}/.SRCINFO" | \
+      grep '^\s*source'"${arch_suffix}"' = ' "${tmp_dir}/.SRCINFO" | \
         sed '
           s|^.* = ||
           s|::.*$||
@@ -1135,7 +1135,7 @@ smoothen_namcap_log() {
       s|i[34567]86|$ARCH|g
       s|x86\([-_]64\)\?|$ARCH|g
       # remove haskell hashes
-      '"s|\('[^']*-[0-9.]\+\)-[a-zA-Z0-9]\{1,22\}\(-ghc[^']*'\)|\1\2|g"'
+      s|\('"'"'[^'"'"']*-[0-9.]\+\)-[a-zA-Z0-9]\{1,22\}\(-ghc[^'"'"']*'"'"'\)|\1\2|g
     ' | \
     sort | \
     sponge "${file}"

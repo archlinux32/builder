@@ -200,7 +200,7 @@ for repo in ${repo_names}; do
       # shellcheck disable=SC2016
       sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
         while read -r pkg_repo rest; do
-          eval "printf '%s %s\n'" \
+          eval 'printf '"'"'%s %s\n'"'" \
             "$(printf '"${new_repo_revisions__%s}"' "$(find_git_repository_to_package_repository "${pkg_repo}")")" \
             "'${rest}'"
         done
@@ -371,19 +371,19 @@ find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' -printf '%f\n' | 
   sort -k1,1 > \
   "${tmp_dir}/newest-revisions"
 
-sed "
-  s|^\S\+ |${work_dir}/package-infos/|
-  s|\$|.builds|
-" "${tmp_dir}/newest-revisions" | \
+sed '
+  s|^\S\+ |'"${work_dir}"'/package-infos/|
+  s|$|.builds|
+' "${tmp_dir}/newest-revisions" | \
   xargs -r cat | \
   sort | \
   uniq -c > \
   "${work_dir}/built-packages"
 
-sed "
-  s|^\S\+ |${work_dir}/package-infos/|
+sed '
+  s|^\S\+ |'"${work_dir}"'/package-infos/|
   s|\$|.build-depends|
-" "${tmp_dir}/newest-revisions" | \
+' "${tmp_dir}/newest-revisions" | \
   xargs -r grep -HF '' | \
   sed '
     s|\(\.[^.]\+\)\{4\}:\([^:]\+\)$| \2|
@@ -453,7 +453,7 @@ while read -r package git_revision mod_git_revision repository; do
   # add "$dependency -> $pkgname" to build-order list
   sed "s|\$| ${package}|" "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
   # add "base/base-devel -> $pkgname" to build-order list
-  printf "%s ${package}\n" 'base' 'base-devel'
+  printf '%s '"${package}"'\n' 'base' 'base-devel'
 done \
   < "${work_dir}/build-list.new" \
   > "${work_dir}/build-order"

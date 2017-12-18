@@ -96,7 +96,7 @@ if [ $# -eq 0 ]; then
   exit
 fi
 
-if pgrep -f "^\S+ $0." | \
+if pgrep -f '^\S+ '"$0"'.' | \
   grep -vxF "$$" >&2; then
 
   >&2 echo $$
@@ -143,7 +143,7 @@ find "${work_dir}/package-infos" -maxdepth 1 -printf '%f\n' | \
 
 find "${work_dir}/package-infos" -maxdepth 1 -name '*.groups' -printf '%f %p\n' | \
   while read -r name pf; do
-    xargs -r printf "${name%.*.*.*.*} %s\n" < \
+    xargs -r printf "${name%.*.*.*.*}"' %s\n' < \
       "${pf}"
   done > \
   "${tmp_dir}/known-groups"
@@ -151,13 +151,13 @@ find "${work_dir}/package-infos" -maxdepth 1 -name '*.groups' -printf '%f %p\n' 
 find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f %p\n' | \
   while read -r name pf; do
     grep -vxF "${name%.*.*.*.*}" "${pf}" | \
-      xargs -r printf "${name%.*.*.*.*} %s\n"
+      xargs -r printf "${name%.*.*.*.*}"' %s\n'
   done > \
   "${tmp_dir}/known-split-packages"
 
 find "${work_dir}/package-infos" -maxdepth 1 -name '*.run-depends' -printf '%f %p\n' | \
   while read -r name pf; do
-    xargs -r printf "%s ${name%.*.*.*.*}\n" < \
+    xargs -r printf '%s '"${name%.*.*.*.*}"'\n' < \
       "${pf}"
   done > \
   "${tmp_dir}/known-run-depends"
@@ -398,10 +398,10 @@ for target_package in "$@"; do
 
   find "${tmp_dir}/neighbours" -maxdepth 1 -type f | \
     while read -r file; do
-      sed "
-          s@\(^\| \)$(str_to_regex "${file##*/}")\( \|\$\)@\1<knot>\2@
-          s@\(^\| \)$(str_to_regex "${file##*/}")\( \|\$\)@\1<knot>\2@
-        " "${file}" | \
+      sed '
+          s@\(^\| \)'"$(str_to_regex "${file##*/}")"'\( \|$\)@\1<knot>\2@
+          s@\(^\| \)'"$(str_to_regex "${file##*/}")"'\( \|$\)@\1<knot>\2@
+        ' "${file}" | \
         sort -u | \
         sponge "${file}"
     done
@@ -426,10 +426,10 @@ for target_package in "$@"; do
   ' "${tmp_dir}/sums" | \
   join -1 1 -2 1 -o 2.2,1.2 - "${tmp_dir}/sums" | \
   while read -r original replacement; do
-    sed -i "
-      s@\( \|^\)$(str_to_regex "${original}")\( \|\$\)@\1${replacement}\2@
-      s@\( \|^\)$(str_to_regex "${original}")\( \|\$\)@\1${replacement}\2@
-    " "${tmp_dir}/build-order" "${tmp_dir}/knots"
+    sed -i '
+      s@\( \|^\)'"$(str_to_regex "${original}")"'\( \|$\)@\1'"${replacement}"'\2@
+      s@\( \|^\)'"$(str_to_regex "${original}")"'\( \|$\)@\1'"${replacement}"'\2@
+    ' "${tmp_dir}/build-order" "${tmp_dir}/knots"
   done
 
   grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \

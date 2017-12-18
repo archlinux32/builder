@@ -27,8 +27,8 @@ hand_out_assignment() {
   # we don't care anymore if an older version of this package was
   # "locked" or "broken"
   find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-    -regex ".*/$(str_to_regex "$1")\(\.[^.]\+\)\{3\}\.\(locked\|broken\)" \
-    -not -regex ".*/$(str_to_regex "$1.$2.$3.$4.")[^.]\+" \
+    -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{3\}\.\(locked\|broken\)' \
+    -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4.")"'[^.]\+' \
     -delete
 
   # move that build order to the end of the build-list

@@ -75,18 +75,6 @@ fi
 errors=$(
   cd "${tmp_dir}" || \
     echo 'Cannot cd.'
-  checkbashisms bin/* conf/* 2>&1
-)
-
-if [ -n "${errors}" ]; then
-  >&2 echo 'possible bashisms found:'
-  >&2 echo "${errors}"
-  exit 1
-fi
-
-errors=$(
-  cd "${tmp_dir}" || \
-    echo 'Cannot cd.'
   shellcheck -x bin/* conf/* 2>&1
 )
 

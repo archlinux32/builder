@@ -313,7 +313,7 @@ move_packages() {
     else
       # remove old state files of $package with ending $rm_ending
       find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-        -regex ".*/$(str_to_regex "${package%.*.*.*}")\(\.[^.]\+\)\{3\}\.${rm_ending}" \
+        -regex '.*/'"$(str_to_regex "${package%.*.*.*}")"'\(\.[^.]\+\)\{3\}\.'"${rm_ending}" \
         -execdir ${dummynator} rm {} \;
       ${dummynator} mv \
         "${work_dir}/package-states/${package}.${from_ending}" \

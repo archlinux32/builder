@@ -278,8 +278,8 @@ done
 find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
   -not -name '*.testing' \
   -not -name '*.tested' \
-  -regex ".*/$(str_to_regex "$1")\(\.[^.]\+\)\{4\}" \
-  -not -regex ".*/$(str_to_regex "$1.$2.$3.$4")\.[^.]\+" \
+  -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{4\}' \
+  -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4")"'\.[^.]\+' \
   -exec rm '{}' \;
 
 # remove all loops which are broken by this package
