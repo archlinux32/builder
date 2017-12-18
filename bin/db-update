@@ -609,12 +609,16 @@ if [ -s "${tmp_dir}/stabilize-packages" ]; then
   >&2 printf 'move packages from *testing/ to the stable repos ...'
   move_packages "${tmp_dir}/stabilize-packages"
   >&2 printf ' ok.\n'
+else
+  >&2 printf 'Nothing to move from *testing to the stable repos.\n'
 fi
 
 if [ -s "${tmp_dir}/unstage-packages" ]; then
   >&2 printf 'move packages from *staging to *testing ...'
   move_packages "${tmp_dir}/unstage-packages"
   >&2 printf ' ok.\n'
+else
+  >&2 printf 'Nothing to move from *staging to *testing.\n'
 fi
 
 clean_up_lock_file
