@@ -382,7 +382,7 @@ sed '
 
 sed '
   s|^\S\+ |'"${work_dir}"'/package-infos/|
-  s|\$|.build-depends|
+  s|$|.build-depends|
 ' "${tmp_dir}/newest-revisions" | \
   xargs -r grep -HF '' | \
   sed '
@@ -404,10 +404,10 @@ while [ -n "${black_listed_new}" ]; do
       printf '%s\n' ${black_listed} | \
         sort -k1,1 | \
         join -j1 -o 2.2 - "${tmp_dir}/newest-revisions" | \
-        sed "
-          s|^|${work_dir}/package-infos/|
-          s|\$|.builds|
-        " | \
+        sed '
+          s|^|'"${work_dir}"'/package-infos/|
+          s|$|.builds|
+        ' | \
         xargs -r cat | \
         sort | \
         uniq -c
