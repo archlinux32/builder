@@ -75,6 +75,7 @@ if [ "$1" = 'watch' ]; then
           sed -i "/${regex}/d" "${out_file}"
         fi
       done
+    sleep 1
   done
   exit
 fi
