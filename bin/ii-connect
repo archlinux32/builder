@@ -29,3 +29,52 @@ if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
   } > \
     "${irc_dir}/in"
 fi
+
+# start watch daemon if not running yet
+if ! pgrep -xf 'SCREEN -d -m ii-connect watch' > /dev/null; then
+  screen -d -m ii-connect watch
+fi
+
+# watch if asked to
+if [ "$1" = 'watch' ]; then
+  while pgrep -x 'ii' > /dev/null; do
+    find "${irc_dir}" \
+      -regextype sed \
+      -type f \
+      -name 'out' \
+      -printf '%p\n' | \
+      while read -r out_file; do
+        channel="${out_file%/out}"
+        channel="${channel##*/}"
+        if [ -z "${channel%%#*}" ]; then
+          prefix='buildmaster: '
+        else
+          prefix=''
+        fi
+        regex='^\S\+ \S\+ <\S\+> '"${prefix}"'why[- ]dont[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
+        if grep -q "${regex}" "${out_file}"; then
+          sed -n '
+            s/'"${regex}"'/\1 /
+            T
+            p
+          ' "${out_file}" | \
+            while read -r line; do
+              reason=$(
+                echo "${line}" | \
+                  xargs why-dont-you
+              )
+              if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
+                echo "${reason}"
+              else
+                echo "${reason}" | \
+                  head -n5
+                printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
+              fi > \
+                "${out_file%/out}/in"
+            done
+          sed -i "/${regex}/d" "${out_file}"
+        fi
+      done
+  done
+  exit
+fi
