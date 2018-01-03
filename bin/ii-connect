@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# run and handle the irc client
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# start ii if it is not running
+if ! pgrep -x ii > /dev/null; then
+  rm -rf --one-file-system "${irc_dir}"
+  screen -d -m ii -f buildmaster -n buildmaster
+  sleep 10
+fi
+
+# register if not yet done
+if tail -n1 "${irc_dir}/nickserv/out" 2> /dev/null | \
+  grep -qF 'This nickname is registered. Please choose a different nickname'; then
+  printf 'identify %s\n' "${irc_password}" > \
+    "${irc_dir}/nickserv/in"
+fi
+
+# join #archlinux-ports if not yet done
+if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
+  tail -n1 | \
+  grep -q ' #archlinux-ports '; then
+  {
+    echo '/j #archlinux-ports'
+    echo '/WHO buildmaster'
+  } > \
+    "${irc_dir}/in"
+fi
