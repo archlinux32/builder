@@ -67,6 +67,14 @@ if [ "$5" = 'ERROR' ]; then
     --transform="s|^|$1.$2.$3.$4.|" \
     '*.build-log.gz'
 
+  if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ] && \
+    [ -p "${irc_dir}/#archlinux-ports/in" ]; then
+    printf '%s is broken (says %s).\n' \
+      "$1" \
+      "${slave}" > \
+      "${irc_dir}/#archlinux-ports/in"
+  fi
+
   # shellcheck disable=SC2154
   echo "${slave}" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
