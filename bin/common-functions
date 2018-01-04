@@ -399,6 +399,9 @@ ls_master_mirror() {
 # removes all older (not-newer) versions of $package_file
 # in all repositories not-older (newer) than $repository
 
+# TODO: should remove all other version (also newer) from
+# some repositories :-/
+
 # A package is considered not newer if
 #  a) its version is not newer
 # A package is considered older if
