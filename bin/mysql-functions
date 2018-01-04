@@ -277,6 +277,7 @@ mysql_generate_package_metadata() {
       "${temp_dir}/add-build-assignments-command"
 
     # TODO: correctly link between binary_packages and build_assignments using any_arch
+
     # shellcheck disable=SC2034
     # select any specific arch (which will be building the 'any' part of a split package)
     any_arch=$(
