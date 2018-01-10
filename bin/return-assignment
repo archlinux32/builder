@@ -130,7 +130,7 @@ if [ "$5" = 'ERROR' ]; then
   )
   if [ -n "${haskell_rebuild_packages}" ]; then
     # shellcheck disable=SC2086
-    seed-build-list ${haskell_rebuild_packages}
+    "${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages}
   fi
 
   exit 0
