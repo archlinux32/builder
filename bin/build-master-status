@@ -314,6 +314,10 @@ if ${web}; then
       -printf '%f source\n' \
     \) -o \
     \( \
+      -exec zgrep -q '^==> ERROR: '"'"'pacman'"'"' failed to install missing dependencies\.$' {} \; \
+      -printf '%f dependencies\n' \
+    \) -o \
+    \( \
       -exec zgrep -q 'error: failed to commit transaction (invalid or corrupted package)$' {} \; \
       -printf '%f package-cache\n' \
     \) -o \
