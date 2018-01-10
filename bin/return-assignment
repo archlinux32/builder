@@ -108,6 +108,31 @@ if [ "$5" = 'ERROR' ]; then
       "${work_dir}/build-list"
   fi
 
+  # release lock on build-list - otherwise seed-build-list won't run
+  flock -u 9
+
+  haskell_rebuild_packages=$(
+    find "${build_log_directory}/error" -type f \
+      -name "$1.$2.$3.$4.*.build-log.gz" \
+      -exec zgrep -qFx '    The following packages are broken because other packages they depend on are missing. These broken packages must be rebuilt before they can be used.' {} \; \
+      -exec zcat {} \; | \
+      sed -n '
+        s/^installed package \(.*\) is broken due to missing package .*$/\1/
+        T
+        p
+      ' | \
+      tr ' ' '\n' | \
+      sed '
+        s/^/-p ^/
+        s/-[0-9.]\+$/\$/
+      ' | \
+      sort -u
+  )
+  if [ -n "${haskell_rebuild_packages}" ]; then
+    # shellcheck disable=SC2086
+    seed-build-list ${haskell_rebuild_packages}
+  fi
+
   exit 0
 
 fi
