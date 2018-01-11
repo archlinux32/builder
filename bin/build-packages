@@ -313,11 +313,17 @@ while [ "${count}" -ne 0 ]; do
         else
           build_command='staging-i686-build'
         fi
+
         if echo "${straw}" | \
           grep -qF ':clean_chroot:'; then
           parameters='-c'
         else
           parameters=''
+        fi
+
+        if echo "${straw}" | \
+          grep -qF ':without_check:'; then
+          parameters="${parameters} -- -- --nocheck"
         fi
 
         find . -maxdepth 1 -type f \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -exec \
@@ -332,7 +338,7 @@ while [ "${count}" -ne 0 ]; do
           "${straw}"
         # by piping the log, we don't see anything in the terminal,
         # but all ways to duplicate the logs seem pretty elaborate
-        # shellcheck disable=SC2024
+        # shellcheck disable=SC2024,SC2086
         if sudo "${build_command}" ${parameters} > \
           "$(
             date -u --iso-8601=seconds | \
