@@ -67,10 +67,10 @@ if [ "$5" = 'ERROR' ]; then
     --transform="s|^|$1.$2.$3.$4.|" \
     '*.build-log.gz'
 
-  if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
-    was_broken_before=false
-  else
+  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
     was_broken_before=true
+  else
+    was_broken_before=false
   fi
 
   # shellcheck disable=SC2154
