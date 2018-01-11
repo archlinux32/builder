@@ -67,12 +67,10 @@ if [ "$5" = 'ERROR' ]; then
     --transform="s|^|$1.$2.$3.$4.|" \
     '*.build-log.gz'
 
-  if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ] && \
-    [ -p "${irc_dir}/#archlinux-ports/in" ]; then
-    printf '%s is broken (says %s).\n' \
-      "$1" \
-      "${slave}" > \
-      "${irc_dir}/#archlinux-ports/in"
+  if [ ! -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
+    was_broken_before=false
+  else
+    was_broken_before=true
   fi
 
   # shellcheck disable=SC2154
@@ -130,7 +128,18 @@ if [ "$5" = 'ERROR' ]; then
   )
   if [ -n "${haskell_rebuild_packages}" ]; then
     # shellcheck disable=SC2086
-    "${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages}
+    if [ -n "$("${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages})" ]; then
+      # something was rescheduled, so we don't want to say it on the irc channel
+      was_broken_before=false
+    fi
+  fi
+
+  if ! ${was_broken_before} && \
+    [ -p "${irc_dir}/#archlinux-ports/in" ]; then
+    printf '%s is broken (says %s).\n' \
+      "$1" \
+      "${slave}" > \
+      "${irc_dir}/#archlinux-ports/in"
   fi
 
   exit 0
