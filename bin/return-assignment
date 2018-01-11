@@ -109,37 +109,49 @@ if [ "$5" = 'ERROR' ]; then
   # release lock on build-list - otherwise seed-build-list won't run
   flock -u 9
 
-  haskell_rebuild_packages=$(
-    find "${build_log_directory}/error" -type f \
-      -name "$1.$2.$3.$4.*.build-log.gz" \
-      -exec zgrep -qFx '    The following packages are broken because other packages they depend on are missing. These broken packages must be rebuilt before they can be used.' {} \; \
-      -exec zcat {} \; | \
-      sed -n '
-        s/^installed package \(.*\) is broken due to missing package .*$/\1/
-        T
-        p
-      ' | \
-      tr ' ' '\n' | \
-      sed '
-        s/^/-p ^haskell-/
-        s/-[0-9.]\+$/\$/
-      ' | \
-      sort -u
-  )
-  if [ -n "${haskell_rebuild_packages}" ]; then
-    # shellcheck disable=SC2086
-    if [ -n "$("${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages})" ]; then
-      # something was rescheduled, so we don't want to say it on the irc channel
-      was_broken_before=false
-    fi
-  fi
+  if ! ${was_broken_before}; then
 
-  if ! ${was_broken_before} && \
-    [ -p "${irc_dir}/#archlinux-ports/in" ]; then
-    printf '%s is broken (says %s).\n' \
-      "$1" \
-      "${slave}" > \
-      "${irc_dir}/#archlinux-ports/in"
+    haskell_rebuild_packages=$(
+      find "${build_log_directory}/error" -type f \
+        -name "$1.$2.$3.$4.*.build-log.gz" \
+        -exec zgrep -qFx '    The following packages are broken because other packages they depend on are missing. These broken packages must be rebuilt before they can be used.' {} \; \
+        -exec zcat {} \; | \
+        sed -n '
+          s/^installed package \(.*\) is broken due to missing package .*$/\1/
+          T
+          p
+        ' | \
+        tr ' ' '\n' | \
+        sed '
+          s/^/-p ^haskell-/
+          s/-[0-9.]\+$/\$/
+        ' | \
+        sort -u
+    )
+
+    rescheduled_packages=$(
+      if [ -n "${haskell_rebuild_packages}" ]; then
+        # shellcheck disable=SC2086
+        "${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages} | \
+          sed 's/\(\.[^.]\+\)\{3\}$//'
+      fi
+    )
+
+    if [ -p "${irc_dir}/#archlinux-ports/in" ]; then
+      {
+        printf '%s is broken (says %s).' \
+          "$1" \
+          "${slave}"
+        if [ -n "${rescheduled_packages}" ]; then
+          printf ' - I rescheduled:'
+          # shellcheck disable=SC2086
+          printf ' %s,' ${rescheduled_packages} | \
+            sed 's/,$/./'
+        fi
+        printf '\n'
+      } > \
+        "${irc_dir}/#archlinux-ports/in"
+    fi
   fi
 
   exit 0
