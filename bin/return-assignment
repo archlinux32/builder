@@ -133,7 +133,7 @@ if [ "$5" = 'ERROR' ]; then
       if [ -n "${haskell_rebuild_packages}" ]; then
         # shellcheck disable=SC2086
         "${base_dir}/bin/seed-build-list" ${haskell_rebuild_packages} | \
-          sed 's/\(\.[^.]\+\)\{3\}$//'
+          sed 's/ .*$//'
       fi
     )
 
@@ -143,7 +143,7 @@ if [ "$5" = 'ERROR' ]; then
           "$1" \
           "${slave}"
         if [ -n "${rescheduled_packages}" ]; then
-          printf ' - I rescheduled:'
+          printf -- ' - I rescheduled:'
           # shellcheck disable=SC2086
           printf ' %s,' ${rescheduled_packages} | \
             sed 's/,$/./'
