@@ -396,4 +396,8 @@ while [ $# -gt 0 ]; do
 
 done
 
-rm -f "${work_dir}/build-master-sanity"
+if [ -f "${work_dir}/build-master-sanity" ]; then
+  rm "${work_dir}/build-master-sanity"
+  printf '\001ACTION resumes sanity.\001\n' > \
+    "${irc_dir}/#archlinux-ports/in"
+fi
