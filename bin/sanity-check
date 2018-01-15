@@ -19,7 +19,7 @@ usage() {
 
 i_am_insane() {
   if [ ! -s "${work_dir}/build-master-sanity" ]; then
-    printf '\001ACTION went insane.\001\n' > \
+    printf '\001ACTION goes insane.\001\n' > \
       "${irc_dir}/#archlinux-ports/in"
   fi
   echo 'build master is insane' > \
