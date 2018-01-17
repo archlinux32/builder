@@ -45,7 +45,6 @@ if [ ! "$1" = 'slim' ]; then
       ' pkgrel MEDIUMINT' \
       ' sub_pkgrel MEDIUMINT' \
       ' has_issues BIT' \
-      ' is_blocked VARCHAR(128)' \
       ' is_tested BIT' \
       ' pkgname VARCHAR(64)' \
       ' architecture SMALLINT :architectures' \
@@ -66,6 +65,7 @@ if [ ! "$1" = 'slim' ]; then
       'build_assignments BIGINT' \
       ' package_source BIGINT :package_sources' \
       ' architecture SMALLINT :architectures' \
+      ' is_blocked VARCHAR(128) NULL' \
       ' UNIQUE content package_source architecture' \
       'build_dependency_loops BIGINT' \
       ' loop MEDIUMINT' \

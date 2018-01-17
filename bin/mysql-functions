@@ -284,8 +284,8 @@ mysql_generate_package_metadata() {
       fi
     } | \
       while read -r arch; do
-        printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`)'
-        printf ' SELECT `package_sources`.`id`,`architectures`.`id`'
+        printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`,`is_blocked`)'
+        printf ' SELECT `package_sources`.`id`,`architectures`.`id`,0'
         printf ' FROM `architectures` JOIN `package_sources`'
         printf ' WHERE `architectures`.`name` = from_base64("%s")' \
           "$(
@@ -429,7 +429,6 @@ mysql_generate_package_metadata() {
             'sub_pkgrel' \
             'pkgname' \
             'has_issues' \
-            'is_blocked' \
             'is_tested'
           printf ') SELECT '
           printf '`%s`.`id`,' \
@@ -442,7 +441,7 @@ mysql_generate_package_metadata() {
             "${pkgrel}" \
             "${sub_pkgrel}" \
             "${pkgname}"
-          printf '0,0,0 FROM'
+          printf '0,0 FROM'
           printf ' `%s` JOIN' \
             'repositories' \
             'architectures' \
