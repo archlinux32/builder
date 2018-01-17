@@ -239,6 +239,11 @@ while [ "${count}" -ne 0 ]; do
 
       find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
 
+      # trigger update of mirror (if configured)
+      if [ -n "${mirror_update_command}" ]; then
+        ${mirror_update_command}
+      fi
+
       bail_out() {
         err=$?
         if [ -n "$1" ]; then
