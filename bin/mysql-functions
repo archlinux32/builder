@@ -573,3 +573,50 @@ mysql_generate_package_metadata() {
 
   )
 }
+
+# mysql_sanity_check
+# do a sanity check on the mysql database
+
+mysql_sanity_check() {
+  ( # new shell is intentional
+    temp_dir=$(mktemp -d)
+    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
+
+    for dir in $(ls_master_mirror 'i686'); do
+      ls_master_mirror "i686/${dir}" | \
+        sed -n '
+          s/\.pkg\.tar\.xz$//
+          T
+          s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
+          s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
+          s|^|'"${dir}"'/|
+          p
+        '
+    done | \
+      sort > \
+      "${temp_dir}/master-mirror-listing"
+
+    # shellcheck disable=SC2016
+    ${mysql_command} '
+      SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`
+      FROM `binary_packages`
+      JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`
+      JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`
+    ' --batch | \
+      sed '
+        1d
+        s,\t,/,
+        s,\t,-,
+        s,\t,:,
+        s,\t,-,
+        s,\t,.,
+        s,\t,-,
+      ' | \
+      sort > \
+      "${temp_dir}/mysql-packages"
+
+    diff -u \
+      "${temp_dir}/mysql-packages" \
+      "${temp_dir}/master-mirror-listing"
+  )
+}
