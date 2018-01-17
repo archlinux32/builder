@@ -168,12 +168,36 @@ mysql_add_install_target() {
 # mysql_generate_package_metadata $package $git_revision $mod_git_revision $repository
 # or
 # mysql_generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
+# if sub_pkgrel should be determined automatically and the package is on the build-list
+# and
+# mysql_generate_package_metadata $sub_pkgrel $package $current_repository $git_revision $mod_git_revision $repository
+# or
+# mysql_generate_package_metadata $sub_pkgrel $current_repository $package.$git_revision.$mod_git_revision.$repository
+# if $sub_pkgrel should be forced and the package is currently in $current_repository
 # generate the meta data of a package (dependencies, built packages, ...) in the database
 
 # shellcheck disable=SC2016
 mysql_generate_package_metadata() {
 
   ( # new shell is intentional
+    case "$1" in
+      ''|*[!0-9]*)
+        unset forced_sub_pkgrel
+        current_repository=$(
+          echo 'build-list' | \
+            base64_encode_each
+        )
+      ;;
+      *)
+        forced_sub_pkgrel="$1"
+        shift
+        current_repository=$(
+          echo "$1" | \
+            base64_encode_each
+        )
+        shift
+      ;;
+    esac
     package="$1"
     git_revision="$2"
     mod_git_revision="$3"
@@ -370,23 +394,27 @@ mysql_generate_package_metadata() {
             base64_encode_each
         )
         sub_pkgrel=$(
-          ${mysql_command} "$(
-            printf 'SELECT count(*) FROM `binary_packages` JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` WHERE'
-            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
-              'epoch' "${epoch}" \
-              'pkgver' "${pkgver}" \
-              'pkgrel' "${pkgrel}" \
-              'pkgname' "${pkgname}"
-            if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
-              # 'any' gets higher sub_pkgrel than any architecture
-              printf ' 1'
-            else
-              # not-'any' gets higher sub_pkgrel than same or 'any' architecture
-              printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
-                "${arch}"
-            fi
-          )" | \
-            tail -n1 | \
+          if [ -n "${forced_sub_pkgrel}" ]; then
+            echo "${forced_sub_pkgrel}"
+          else
+            ${mysql_command} "$(
+              printf 'SELECT count(*) FROM `binary_packages` JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` WHERE'
+              printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+                'epoch' "${epoch}" \
+                'pkgver' "${pkgver}" \
+                'pkgrel' "${pkgrel}" \
+                'pkgname' "${pkgname}"
+              if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
+                # 'any' gets higher sub_pkgrel than any architecture
+                printf ' 1'
+              else
+                # not-'any' gets higher sub_pkgrel than same or 'any' architecture
+                printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
+                  "${arch}"
+              fi
+            )" | \
+            tail -n1
+          fi | \
             base64_encode_each
         )
         {
@@ -425,7 +453,7 @@ mysql_generate_package_metadata() {
           printf ' ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
           printf ' WHERE'
           printf ' `%s`.`%s` = from_base64("%s") AND' \
-            'repositories' 'name' "$(printf 'build-list' | base64 -w0)" \
+            'repositories' 'name' "${current_repository}" \
             'architectures' 'name' "${arch}" \
             'package_sources' 'pkgbase' "${pkgbase}" \
             'package_sources' 'git_revision' "${git_revision}" \
@@ -517,7 +545,8 @@ mysql_generate_package_metadata() {
               'pkgname' "${pkgname}"
             printf ' `architectures`.`name` = from_base64("%s") AND' \
               "${arch}"
-            printf ' `repositories`.`name` = "build-list";\n'
+            printf ' `repositories`.`name` = from_base64("%s");\n' \
+              "${current_repository}"
           done
 
           printf 'DROP TABLE `%s`;\n' \
