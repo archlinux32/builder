@@ -270,6 +270,9 @@ fi
           'nlopc'*|'rechenknecht'|'buildknecht'*)
             operator='deep42thought'
           ;;
+          'eurobuild')
+            operator='abaumann'
+          ;;
           *)
             operator="${name}"
           ;;
