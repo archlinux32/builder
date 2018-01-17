@@ -381,3 +381,9 @@ find "${work_dir}/package-states" \
     mysql_generate_package_metadata "${sub_pkgrel}" "${repository}" "${state_file}"
     printf ' ok\n'
   done
+
+tr ' ' '.' < \
+  "${work_dir}/build-list" | \
+  while read -r state_file; do
+    mysql_generate_package_metadata "${state_file}"
+  done
