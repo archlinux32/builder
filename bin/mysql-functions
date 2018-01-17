@@ -616,7 +616,7 @@ mysql_sanity_check() {
       "${temp_dir}/mysql-packages"
 
     diff -u \
-      "${temp_dir}/mysql-packages" \
-      "${temp_dir}/master-mirror-listing"
+      "${temp_dir}/master-mirror-listing" \
+      "${temp_dir}/mysql-packages"
   )
 }
