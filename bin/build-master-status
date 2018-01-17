@@ -321,6 +321,10 @@ if ${web}; then
       -exec zgrep -q 'error: failed to commit transaction (invalid or corrupted package)$' {} \; \
       -printf '%f package-cache\n' \
     \) -o \
+    \( \
+      -exec zgrep -q '^==> ERROR: Running makepkg as root is not allowed as it can cause permanent,' {} \; \
+      -printf '%f run-as-root\n' \
+    \) -o \
     -printf '%f unknown\n' \
     \) | \
     sed '
