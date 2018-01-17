@@ -311,15 +311,15 @@ fi
     sed 's|,;|;|'
 
   for repo in \
-    'core:stable:1' \
-    'extra:stable:1' \
-    'community:stable:1' \
-    'build-support:standalone:1' \
-    'testing:testing:1' \
-    'community-testing:testing:1' \
-    'staging:staging:1' \
-    'community-staging:staging:1' \
-    'build-list:unbuilt:0'; do
+    'core:stable:AQ=' \
+    'extra:stable:AQ=' \
+    'community:stable:AQ=' \
+    'build-support:standalone:AQ=' \
+    'testing:testing:AQ=' \
+    'community-testing:testing:AQ=' \
+    'staging:staging:AQ=' \
+    'community-staging:staging:AQ=' \
+    'build-list:unbuilt:AA='; do
     # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
     # shellcheck disable=SC2016
@@ -331,8 +331,7 @@ fi
       )" \
       "$(
         printf '%s' "${repo}" | \
-          cut -d: -f3 | \
-          base64_encode_each
+          cut -d: -f3
       )" \
       "$(
         printf '%s' "${repo}" | \
