@@ -26,5 +26,15 @@ ${mysql_command} '
     }
     1 i <html><head><title>list of build slaves</title></head><body>
     $ a </body></html>
-  ' > \
-  "${webserver_directory}/build-slaves.html"
+  ' | \
+  sponge "${webserver_directory}/build-slaves.html"
+
+mysql_sanity_check | \
+  sed '
+    s,^-.*$,<font color="#FF0000">\0</font>,
+    s,^+.*$,<font color="#00FF00">\0</font>,
+    s/$/<br>/
+    1 i <html><head><title>sanity of the buildmaster'"'"'s mysql database</title></head><body>
+    $ a </body></html>
+  ' | \
+  sponge "${webserver_directory}/mysql-sanity.html"
