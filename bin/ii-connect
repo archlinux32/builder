@@ -31,8 +31,8 @@ if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
 fi
 
 # start watch daemon if not running yet
-if ! pgrep -xf 'SCREEN -d -m ii-connect watch' > /dev/null; then
-  screen -d -m ii-connect watch
+if ! pgrep -xf 'SCREEN -S ii-connect\.watch -d -m .*/ii-connect watch' > /dev/null; then
+  screen -S ii-connect.watch -d -m "${base_dir}/bin/ii-connect" watch
 fi
 
 # watch if asked to
@@ -61,7 +61,7 @@ if [ "$1" = 'watch' ]; then
             while read -r line; do
               reason=$(
                 echo "${line}" | \
-                  xargs why-dont-you 2>&1
+                  xargs "${base_dir}/bin/why-dont-you" 2>&1
               )
               if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
                 echo "${reason}"
