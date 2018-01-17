@@ -324,12 +324,7 @@ move_packages() {
     "${tmp_dir}/tmp/packages"
 
   if ! ${no_action}; then
-    date '+%s' > \
-      "${tmp_dir}/tmp/lastupdate"
-    # shellcheck disable=SC2086
-    ${dummynator} ${master_mirror_rsync_command} \
-      "${tmp_dir}/tmp/lastupdate" \
-      "${master_mirror_rsync_directory}/lastupdate"
+    ${dummynator} trigger_mirror_refreshs
   fi
 
   rm -rf --one-file-system "${tmp_dir:?}/tmp"

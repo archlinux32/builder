@@ -1303,3 +1303,21 @@ modification_revision_link() {
       "${mod_rev}"
   fi
 }
+
+# trigger_mirror_refreshs
+# trigger a refresh of capable tier 1 mirrors (as backup for master mirror)
+
+trigger_mirror_refreshs() {
+  local tmp_file
+
+  tmp_file=$(mktemp)
+  date '+%s' > \
+    "${tmp_file}"
+  ${master_mirror_rsync_command} \
+    "${tmp_file}" \
+    "${master_mirror_rsync_directory}/lastupdate"
+  rm "${tmp_file}"
+  for trigger_url in ${mirror_refresh_trigger_urls}; do
+    screen -S trigger-mirror-update -d -m curl -L "${trigger_url}"
+  done
+}
