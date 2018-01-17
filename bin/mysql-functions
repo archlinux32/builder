@@ -602,6 +602,7 @@ mysql_sanity_check() {
       FROM `binary_packages`
       JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`
       JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`
+      WHERE `repositories`.`is_on_master_mirror`
     ' --batch | \
       sed '
         1d
