@@ -1,0 +1,381 @@
+#!/bin/sh
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+. "${0%/*}/mysql-functions"
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+for dir in $(ls_master_mirror 'i686'); do
+  ls_master_mirror "i686/${dir}" | \
+    sed '
+      /\.pkg\.tar\.xz$/!d
+      s|^|'"${dir}"' |
+    '
+done | \
+  sort -k2,2 > \
+  "${tmp_dir}/master-mirror-listing"
+
+if [ ! "$1" = 'slim' ]; then
+  tables=$(
+    printf '%s\n' \
+      'dependency_types SMALLINT' \
+      ' name VARCHAR(32)' \
+      ' relevant_for_building BIT' \
+      ' relevant_for_binary_packages BIT' \
+      ' UNIQUE name' \
+      'dependencies BIGINT' \
+      ' dependent BIGINT :binary_packages' \
+      ' depending_on BIGINT :install_targets' \
+      ' dependency_type SMALLINT :dependency_types' \
+      ' UNIQUE content dependent depending_on dependency_type' \
+      'install_targets BIGINT' \
+      ' name VARCHAR(64)' \
+      ' UNIQUE name' \
+      'install_target_providers BIGINT' \
+      ' package BIGINT :binary_packages' \
+      ' install_target BIGINT :install_targets' \
+      ' UNIQUE content package install_target' \
+      'binary_packages BIGINT' \
+      ' build_assignment BIGINT :build_assignments' \
+      ' repository MEDIUMINT :repositories' \
+      ' epoch MEDIUMINT' \
+      ' pkgver VARCHAR(64)' \
+      ' pkgrel MEDIUMINT' \
+      ' sub_pkgrel MEDIUMINT' \
+      ' has_issues BIT' \
+      ' is_blocked VARCHAR(128)' \
+      ' is_tested BIT' \
+      ' pkgname VARCHAR(64)' \
+      ' architecture SMALLINT :architectures' \
+      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture' \
+      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture' \
+      'repositories MEDIUMINT' \
+      ' name VARCHAR(64)' \
+      ' stability MEDIUMINT :repository_stabilities' \
+      ' is_on_master_mirror BIT' \
+      ' UNIQUE name' \
+      'repository_stabilities MEDIUMINT' \
+      ' name VARCHAR(32)' \
+      ' bugtracker_category VARCHAR(64) NULL' \
+      ' UNIQUE name' \
+      'architectures SMALLINT' \
+      ' name VARCHAR(16)' \
+      ' UNIQUE name' \
+      'build_assignments BIGINT' \
+      ' package_source BIGINT :package_sources' \
+      ' architecture SMALLINT :architectures' \
+      ' UNIQUE content package_source architecture' \
+      'build_dependency_loops BIGINT' \
+      ' loop MEDIUMINT' \
+      ' build_assignment BIGINT :build_assignments' \
+      ' UNIQUE content loop build_assignment' \
+      'build_slaves MEDIUMINT' \
+      ' name VARCHAR(32)' \
+      ' ssh_key VARCHAR(1024)' \
+      ' operator VARCHAR(32)' \
+      ' currently_building BIGINT NULL :build_assignments' \
+      ' last_connection DATETIME' \
+      ' UNIQUE name' \
+      'package_sources BIGINT' \
+      ' pkgbase VARCHAR(64)' \
+      ' git_revision VARCHAR(40)' \
+      ' mod_git_revision VARCHAR(40)' \
+      ' upstream_package_repository SMALLINT :upstream_repositories' \
+      ' UNIQUE content pkgbase git_revision mod_git_revision' \
+      'upstream_repositories SMALLINT' \
+      ' name VARCHAR(64)' \
+      ' git_repository SMALLINT :git_repositories' \
+      ' UNIQUE content name git_repository' \
+      'git_repositories SMALLINT' \
+      ' name VARCHAR(64)' \
+      ' url VARCHAR(128)' \
+      ' directory VARCHAR(128)' \
+      ' head VARCHAR(40)' \
+      ' UNIQUE name' \
+      ' UNIQUE url' \
+      ' UNIQUE directory'
+  )
+
+  {
+    printf '%s\n' \
+      '/*!40014 SET UNIQUE_CHECKS=0 */;' \
+      '/*!40014 SET FOREIGN_KEY_CHECKS=0 */;'
+    for turn in 'drop' 'create'; do # 'link'; do
+      echo "${tables}" | \
+        sed -n '
+          /^\S/p
+        ' | \
+        while read -r table size; do
+          case "${turn}" in
+           'drop')
+              # shellcheck disable=SC2016
+              printf 'DROP TABLE IF EXISTS `%s`;\n' "${table}"
+            ;;
+            'create'|'link')
+              if [ "${turn}" = 'create' ]; then
+                # shellcheck disable=SC2016
+                printf 'CREATE TABLE `%s` (\n' "${table}"
+                # shellcheck disable=SC2016
+                printf '  `id` %s NOT NULL AUTO_INCREMENT,\n' "${size}"
+              fi
+              echo "${tables}" | \
+                sed -n '
+                  s/^'"$(str_to_regex "${table} ${size}")"'$//
+                  T
+                  :a
+                    $!N
+                    s/\n\S.*$//
+                    $!Ta
+                  s/^\n//
+                  p
+                ' | \
+                while read -r column type rest; do
+                  case "${column}" in
+                    'UNIQUE')
+                      if [ ! "${turn}" = 'create' ]; then
+                        continue
+                      fi
+                      if [ -z "${rest}" ]; then
+                        rest="${type}"
+                      fi
+                      # shellcheck disable=SC2016
+                      printf '  UNIQUE KEY `%s` (' "${type}"
+                      # shellcheck disable=SC2016,SC2086
+                      printf '`%s`,' ${rest} | \
+                        sed 's|,$||'
+                      printf ')'
+                    ;;
+                    *)
+                      if [ "${turn}" = 'create' ]; then
+                        # shellcheck disable=SC2016
+                        printf '  `%s` %s' "${column}" "${type}"
+                        if ! echo "${rest}" | \
+                          grep -qwF 'NULL'; then
+                          printf ' NOT NULL'
+                        fi
+                      else
+                        echo "${rest}" | \
+                          tr ' ' '\n' | \
+                          sed -n 's/^://;T;p' | \
+                          while read -r link; do
+                            # shellcheck disable=SC2016
+                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`);\n' \
+                              "${table}" \
+                              "${column}" \
+                              "${link}"
+                          done
+                      fi
+                    ;;
+                  esac
+                  if [ "${turn}" = 'create' ]; then
+                    printf ',\n'
+                  fi
+                done
+              if [ "${turn}" = 'create' ]; then
+                # shellcheck disable=SC2016
+                printf '  PRIMARY KEY (`id`));\n'
+              fi
+            ;;
+            *)
+              >&2 printf 'unknown turn "%s"\n' "${turn}"
+              exit 2
+          esac
+        done
+    done
+    printf '%s\n' \
+      '/*!40014 SET UNIQUE_CHECKS=1 */;' \
+      '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;'
+    printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
+      'CREATE TEMPORARY TABLES' 'buildmaster.*' \
+      'SHOW VIEW' 'buildmaster.*' \
+      'SELECT' 'buildmaster.*' \
+      'UPDATE' 'buildmaster.*' \
+      'RELOAD' '*.*'
+    printf 'FLUSH PRIVILEGES;\n'
+  } | \
+    mysql -u root -p buildmaster
+fi
+
+{
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `architectures` (`name`) VALUES '
+  printf '("%s"),' \
+    'any' 'i686' | \
+    sed 's|,$||'
+  printf ';\n'
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `git_repositories` (`name`,`url`,`directory`,`head`) VALUES'
+  {
+    for repo in ${repo_names}; do
+      eval 'repo_path="${repo_paths__'"${repo}"'}"'
+      printf '\n  ('
+      printf 'from_base64("%s"),' \
+        "$(
+          printf '%s' "${repo}" | \
+            base64 -w0
+        )" \
+        "$(
+          git -C "${repo_path}" remote -v | \
+            awk '{print $2}' | \
+            tail -n1 | \
+            base64_encode_each
+        )" \
+        "$(
+          printf '%s' "${repo_path}" | \
+            base64_encode_each
+        )" \
+        "$(
+          base64_encode_each < \
+            "${work_dir}/${repo}.revision"
+        )" | \
+        sed 's|,$|),|'
+    done
+    printf ';\n'
+  } | \
+    sed '
+      s|,;|;|
+    '
+
+  for repo in \
+    'core:packages' \
+    'extra:packages' \
+    'multilib:packages' \
+    'community:community'; do
+    # shellcheck disable=SC2016
+    printf 'INSERT IGNORE INTO `upstream_repositories` (`name`,`git_repository`) SELECT\n'
+    # shellcheck disable=SC2016
+    printf '  from_base64("%s"),`id` FROM `git_repositories` WHERE `name` = from_base64("%s");\n' \
+      "$(
+        printf '%s' "${repo%:*}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${repo#*:}" | \
+          base64 -w0
+      )"
+  done
+
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `build_slaves` (`name`,`ssh_key`,`operator`,`last_connection`) VALUES'
+  {
+    sed -n '
+      s/^command="\S\+ \(\S\+\)" \S\+ \(\S\+\) \S\+$/\1 \2/
+      T
+      p
+    ' ~/.ssh/authorized_keys | \
+      while read -r name key; do
+        case "${name}" in
+          'nlopc'*|'rechenknecht'|'buildknecht'*)
+            operator='deep42thought'
+          ;;
+          *)
+            operator="${name}"
+          ;;
+        esac
+        printf '\n  ('
+        printf 'from_base64("%s"),' \
+          "$(
+            printf '%s' "${name}" | \
+              base64 -w0
+          )" \
+          "$(
+            printf '%s' "${key}" | \
+              base64 -w0
+          )" \
+          "$(
+            printf '%s' "${operator}" | \
+              base64 -w0
+          )"
+        printf 'NOW()),'
+      done
+    printf ';\n'
+  } | \
+    sed 's|,;|;|'
+
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `repository_stabilities` (`name`,`bugtracker_category`) VALUES'
+  {
+    printf '\n  ("%s",%s),' \
+      'stable' '"Packages:Stable"' \
+      'testing' '"Packages:Testing"' \
+      'staging' 'NULL' \
+      'standalone' 'NULL' \
+      'unbuilt' '"Packages:Build-list"'
+    printf ';\n'
+  } | \
+    sed 's|,;|;|'
+
+  for repo in \
+    'core:stable:1' \
+    'extra:stable:1' \
+    'community:stable:1' \
+    'build-support:standalone:1' \
+    'testing:testing:1' \
+    'community-testing:testing:1' \
+    'staging:staging:1' \
+    'community-staging:staging:1' \
+    'build-list:unbuilt:0'; do
+    # shellcheck disable=SC2016
+    printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
+    # shellcheck disable=SC2016
+    printf ' from_base64("%s"),`id`,from_base64("%s") FROM `repository_stabilities` WHERE `name`=from_base64("%s");\n' \
+      "$(
+        printf '%s' "${repo}" | \
+          cut -d: -f1 | \
+          base64_encode_each
+      )" \
+      "$(
+        printf '%s' "${repo}" | \
+          cut -d: -f3 | \
+          base64_encode_each
+      )" \
+      "$(
+        printf '%s' "${repo}" | \
+          cut -d: -f2 | \
+          base64_encode_each
+      )"
+  done
+
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `dependency_types` (`name`,`relevant_for_building`,`relevant_for_binary_packages`) VALUES'
+  {
+    printf '\n  ("%s",%s,%s),' \
+      'build' '1' '0' \
+      'run' '1' '1'
+    printf ';\n'
+  } | \
+    sed 's|,;|;|'
+} | \
+  mysql buildmaster
+
+find "${work_dir}/package-states" \
+  -maxdepth 1 \
+  -mindepth 1 \
+  \( \
+    -name '*.done' -o \
+    -name '*.testing' -o \
+    -name '*.tested' \
+  \) \
+  -exec sed '
+    s@^.*-\([^-]\+\)-\([^-.]\+\)\.pkg\.tar\.xz$@{} \1 \2 \0@
+    s@^\S*/@@
+    s/^\(\S\+\)\.\(done\|testing\|tested\) /\1 /
+    s/ \([0-9]\+\) / \1.0 /
+    s/ [0-9]\+\.\([0-9]\+\) / \1 /
+  ' {} \; | \
+  while read -r state_file sub_pkgrel arch package_file; do
+    printf '%s ' "${state_file}"
+    repository=$(
+      grep '^\S\+ '"$(str_to_regex "${package_file}")"'$' "${tmp_dir}/master-mirror-listing" | \
+        cut -d' ' -f1
+    )
+    if [ "$(echo "${repository}" | grep -cx '\S\+')" -ne 1 ]; then
+      printf 'not found exactly once on the master mirror.\n'
+      >&2 printf '"%s"\n' "${state_file}" "${sub_pkgrel}" "${arch}" "${package_file}"
+      continue
+    fi
+    mysql_generate_package_metadata "${sub_pkgrel}" "${repository}" "${state_file}"
+    printf ' ok\n'
+  done
