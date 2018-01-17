@@ -31,7 +31,7 @@ if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
 fi
 
 # start watch daemon if not running yet
-if ! pgrep -xf 'SCREEN -S ii-connect\.watch -d -m .*/ii-connect watch' > /dev/null; then
+if ! pgrep -f '/ii-connect watch$' > /dev/null; then
   screen -S ii-connect.watch -d -m "${base_dir}/bin/ii-connect" watch
 fi
 
