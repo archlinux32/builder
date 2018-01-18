@@ -2,7 +2,8 @@
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
-. "${0%/*}/mysql-functions"
+# shellcheck source=bin/mysql-functions
+. "${base_dir}/bin/mysql-functions"
 
 tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
@@ -387,3 +388,88 @@ tr ' ' '.' < \
   while read -r state_file; do
     mysql_generate_package_metadata "${state_file}"
   done
+
+grep '^\('"$(
+  # shellcheck disable=SC2086
+  printf '%s\\|' ${standalone_package_repositories} ${stable_package_repositories}
+)"'\) ' "${tmp_dir}/master-mirror-listing" | \
+  sed '
+    s/\.pkg\.tar\.xz$//
+    s/-\([^-:]\+\)\(\(-[^-]\+\)\{2\}\)$/-0:\1\2/
+    s/\(-[0-9]\+\)\(-[^-]\+\)$/\1.0\2/
+    s/-\([^-:]\+\):\([^-:]\+\)-\([^-.]\+\)\.\([^-.]\+\)-\([^-]\+\)$/ \1 \2 \3 \4 \5/
+  ' | \
+  while read -r repo pkgname epoch pkgver pkgrel sub_pkgrel arch; do
+    # we don't care too much about those - they won't be moved anyways
+    printf '('
+    # shellcheck disable=SC2046
+    printf 'from_base64("%s"),' \
+      $(
+        printf '%s\n' \
+          "${pkgname}" \
+          "${epoch}" \
+          "${pkgver}" \
+          "${pkgrel}" \
+          "${sub_pkgrel}" \
+          "${arch}" \
+          "${repo}" | \
+          base64_encode_each
+      ) | \
+      sed 's/,$/),/'
+    printf '\n'
+  done > \
+  "${tmp_dir}/new-stable-packages"
+
+if [ -s "${tmp_dir}/new-stable-packages" ]; then
+  {
+    # shellcheck disable=SC2016
+    printf 'CREATE TEMPORARY TABLE `stable_packages` ('
+    # shellcheck disable=SC2016
+    printf '`%s` %s,' \
+      'pkgname' 'VARCHAR(64)' \
+      'epoch' 'MEDIUMINT' \
+      'pkgver' 'VARCHAR(64)' \
+      'pkgrel' 'MEDIUMINT' \
+      'sub_pkgrel' 'MEDIUMINT' \
+      'architecture' 'VARCHAR(16)' \
+      'repository' 'VARCHAR(64)' \
+      'build_assignment' 'BIGINT NOT NULL AUTO_INCREMENT'
+    # shellcheck disable=SC2016
+    printf 'PRIMARY KEY (`build_assignment`));\n'
+    # shellcheck disable=SC2016
+    sed '
+      1~10 ! b not_start
+      s/^/INSERT IGNORE INTO `stable_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`) VALUES \n/
+      :not_start
+      $    b end
+      0~10 b end
+      b
+      :end
+      s/,$/;/
+    ' "${tmp_dir}/new-stable-packages"
+    # shellcheck disable=SC2016
+    printf 'INSERT IGNORE INTO `binary_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`,`build_assignment`,`has_issues`,`is_tested`)'
+    printf ' SELECT '
+    # shellcheck disable=SC2016
+    printf '`stable_packages`.`%s`,' \
+      'pkgname' \
+      'epoch' \
+      'pkgver' \
+      'pkgrel' \
+      'sub_pkgrel'
+    # shellcheck disable=SC2016
+    printf '`%s`.`id`,' \
+      'architectures' \
+      'repositories'
+    # shellcheck disable=SC2016
+    printf -- '-`build_assignment`,0,1 FROM `stable_packages`'
+    # shellcheck disable=SC2016
+    printf ' JOIN `%s` ON `stable_packages`.`%s`=`%s`.`name`' \
+      'repositories' 'repository' 'repositories' \
+      'architectures' 'architecture' 'architectures'
+    printf ';\n'
+    # shellcheck disable=SC2016
+    printf 'DROP TABLE `stable_packages`;\n'
+  } | \
+    ${mysql_command% -e}
+fi
