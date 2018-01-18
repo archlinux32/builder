@@ -249,7 +249,7 @@ delete_old_metadata() {
     # build-list items should stay
     sed 'p' "${work_dir}/build-list"
 
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d 'tmp.common-functions.delete_old_metadata.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     echo "${current_metadata}" | \
@@ -467,7 +467,7 @@ remove_old_package_versions() {
   fi
 
   ( # the new shell is intentional
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d 'tmp.common-functions.remove_old_package_versions.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     {
@@ -629,7 +629,7 @@ make_source_info() {
 
   ( # the new shell is intentional
 
-    tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
+    tmp_dir=$(mktemp -d "${work_dir}/tmp.make_source_info.XXXXXX")
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
     extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}" '0'
@@ -862,7 +862,7 @@ download_sources_by_hash() {
   local sum_type
   local arch_suffix
 
-  tmp_dir=$(mktemp -d)
+  tmp_dir=$(mktemp -d 'tmp.common-functions.download_sources_by_hash.XXXXXXXXXX' --tmpdir)
 
   if ! make_source_info "${package}" "${repository}" "${git_revision}" "${git_mod_revision}" "${tmp_dir}/.SRCINFO"; then
     >&2 echo 'download_sources_by_hash: make_source_info failed.'
@@ -1002,7 +1002,7 @@ find_biggest_subset_of_packages() {
     sort -u "${omega}" | \
       sponge "${omega}"
 
-    temp_dir=$(mktemp -d)
+    temp_dir=$(mktemp -d 'tmp.common-functions.find_biggest_subset_of_packages.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
     {
@@ -1232,7 +1232,7 @@ next_sub_pkgrel() {
     repository="$4"
     git_repo=$(find_git_repository_to_package_repository "${repository}")
 
-    temp_dir=$(mktemp -d)
+    temp_dir=$(mktemp -d 'tmp.common-functions.next_sub_pkgrel.XXXXXXXXXX' --tmpdir)
 
     find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
     extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${temp_dir}" '0'
@@ -1310,7 +1310,7 @@ modification_revision_link() {
 trigger_mirror_refreshs() {
   local tmp_file
 
-  tmp_file=$(mktemp)
+  tmp_file=$(mktemp "tmp.common-functions.trigger_mirror_refreshs.XXXXXXXXXX" --tmpdir)
   date '+%s' > \
     "${tmp_file}"
   ${master_mirror_rsync_command} \

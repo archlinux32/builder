@@ -13,7 +13,7 @@ if [ $# -eq 0 ]; then
   )
   new_sum='x'
   sum=''
-  tmp_dir=$(mktemp -d)
+  tmp_dir=$(mktemp -d 'tmp.show-dependencies.0.XXXXXXXXXX' --tmpdir)
   trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
   find "${work_dir}/package-infos" -maxdepth 1 -name '*.builds' -exec \
     grep -HF '' {} \; | \
@@ -116,7 +116,7 @@ if ! flock -s -n 8; then
   exit
 fi
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.show-dependencies.1.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 sort -u "${work_dir}/build-order" | \

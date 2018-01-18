@@ -10,7 +10,7 @@
 action="$1"
 shift
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.why-dont-you.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 case "${action}" in

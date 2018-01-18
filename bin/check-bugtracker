@@ -8,7 +8,7 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.check-bugtracker.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 receive_buglist 'Testing' | \

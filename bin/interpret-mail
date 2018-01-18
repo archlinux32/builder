@@ -83,7 +83,7 @@ run_and_log_on_error() {
   fi
 }
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.interpret-mail.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 cat > \

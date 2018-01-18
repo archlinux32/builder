@@ -27,7 +27,7 @@ usage() {
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.seed-build-list.XXXXXXXXXX' --tmpdir)
 # shellcheck disable=SC2064
 trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 

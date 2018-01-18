@@ -388,7 +388,7 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-tmp_dir=$(mktemp -d "${work_dir}/tmp.XXXXXX")
+tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 for package in ${packages_to_force_stabilize}; do

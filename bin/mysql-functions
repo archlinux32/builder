@@ -202,7 +202,7 @@ mysql_generate_package_metadata() {
     git_revision="$2"
     mod_git_revision="$3"
     repository="$4"
-    temp_dir=$(mktemp -d)
+    temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
     if [ $# -eq 1 ]; then
@@ -578,7 +578,7 @@ mysql_generate_package_metadata() {
 
 mysql_sanity_check() {
   ( # new shell is intentional
-    temp_dir=$(mktemp -d)
+    temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_sanity_check.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
     for dir in $(ls_master_mirror 'i686'); do

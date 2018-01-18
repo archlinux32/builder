@@ -91,7 +91,7 @@ delete_package() {
 }
 
 # create tmp_dir and trap
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.get-package-updates.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 # Update git repositories (official packages, community packages and the repository of package customizations).

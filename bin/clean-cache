@@ -22,7 +22,7 @@ mirror=$(
     sed 's|^\s*||'
 )
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.clean-cache.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 for repo in ${repos}; do

@@ -43,7 +43,7 @@ git diff-index --check --cached $against -- || exit $?
 
 tree=$(git write-tree)
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.strict-bashism-check.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 git archive "${tree}" | \

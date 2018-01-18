@@ -98,7 +98,7 @@ finish() {
   rm -rf --one-file-system "${tmp_dir}"
 }
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d 'tmp.sanity-check.XXXXXXXXXX' --tmpdir)
 touch "${tmp_dir}/messages"
 trap 'finish' EXIT
 
