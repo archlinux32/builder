@@ -76,6 +76,20 @@ if [ "$5" = 'ERROR' ]; then
   # shellcheck disable=SC2154
   echo "${slave}" >> \
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
+  ${mysql_command} -e "$(
+    # shellcheck disable=SC2016
+    printf 'UPDATE `build_assignments`'
+    # shellcheck disable=SC2016
+    printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+    # shellcheck disable=SC2016
+    printf ' SET `build_assignments`.`is_broken`=1, `build_slaves`.`currently_building`=NULL'
+    # shellcheck disable=SC2016
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+      "$(
+        printf '%s' "${slave}" | \
+          base64 -w0
+      )"
+  )"
 
   # shellcheck disable=SC2154
   sed -i '
