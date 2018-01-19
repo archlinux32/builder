@@ -67,6 +67,7 @@ if [ ! "$1" = 'slim' ]; then
       ' package_source BIGINT :package_sources' \
       ' architecture SMALLINT :architectures' \
       ' is_blocked VARCHAR(128) NULL' \
+      ' is_broken BIT' \
       ' UNIQUE content package_source architecture' \
       'build_dependency_loops BIGINT' \
       ' loop MEDIUMINT' \
