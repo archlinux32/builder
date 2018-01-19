@@ -1,5 +1,7 @@
 #!/bin/sh
 
+. "${0%/*}/../conf/default.conf"
+
 usage( ) {
   >&2 cat <<EOF
 
@@ -28,7 +30,7 @@ err( ) {
   EXIT_CODE=1
 }
 
-tmp_dir=$(mktemp -d 'tmp.check-opcodes.XXXXXXXXXX' --tmpdir)
+tmp_dir=$(mktemp -d "${work_dir}/tmp.check-opcodes.XXXXXX")
 trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 
 ARCH=i686
@@ -140,7 +142,7 @@ for absfile in `find $tmp_dir -name '*.so*' -type f`; do
   fi
 
   objdump -M intel -d $absfile > $tmp_dir/$file.asm
-  bad_opcodes=`cat $tmp_dir/$file.asm | ./opcode $OPCODE_ARGS -m 1 | wc -l`
+  bad_opcodes=`cat $tmp_dir/$file.asm | ${base_dir}/bin/opcode $OPCODE_ARGS -m 1 | wc -l`
   if test $bad_opcodes != 0; then
     case $ARCH in
       i486)
