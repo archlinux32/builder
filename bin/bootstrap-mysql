@@ -312,15 +312,15 @@ fi
     sed 's|,;|;|'
 
   for repo in \
-    'core:stable:AQ=' \
-    'extra:stable:AQ=' \
-    'community:stable:AQ=' \
-    'build-support:standalone:AQ=' \
-    'testing:testing:AQ=' \
-    'community-testing:testing:AQ=' \
-    'staging:staging:AQ=' \
-    'community-staging:staging:AQ=' \
-    'build-list:unbuilt:AA='; do
+    'core:stable:AQ==' \
+    'extra:stable:AQ==' \
+    'community:stable:AQ==' \
+    'build-support:standalone:AQ==' \
+    'testing:testing:AQ==' \
+    'community-testing:testing:AQ==' \
+    'staging:staging:AQ==' \
+    'community-staging:staging:AQ==' \
+    'build-list:unbuilt:AA=='; do
     # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
     # shellcheck disable=SC2016
