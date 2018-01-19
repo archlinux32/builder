@@ -1,0 +1,166 @@
+#!/bin/sh
+
+. "${0%/*}/../conf/default.conf"
+
+usage( ) {
+  >&2 cat <<EOF
+
+check_opcodes: [ -a <arch> ] <package>
+
+possible optons:
+  -h|--help: Show this help page
+  -v|--verbose: Verbose output
+  -a|--architecture: architecture family to check against, one of
+                     i486, i686, pentium4
+
+EOF
+  exit 1
+}
+
+VERBOSE=0
+EXIT_CODE=0
+log( ) {
+  if test $VERBOSE = 1; then
+    echo $*
+  fi
+}
+
+err( ) {
+  echo "ERROR: $*"
+  EXIT_CODE=1
+}
+
+tmp_dir=$(mktemp -d "${work_dir}/tmp.check-opcodes.XXXXXX")
+trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
+
+ARCH=i686
+
+while getopts ":va:h-:" opt; do
+  case $opt in
+    -)
+      case "$OPTARG" in
+        help)
+          usage
+          ;;
+        verbose)
+          VERBOSE=1
+          ;;
+        *)
+          echo "ERROR: Invalid option: --$OPTARG" >&2
+          usage
+          ;;
+      esac
+      ;;
+    h)
+      usage
+      ;;
+    v)
+      VERBOSE=1
+      ;;
+    a)
+      ARCH=$OPTARG
+      ;;
+    \?)
+      echo "ERROR: Invalid option: -$OPTARG" >&2
+      usage
+      ;;
+  esac
+done
+
+shift $((OPTIND-1))
+
+PACKAGE=$1
+
+if test "x$PACKAGE" = "x"; then
+  echo "ERROR: Filename of a package required as argument" >&2
+  usage
+  exit 1
+fi
+
+OPCODE_ARGS=""
+case $ARCH in
+  i486)
+    OPCODE_ARGS='-r -a 486 -v'
+    ;;
+	i686)
+    OPCODE_ARGS='-s MMX -s SSE -s SSE2'
+    ;;
+  pentium4)
+    OPCODE_ARGS='-s SSE3 -s SSSE3 -s AVX'
+    ;;
+	*)
+    echo "ERROR: architecture must currently be one of i486 and i686" >&2
+    usage
+    exit 1
+esac
+
+log "Checking for architecture: $ARCH ($OPCODE_ARGS)"
+bsdtar --no-fflags -x -C $tmp_dir -f $PACKAGE
+
+for absfile in `find $tmp_dir -name '*.so*' -type f`; do
+	file=`basename $absfile`
+	log "Checking shared library: $file"
+	readelf -a $absfile > $tmp_dir/$file.elf
+  objdump -f $absfile > $tmp_dir/$file.objdump
+  file $absfile > $tmp_dir/$file.file
+    
+  arch=`grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,`
+  case $arch in
+    i386:x86-64)
+      arch='x86_64'
+      ;;
+    i386)
+      arch='x86'
+      ;;
+    *)
+      arch='unknown'
+      ;;
+  esac
+  log "  Objdump architecture: $arch"
+  
+  archelf=`grep '^ \+Class' $tmp_dir/$file.elf | cut -f 2 -d : | tr -d ' '`
+  case $archelf in
+    ELF64)
+      archelf='x86_64'
+      ;;
+    ELF32)
+      archelf='x86'
+      ;;
+    *)
+      archelf='unknown'
+      ;;
+  esac
+  log "  Readelf architecture: $archelf"
+
+  if test $arch != $archelf; then
+    err "$file ambigous architecture information (objdump: $arch, ELF: $archelf)"
+  fi
+  
+  if test $arch = "x86_64"; then
+    err "$file is a 64-bit library!"
+    continue
+  fi
+
+  objdump -M intel -d $absfile > $tmp_dir/$file.asm
+  bad_opcodes=`cat $tmp_dir/$file.asm | ${base_dir}/bin/opcode $OPCODE_ARGS -m 1 | wc -l`
+  if test $bad_opcodes != 0; then
+    case $ARCH in
+      i486)
+        err "$file is not built for plain i486 opcodes"
+        ;;
+      i686)
+        err "$file contains MMX, SSE or SSE2 opcodes"
+        ;;
+      pentium4)
+        err "$file contains SSE3 or newer opcodes"
+        ;;
+    esac
+  else
+    if test $VERBOSE = 1; then
+      log "$file fullfills architecture constraint for $ARCH"
+    fi
+  fi
+  
+done
+
+exit $EXIT_CODE
