@@ -15,6 +15,7 @@ ${mysql_command} -e '
   `build_slaves`.`currently_building`=`build_assignments`.`id`
   LEFT JOIN `package_sources` ON
   `build_assignments`.`package_source`=`package_sources`.`id`
+  ORDER BY `build_slaves`.`last_connection`
 ' --html | \
   sed '
     s,</TR>,\0\n,g
