@@ -4,7 +4,10 @@
 
 # shellcheck disable=SC2039
 
-mysql_command='mysql buildmaster -e'
+if [ -z "${base_dir}" ]; then
+  # just to make shellcheck happy
+  . 'conf/default.conf'
+fi
 
 # base64_encode_each encode each line of stdin with base64
 
@@ -34,7 +37,7 @@ mysql_add_package_source() {
   done
   values="${values% }"
 
-  ${mysql_command} "$(
+  ${mysql_command} -e "$(
     printf 'INSERT IGNORE INTO package_sources'
     {
       printf ' ('
@@ -52,7 +55,7 @@ mysql_add_package_source() {
 
 # mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
 
-# shellcheck disable=SC2016,SC2086,SC2154
+# shellcheck disable=SC2016,SC2031,SC2086,SC2154
 mysql_add_binary_package() {
   local names='pkgbase git_revision mod_git_revision upstream_package_repository pkgname sub_pkgrel architecture repository'
   local name
@@ -65,7 +68,7 @@ mysql_add_binary_package() {
     shift
   done
 
-  ${mysql_command} "$(
+  ${mysql_command} -e "$(
     printf 'INSERT IGNORE INTO binary_packages'
     {
       printf ' ('
@@ -96,7 +99,7 @@ mysql_add_binary_package() {
 
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
 
-# shellcheck disable=SC2016,SC2086,SC2154
+# shellcheck disable=SC2016,SC2031,SC2086,SC2154
 mysql_show_binary_package() {
   local names='pkgname pkgver pkgrel sub_pkgrel'
   local name
@@ -110,7 +113,7 @@ mysql_show_binary_package() {
   done
 
   local joint
-  ${mysql_command} "$(
+  ${mysql_command} -e "$(
     {
       printf 'SELECT'
       printf ' `%s`.`%s`,' \
@@ -161,7 +164,7 @@ mysql_add_install_target() {
       base64 -w0
   )
 
-  ${mysql_command} "$(
+  ${mysql_command} -e "$(
     printf 'INSERT IGNORE INTO `install_targets` (`name`)'
     printf ' VALUES (from_base64("%s"))' \
       "${install_target}"
@@ -401,7 +404,7 @@ mysql_generate_package_metadata() {
           if [ -n "${forced_sub_pkgrel}" ]; then
             echo "${forced_sub_pkgrel}"
           else
-            ${mysql_command} "$(
+            ${mysql_command} -e "$(
               printf 'SELECT count(*) FROM `binary_packages` JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` WHERE'
               printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
                 'epoch' "${epoch}" \
@@ -561,7 +564,7 @@ mysql_generate_package_metadata() {
       done
     printf '.' >&2
 
-    ${mysql_command} "$(
+    ${mysql_command} -e "$(
       if [ -s "${temp_dir}/add-build-assignments-command" ]; then
         cat "${temp_dir}/add-build-assignments-command"
       fi
@@ -600,7 +603,7 @@ mysql_sanity_check() {
       "${temp_dir}/master-mirror-listing"
 
     # shellcheck disable=SC2016
-    ${mysql_command} '
+    ${mysql_command} -e '
       SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`
       FROM `binary_packages`
       JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`
