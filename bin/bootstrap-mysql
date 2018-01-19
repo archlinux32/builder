@@ -226,7 +226,7 @@ fi
         )" \
         "$(
           printf '%s' "${repo_path}" | \
-            base64_encode_each
+            base64 -w0
         )" \
         "$(
           base64_encode_each < \
