@@ -25,6 +25,9 @@ ${mysql_command} -e '
       s,<TH>pkgbase</TH>,<TH>currently building</TH>,
       y,_, ,
     }
+    \,</TH></TR>$, ! {
+      s,<TD>NULL</TD>,<TD>\&nbsp;</TD>,
+    }
     1 i <html><head><title>list of build slaves</title></head><body>
     $ a </body></html>
   ' | \
