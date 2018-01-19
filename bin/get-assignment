@@ -50,6 +50,33 @@ hand_out_assignment() {
   } | \
     sort -u | \
     sponge "${work_dir}/package-states/$1.$2.$3.$4.locked"
+  ${mysql_command} -e "$(
+    # shellcheck disable=SC2016
+    printf 'UPDATE `build_slaves`'
+    # shellcheck disable=SC2016
+    printf ' SET `currently_building` = ('
+    # shellcheck disable=SC2016
+    printf ' SELECT `build_assignments`.`id`'
+    # shellcheck disable=SC2016
+    printf ' FROM `build_assignments`'
+    # shellcheck disable=SC2016
+    printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+    # shellcheck disable=SC2016
+    printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+    printf ' WHERE'
+    # shellcheck disable=SC2016
+    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
+      'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision'     "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    # shellcheck disable=SC2016
+    printf ' `upstream_repositories`.`name` = from_base64("%s")' \
+      "$(printf '%s' "$4" | base64 -w0)"
+    printf ')'
+    # shellcheck disable=SC2016
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");' \
+      "$(printf '%s' "${slave}" | base64 -w0)"
+  )"
 
   # lock every loop this package breaks
   find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
