@@ -8,8 +8,9 @@ usage( ) {
 check_opcodes: [ -a <arch> ] <package>
 
 possible optons:
-  -h|--help: Show this help page
-  -v|--verbose: Verbose output
+  -h|--help:         show this help page
+  -v|--verbose:      verbose output
+  -d|--debug:        enable debug output
   -a|--architecture: architecture family to check against, one of
                      i486, i686, pentium4
 
@@ -18,13 +19,20 @@ EOF
 }
 
 VERBOSE=0
-EXIT_CODE=0
 log( ) {
   if test $VERBOSE = 1; then
     echo $*
   fi
 }
 
+DEBUG=0
+debug( ) {
+  if test $DEBUG = 1; then
+    echo $*
+  fi
+}
+
+EXIT_CODE=0
 err( ) {
   echo "ERROR: $*"
   EXIT_CODE=1
@@ -35,7 +43,7 @@ trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 
 ARCH=i686
 
-while getopts ":va:h-:" opt; do
+while getopts ":va:d-h-:" opt; do
   case $opt in
     -)
       case "$OPTARG" in
@@ -44,6 +52,9 @@ while getopts ":va:h-:" opt; do
           ;;
         verbose)
           VERBOSE=1
+          ;;
+        debug)
+          DEBUG=1
           ;;
         *)
           echo "ERROR: Invalid option: --$OPTARG" >&2
@@ -56,6 +67,9 @@ while getopts ":va:h-:" opt; do
       ;;
     v)
       VERBOSE=1
+      ;;
+    d)
+      DEBUG=1
       ;;
     a)
       ARCH=$OPTARG
@@ -82,28 +96,51 @@ case $ARCH in
   i486)
     OPCODE_ARGS='-r -a 486 -v'
     ;;
-	i686)
+  i686)
     OPCODE_ARGS='-s MMX -s SSE -s SSE2'
     ;;
   pentium4)
     OPCODE_ARGS='-s SSE3 -s SSSE3 -s AVX'
     ;;
-	*)
+  *)
     echo "ERROR: architecture must currently be one of i486 and i686" >&2
     usage
     exit 1
 esac
 
-log "Checking for architecture: $ARCH ($OPCODE_ARGS)"
+log "Checking package $PACKAGE"
+log "Checking for architecture constraint: $ARCH ($OPCODE_ARGS)"
 bsdtar --no-fflags -x -C $tmp_dir -f $PACKAGE
 
-for absfile in `find $tmp_dir -name '*.so*' -type f`; do
-	file=`basename $absfile`
-	log "Checking shared library: $file"
-	readelf -a $absfile > $tmp_dir/$file.elf
-  objdump -f $absfile > $tmp_dir/$file.objdump
-  file $absfile > $tmp_dir/$file.file
+for absfile in `find $tmp_dir -type f`; do
+  file=`basename $absfile`
+  ext=`echo $absfile | rev | cut -f 1 -d . | rev`
+  
+  case "$file" in
+    .PKGINFO|.BUILDINFO|.MTREE)
+      debug "Skipping $file (internal Archlinux file)"
+      continue
+      ;;
+    *.hpp|*.h|*.c|*.cpp|*.html|*.mo|*.po|*.svg|*.png|*.pl|*.pod|*.vim|*.js|*.cmake|*.xml|*.txt|*.rst|*.in|*.conf|*.[0123456789])
+      debug "Skipping $file (extension is .$ext)"
+      continue
+      ;;
+    *)
+      # we cannot really ignore the file by extension
+  esac
+
+  mimetype=`file -i $absfile | cut -f 2- -d : | cut -f 1 -d ';' | tr -d ' '`  
+  case "$mimetype" in
+    application/x-sharedlib)
+      debug "Checking library/binary: $file"
+      ;;
+    *)
+      debug "Skipping $file (MIME type is $mimetype)"
+      continue
+      ;;
+  esac
     
+  objdump -f $absfile > $tmp_dir/$file.objdump
   arch=`grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,`
   case $arch in
     i386:x86-64)
@@ -116,8 +153,9 @@ for absfile in `find $tmp_dir -name '*.so*' -type f`; do
       arch='unknown'
       ;;
   esac
-  log "  Objdump architecture: $arch"
+  debug "  Objdump architecture: $arch"
   
+  readelf -a $absfile > $tmp_dir/$file.elf 2> $tmp_dir/$file.elferr
   archelf=`grep '^ \+Class' $tmp_dir/$file.elf | cut -f 2 -d : | tr -d ' '`
   case $archelf in
     ELF64)
@@ -130,7 +168,7 @@ for absfile in `find $tmp_dir -name '*.so*' -type f`; do
       archelf='unknown'
       ;;
   esac
-  log "  Readelf architecture: $archelf"
+  debug "  Readelf architecture: $archelf"
 
   if test $arch != $archelf; then
     err "$file ambigous architecture information (objdump: $arch, ELF: $archelf)"
