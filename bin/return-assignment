@@ -368,6 +368,21 @@ if ! [ "${destination}" = 'build-support' ]; then
   printf '%s\n' ${packages} > \
     "${work_dir}/package-states/$1.$2.$3.$4.done"
 fi
+# TODO: mark packages in correct repository in database
+${mysql_command} -e "$(
+  # shellcheck disable=SC2016
+  printf 'UPDATE `build_assignments`'
+  # shellcheck disable=SC2016
+  printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+  # shellcheck disable=SC2016
+  printf ' SET `build_assignments`.`is_broken`=0, `build_slaves`.`currently_building`=NULL'
+  # shellcheck disable=SC2016
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+    "$(
+      printf '%s' "${slave}" | \
+        base64 -w0
+    )"
+)"
 rm -f \
   "${work_dir}/package-states/$1.$2.$3.$4.locked" \
   "${work_dir}/package-states/$1.$2.$3.$4.broken"
