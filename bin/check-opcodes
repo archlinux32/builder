@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# shellcheck disable=SC2086
+
+# shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage( ) {
@@ -21,7 +24,7 @@ VERBOSE=0
 EXIT_CODE=0
 log( ) {
   if test $VERBOSE = 1; then
-    echo $*
+    echo "$@"
   fi
 }
 
@@ -31,7 +34,7 @@ err( ) {
 }
 
 tmp_dir=$(mktemp -d "${work_dir}/tmp.check-opcodes.XXXXXX")
-trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
+trap 'rm -rf --one-file-system "${tmp_dir:?}"' EXIT
 
 ARCH=i686
 
@@ -97,14 +100,15 @@ esac
 log "Checking for architecture: $ARCH ($OPCODE_ARGS)"
 bsdtar --no-fflags -x -C $tmp_dir -f $PACKAGE
 
-for absfile in `find $tmp_dir -name '*.so*' -type f`; do
-	file=`basename $absfile`
+# shellcheck disable=SC2044
+for absfile in $(find $tmp_dir -name '*.so*' -type f); do
+	file=$(basename $absfile)
 	log "Checking shared library: $file"
 	readelf -a $absfile > $tmp_dir/$file.elf
   objdump -f $absfile > $tmp_dir/$file.objdump
   file $absfile > $tmp_dir/$file.file
     
-  arch=`grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,`
+  arch=$(grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,)
   case $arch in
     i386:x86-64)
       arch='x86_64'
@@ -118,7 +122,7 @@ for absfile in `find $tmp_dir -name '*.so*' -type f`; do
   esac
   log "  Objdump architecture: $arch"
   
-  archelf=`grep '^ \+Class' $tmp_dir/$file.elf | cut -f 2 -d : | tr -d ' '`
+  archelf=$(grep '^ \+Class' $tmp_dir/$file.elf | cut -f 2 -d : | tr -d ' ')
   case $archelf in
     ELF64)
       archelf='x86_64'
@@ -142,7 +146,7 @@ for absfile in `find $tmp_dir -name '*.so*' -type f`; do
   fi
 
   objdump -M intel -d $absfile > $tmp_dir/$file.asm
-  bad_opcodes=`cat $tmp_dir/$file.asm | ${base_dir}/bin/opcode $OPCODE_ARGS -m 1 | wc -l`
+  bad_opcodes=$(${base_dir}/bin/opcode $OPCODE_ARGS -m 1 < $tmp_dir/$file.asm | wc -l)
   if test $bad_opcodes != 0; then
     case $ARCH in
       i486)
