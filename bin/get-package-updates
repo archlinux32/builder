@@ -7,6 +7,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+. "${base_dir}/bin/mysql-functions"
+
 # TODO: Find out, why sometimes package updates are missed.
 
 # shellcheck disable=SC2016
@@ -268,6 +270,7 @@ done | \
       echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
         "${work_dir}/build-list.new"
       sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
+      mysql_generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
 
@@ -287,7 +290,6 @@ mkdir -p "${work_dir}/package-infos"
 while read -r package git_revision mod_git_revision repository; do
 
   generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-  myqsl_generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
 done < "${work_dir}/build-list.new"
 
