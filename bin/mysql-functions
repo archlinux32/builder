@@ -191,16 +191,19 @@ mysql_generate_package_metadata() {
       ''|*[!0-9]*)
         unset forced_sub_pkgrel
         current_repository=$(
-          echo 'build-list' | \
-            base64_encode_each
+          printf 'build-list' | \
+            base64 -w0
         )
       ;;
       *)
-        forced_sub_pkgrel="$1"
+        forced_sub_pkgrel=$(
+          printf '%s' "$1" | \
+            base64 -w0
+        )
         shift
         current_repository=$(
-          echo "$1" | \
-            base64_encode_each
+          printf '%s' "$1" | \
+            base64 -w0
         )
         shift
       ;;
