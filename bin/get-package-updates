@@ -287,6 +287,7 @@ mkdir -p "${work_dir}/package-infos"
 while read -r package git_revision mod_git_revision repository; do
 
   generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
+  myqsl_generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 
 done < "${work_dir}/build-list.new"
 
