@@ -567,7 +567,7 @@ mysql_generate_package_metadata() {
       done
     printf '.' >&2
 
-    ${mysql_command} -e "$(
+    {
       if [ -s "${temp_dir}/add-build-assignments-command" ]; then
         cat "${temp_dir}/add-build-assignments-command"
       fi
@@ -577,7 +577,8 @@ mysql_generate_package_metadata() {
       if [ -s "${temp_dir}/add-install-targets-command" ]; then
         cat "${temp_dir}/add-install-targets-command"
       fi
-    )"
+    } | \
+      ${mysql_command}
     printf '.' >&2
 
   )
