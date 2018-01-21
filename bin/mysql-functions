@@ -403,30 +403,45 @@ mysql_generate_package_metadata() {
             sed 's/[<>=].*$//' | \
             base64_encode_each
         )
-        sub_pkgrel=$(
-          if [ -n "${forced_sub_pkgrel}" ]; then
-            echo "${forced_sub_pkgrel}"
-          else
-            ${mysql_command} -e "$(
-              printf 'SELECT count(*) FROM `binary_packages` JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` WHERE'
-              printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
-                'epoch' "${epoch}" \
-                'pkgver' "${pkgver}" \
-                'pkgrel' "${pkgrel}" \
-                'pkgname' "${pkgname}"
-              if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
-                # 'any' gets higher sub_pkgrel than any architecture
-                printf ' 1'
-              else
-                # not-'any' gets higher sub_pkgrel than same or 'any' architecture
-                printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
-                  "${arch}"
-              fi
-            )" | \
-            tail -n1
-          fi | \
-            base64_encode_each
-        )
+        if [ -n "${forced_sub_pkgrel}" ]; then
+          sub_pkgrel='from_base64("'"${forced_sub_pkgrel}"'")'
+        else
+          sub_pkgrel=$(
+            printf '(SELECT COALESCE('
+            # do not add binary packages which are currently on the build-list
+            printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
+            printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+            printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+            printf ' WHERE'
+            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+              'epoch' "${epoch}" \
+              'pkgver' "${pkgver}" \
+              'pkgrel' "${pkgrel}" \
+              'pkgname' "${pkgname}"
+            printf ' `architectures`.`name`=from_base64("%s")' \
+              "${arch}"
+            printf ' AND `repositories`.`name`="build-list"),'
+            # max(sub_pkgrel)+1
+            printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
+            printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+            printf ' WHERE'
+            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+              'epoch' "${epoch}" \
+              'pkgver' "${pkgver}" \
+              'pkgrel' "${pkgrel}" \
+              'pkgname' "${pkgname}"
+            if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
+              # 'any' gets higher sub_pkgrel than any architecture
+              printf ' 1'
+            else
+              # not-'any' gets higher sub_pkgrel than same or 'any' architecture
+              printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
+                "${arch}"
+            fi
+            printf ')'
+            printf ',0))'
+          )
+        fi
         {
           printf 'INSERT IGNORE INTO `binary_packages` ('
           printf '`%s`,' \
@@ -436,8 +451,8 @@ mysql_generate_package_metadata() {
             'epoch' \
             'pkgver' \
             'pkgrel' \
-            'sub_pkgrel' \
             'pkgname' \
+            'sub_pkgrel' \
             'has_issues' \
             'is_tested'
           printf ') SELECT '
@@ -449,9 +464,9 @@ mysql_generate_package_metadata() {
             "${epoch}" \
             "${pkgver}" \
             "${pkgrel}" \
-            "${sub_pkgrel}" \
             "${pkgname}"
-          printf '0,0 FROM'
+          printf '%s,0,0 FROM' \
+            "${sub_pkgrel}"
           printf ' `%s` JOIN' \
             'repositories' \
             'architectures' \
@@ -550,8 +565,9 @@ mysql_generate_package_metadata() {
               'epoch' "${epoch}" \
               'pkgver' "${pkgver}" \
               'pkgrel' "${pkgrel}" \
-              'sub_pkgrel' "${sub_pkgrel}" \
               'pkgname' "${pkgname}"
+            printf ' `binary_packages`.`sub_pkgrel` = %s AND' \
+              "${sub_pkgrel}"
             printf ' `architectures`.`name` = from_base64("%s") AND' \
               "${arch}"
             printf ' `repositories`.`name` = from_base64("%s");\n' \
