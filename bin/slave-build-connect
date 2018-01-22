@@ -18,18 +18,17 @@ if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
   printf '%s %s %s\n' "$(date '+%F %T')" "$1" "${SSH_ORIGINAL_COMMAND}" >> \
     "${work_dir}/ssh-log"
 
-  ${mysql_command} -e "$(
-    # shellcheck disable=SC2016
+  # shellcheck disable=SC2016
+  {
     printf 'UPDATE `build_slaves`'
-    # shellcheck disable=SC2016
     printf ' SET `build_slaves`.`last_connection`=NOW()'
-    # shellcheck disable=SC2016
     printf ' WHERE `build_slaves`.`name`=from_base64("%s")\n' \
       "$(
         printf '%s' "$1" | \
           base64 -w0
       )"
-  )"
+  } | \
+    ${mysql_command}
 
   slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
 

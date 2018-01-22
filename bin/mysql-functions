@@ -37,20 +37,19 @@ mysql_add_package_source() {
   done
   values="${values% }"
 
-  ${mysql_command} -e "$(
+  {
     printf 'INSERT IGNORE INTO package_sources'
-    {
-      printf ' ('
-      printf '`%s`, ' ${names}
-      printf ') SELECT'
-      printf ' from_base64("%s"), ' ${values% *}
-      printf ' `upstream_repositories`.`id`'
-      printf ' FROM `upstream_repositories`'
-      printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
-        "${values##* }"
-    } | \
-      sed 's|, )|)|g'
-  )"
+    printf ' ('
+    printf '`%s`, ' ${names}
+    printf ') SELECT'
+    printf ' from_base64("%s"), ' ${values% *}
+    printf ' `upstream_repositories`.`id`'
+    printf ' FROM `upstream_repositories`'
+    printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
+      "${values##* }"
+  } | \
+    sed 's|, )|)|g' | \
+    ${mysql_command}
 }
 
 # mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
@@ -68,33 +67,32 @@ mysql_add_binary_package() {
     shift
   done
 
-  ${mysql_command} -e "$(
+  {
     printf 'INSERT IGNORE INTO binary_packages'
-    {
-      printf ' ('
-      printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture'
-      printf ') SELECT'
-      printf ' from_base64("%s"), ' "${sub_pkgrel}" "${pkgname}"
-      printf ' `%s`.`id`,' 'package_sources' 'repositories' 'architectures'
-      printf ' FROM'
-      printf ' `%s` JOIN' 'package_sources' 'repositories' 'architectures'
-      printf ' `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
-      printf ' WHERE'
-      printf ' `%s`.`name` = from_base64("%s") AND' \
-        'repositories' "${repository}" \
-        'architectures' "${architecture}"
-      printf ' `package_sources`.`%s` = from_base64("%s") AND' \
-        'pkgbase' "${pkgbase}" \
-        'git_revision' "${git_revision}" \
-        'mod_git_revision' "${mod_git_revision}"
-      printf ' `upstream_repositories`.`name` = from_base64("%s")' \
-        "${upstream_package_repository}"
-    } | \
-      sed '
-        s|, )|)|g
-        s|, FROM| FROM|g
-      '
-  )"
+    printf ' ('
+    printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture'
+    printf ') SELECT'
+    printf ' from_base64("%s"), ' "${sub_pkgrel}" "${pkgname}"
+    printf ' `%s`.`id`,' 'package_sources' 'repositories' 'architectures'
+    printf ' FROM'
+    printf ' `%s` JOIN' 'package_sources' 'repositories' 'architectures'
+    printf ' `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
+    printf ' WHERE'
+    printf ' `%s`.`name` = from_base64("%s") AND' \
+      'repositories' "${repository}" \
+      'architectures' "${architecture}"
+    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
+      'pkgbase' "${pkgbase}" \
+      'git_revision' "${git_revision}" \
+      'mod_git_revision' "${mod_git_revision}"
+    printf ' `upstream_repositories`.`name` = from_base64("%s")' \
+      "${upstream_package_repository}"
+  } | \
+    sed '
+      s|, )|)|g
+      s|, FROM| FROM|g
+    ' | \
+    ${mysql_command}
 }
 
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
@@ -113,45 +111,44 @@ mysql_show_binary_package() {
   done
 
   local joint
-  ${mysql_command} -e "$(
-    {
-      printf 'SELECT'
-      printf ' `%s`.`%s`,' \
-        'repositories' 'name' \
-        'binary_packages' 'pkgname' \
-        'package_sources' 'pkgver' \
-        'package_sources' 'pkgrel' \
-        'binary_packages' 'sub_pkgrel' \
-        'architectures' 'name' \
-        'package_sources' 'pkgbase' \
-        'package_sources' 'git_revision' \
-        'package_sources' 'mod_git_revision' \
-        'upstream_repositories' 'name'
-      printf ' FROM `binary_packages`'
-      for joint in \
-        'architectures:binary_packages:architecture' \
-        'package_sources:binary_packages:package_source' \
-        'repositories:binary_packages:repository' \
-        'upstream_repositories:package_sources:upstream_package_repository'; do
-        printf ' JOIN `%s` ON `%s`.`id` =' \
-          "${joint%%:*}" "${joint%%:*}"
-        joint="${joint#*:}"
-        printf ' `%s`.`%s`' \
-          "${joint%:*}" "${joint#*:}"
-      done
-      printf ' WHERE'
-      printf ' `%s`.`%s` = from_base64("%s") AND' \
-        'binary_packages' 'pkgname' "${pkgname}" \
-        'binary_packages' 'sub_pkgrel' "${sub_pkgrel}" \
-        'package_sources' 'pkgver' "${pkgver}" \
-        'package_sources' 'pkgrel' "${pkgrel}"
-      printf ';'
-    } | \
-      sed '
-        s|, FROM| FROM|g
-        s|AND;|;|g
-      '
-  )" --html
+  {
+    printf 'SELECT'
+    printf ' `%s`.`%s`,' \
+      'repositories' 'name' \
+      'binary_packages' 'pkgname' \
+      'package_sources' 'pkgver' \
+      'package_sources' 'pkgrel' \
+      'binary_packages' 'sub_pkgrel' \
+      'architectures' 'name' \
+      'package_sources' 'pkgbase' \
+      'package_sources' 'git_revision' \
+      'package_sources' 'mod_git_revision' \
+      'upstream_repositories' 'name'
+    printf ' FROM `binary_packages`'
+    for joint in \
+      'architectures:binary_packages:architecture' \
+      'package_sources:binary_packages:package_source' \
+      'repositories:binary_packages:repository' \
+      'upstream_repositories:package_sources:upstream_package_repository'; do
+      printf ' JOIN `%s` ON `%s`.`id` =' \
+        "${joint%%:*}" "${joint%%:*}"
+      joint="${joint#*:}"
+      printf ' `%s`.`%s`' \
+        "${joint%:*}" "${joint#*:}"
+    done
+    printf ' WHERE'
+    printf ' `%s`.`%s` = from_base64("%s") AND' \
+      'binary_packages' 'pkgname' "${pkgname}" \
+      'binary_packages' 'sub_pkgrel' "${sub_pkgrel}" \
+      'package_sources' 'pkgver' "${pkgver}" \
+      'package_sources' 'pkgrel' "${pkgrel}"
+    printf ';'
+  } | \
+    sed '
+      s|, FROM| FROM|g
+      s|AND;|;|g
+    ' | \
+    ${mysql_command} --html
 }
 
 # mysql_add_install_target $install_target
@@ -164,12 +161,12 @@ mysql_add_install_target() {
       base64 -w0
   )
 
-  ${mysql_command} -e "$(
+  {
     printf 'INSERT IGNORE INTO `install_targets` (`name`)'
     printf ' VALUES (from_base64("%s"))' \
       "${install_target}"
-    printf '\n'
-  )"
+  } | \
+    ${mysql_command}
 }
 
 # mysql_generate_package_metadata $package $git_revision $mod_git_revision $repository
@@ -623,13 +620,14 @@ mysql_sanity_check() {
       "${temp_dir}/master-mirror-listing"
 
     # shellcheck disable=SC2016
-    ${mysql_command} -e '
-      SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`
-      FROM `binary_packages`
-      JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`
-      JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`
-      WHERE `repositories`.`is_on_master_mirror`
-    ' --batch | \
+    {
+      printf 'SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
+      printf ' FROM `binary_packages`'
+      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+      printf ' WHERE `repositories`.`is_on_master_mirror`'
+    } | \
+      ${mysql_command} --batch | \
       sed '
         1d
         s,\t,/,
