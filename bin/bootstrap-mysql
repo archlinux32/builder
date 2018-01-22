@@ -369,7 +369,8 @@ fi
       'testing' '"Packages:Testing"' \
       'staging' 'NULL' \
       'standalone' 'NULL' \
-      'unbuilt' '"Packages:Build-list"'
+      'unbuilt' '"Packages:Build-list"' \
+      'forbidden' 'NULL'
     printf ';\n'
   } | \
     sed 's|,;|;|'
@@ -383,7 +384,8 @@ fi
     'community-testing:testing:AQ==' \
     'staging:staging:AQ==' \
     'community-staging:staging:AQ==' \
-    'build-list:unbuilt:AA=='; do
+    'build-list:unbuilt:AA==' \
+    'deletion-list:forbidden:AA=='; do
     # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
     # shellcheck disable=SC2016
