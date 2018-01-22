@@ -213,9 +213,8 @@ if [ "$5" = 'ERROR' ]; then
             sed 's/,$/./'
         fi
         printf '\n'
-      } | tee /dev/stderr > \
-        "${irc_dir}/#archlinux-ports/in"
-        # why do we need tee there in order for the redirection to work???
+      } | \
+        sponge "${irc_dir}/#archlinux-ports/in"
     fi
   fi
 
