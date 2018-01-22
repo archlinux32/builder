@@ -522,7 +522,7 @@ remove_old_package_versions() {
       ' | \
       sort -u > \
       "${tmp_dir}/packages-to-delete"
-    # this file contains a list of packages to be delete, one on each line:
+    # this file contains a list of packages to be deleted, one on each line:
     # $architecture-directory $repository-directory $package-name $pkgver-$pkgrel-$package-architecture.pkg.tar.xz
 
     cut -d' ' -f1,2 < \
