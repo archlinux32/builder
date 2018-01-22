@@ -32,7 +32,31 @@
   ' | \
   sponge "${webserver_directory}/build-slaves.html"
 
-mysql_sanity_check | \
+{
+  mysql_sanity_check || true
+  {
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
+      printf ' FROM `package_sources`'
+      printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+        'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
+        'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
+        'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
+        'repositories' 'binary_packages' 'repository' 'repositories'
+      printf ' WHERE `repositories`.`name`="build-list"'
+    } | \
+      ${mysql_command} --batch | \
+      sed '
+        1d
+        y/\t/ /
+        s/^/+ /
+      '
+    sed 's/^/- /' "${work_dir}/build-list"
+  } | \
+    sort -k2 -k1,1 | \
+    uniq -uf1
+} | \
   sed '
     s,^-.*$,<font color="#FF0000">\0</font>,
     s,^+.*$,<font color="#00FF00">\0</font>,
