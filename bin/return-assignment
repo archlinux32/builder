@@ -97,7 +97,7 @@ if [ "$5" = 'ERROR' ]; then
       for saved_build_log in ${saved_build_logs}; do
         printf '%s' "${fail_reason_identifiers}" | \
           while read -r reason_id identifier; do
-            if zgrep -q "^$(printf '%s' "${identifier}" | base64 -d)\$" "${build_log_directory}/error/${saved_build_log}"; then
+            if zgrep -q "^$(printf '%s' "${identifier}" | base64 -d)\$" "${build_log_directory}/error/$1.$2.$3.$4.${saved_build_log}"; then
               printf ' (from_base64("%s"),%s,from_base64("%s")),' \
                 "$(
                   printf '%s' "${saved_build_log}" | \
@@ -106,7 +106,7 @@ if [ "$5" = 'ERROR' ]; then
                 )" \
                 "${reason_id}" \
                 "$(
-                  printf '%s' "${saved_build_log}" | \
+                  printf '%s' "$1.$2.$3.$4.${saved_build_log}" | \
                     base64 -w0
                 )"
               break
