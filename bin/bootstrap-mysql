@@ -114,6 +114,7 @@ if [ ! "$1" = 'slim' ]; then
       ' UNIQUE directory' \
       'fail_reasons SMALLINT' \
       ' name VARCHAR(32)' \
+      ' identifier VARCHAR(64)' \
       ' severity SMALLINT' \
       ' UNIQUE name' \
       'failed_builds MEDIUMINT' \
@@ -121,7 +122,7 @@ if [ ! "$1" = 'slim' ]; then
       ' build_assignment BIGINT :build_assignments' \
       ' date DATETIME' \
       ' reason SMALLINT :fail_reasons' \
-      ' log_file VARCHAR(128)'
+      ' log_file VARCHAR(512)'
   )
 
   {
@@ -229,6 +230,43 @@ fi
   printf 'INSERT IGNORE INTO `architectures` (`name`) VALUES '
   printf '("%s"),' \
     'any' 'i686' | \
+    sed 's|,$||'
+  printf ';\n'
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `fail_reasons` (`name`,`identifier`,`severity`) VALUES '
+  printf '(from_base64("%s"),"%s",%s),' \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in build()\.' | \
+        base64 -w0
+    )" 'build()' 0 \
+    "$(
+      printf '%s' '==> ERROR: Could not download sources\.' | \
+        base64 -w0
+    )" 'source' 1 \
+    "$(
+      printf '%s' '.*error: failed to commit transaction (invalid or corrupted package)' | \
+        base64 -w0
+    )" 'package-cache' 2 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in prepare()\.' | \
+        base64 -w0
+    )" 'prepare()' 2 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in package\(_\S\+\)\?()\.' | \
+        base64 -w0
+    )" 'package()' 3 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in check()\.' | \
+        base64 -w0
+    )" 'check()' 4 \
+    "$(
+      printf '%s' '==> ERROR: '"'"'pacman'"'"' failed to install missing dependencies\.' | \
+        base64 -w0
+    )" 'dependencies' 1 \
+    "$(
+      printf '%s' '==> ERROR: Running makepkg as root is not allowed as it can cause permanent,.*' | \
+        base64 -w0
+    )" 'run-as-root' 1 | \
     sed 's|,$||'
   printf ';\n'
   # shellcheck disable=SC2016
