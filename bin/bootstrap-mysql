@@ -233,7 +233,7 @@ fi
     sed 's|,$||'
   printf ';\n'
   # shellcheck disable=SC2016
-  printf 'INSERT IGNORE INTO `fail_reasons` (`name`,`identifier`,`severity`) VALUES '
+  printf 'INSERT IGNORE INTO `fail_reasons` (`identifier`,`name`,`severity`) VALUES '
   printf '(from_base64("%s"),"%s",%s),' \
     "$(
       printf '%s' '==> ERROR: A failure occurred in build()\.' | \
