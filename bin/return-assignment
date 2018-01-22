@@ -425,7 +425,6 @@ fi
   printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
-  printf ' `build_slaves`.`currently_building`=NULL,'
   printf ' `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`=from_base64("%s")),' \
     "$(
       printf '%s' "${destination}" | \
@@ -433,6 +432,13 @@ fi
     )"
   printf ' `binary_packages`.`has_issues`=0,'
   printf ' `binary_packages`.`is_tested`=0'
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+    "$(
+      printf '%s' "${slave}" | \
+        base64 -w0
+    )"
+  printf 'UPDATE `build_slaves` SET'
+  printf ' `build_slaves`.`currently_building`=NULL'
   printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
     "$(
       printf '%s' "${slave}" | \
