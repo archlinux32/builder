@@ -60,12 +60,14 @@ if [ "$5" = 'ERROR' ]; then
   fi
 
   # save sent build logs
-  tar -x \
-    -C "${build_log_directory}/error" \
-    --wildcards \
-    --no-wildcards-match-slash \
-    --transform="s|^|$1.$2.$3.$4.|" \
-    '*.build-log.gz'
+  saved_build_logs=$(
+    tar -vx \
+      -C "${build_log_directory}/error" \
+      --wildcards \
+      --no-wildcards-match-slash \
+      --transform="s|^|$1.$2.$3.$4.|" \
+      '*.build-log.gz'
+  )
 
   if [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
     was_broken_before=true
@@ -78,6 +80,55 @@ if [ "$5" = 'ERROR' ]; then
     "${work_dir}/package-states/$1.$2.$3.$4.broken"
   # shellcheck disable=SC2016
   {
+    if [ -n "${saved_build_logs}" ]; then
+      printf 'CREATE TEMPORARY TABLE `failures` ('
+      printf '`%s` %s,' \
+        'date' 'DATETIME' \
+        'reason' 'SMALLINT' \
+        'log_file' 'VARCHAR(512)' | \
+        sed 's/,$//'
+      printf ');'
+      printf 'INSERT INTO `failures` (`date`,`reason`,`log_file`) VALUES'
+      fail_reason_identifiers=$(
+        printf 'SELECT `fail_reasons`.`id`,to_base64(`fail_reasons`.`identifier`) FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`' | \
+          ${mysql_command} --batch
+      )
+      for saved_build_log in ${saved_build_logs}; do
+        printf '%s' "${fail_reason_identifiers}" | \
+          while read -r reason_id identifier; do
+            if zgrep -q "^$(printf '%s' "${identifier}" | base64 -d)\$" "${build_log_directory}/error/${saved_build_log}"; then
+              printf ' (from_base64("%s"),%s,from_base64("%s")),' \
+                "$(
+                  printf '%s' "${saved_build_log}" | \
+                    sed 's|\.build-log\.gz$||;s|^.*\.||' | \
+                    base64 -w0
+                )" \
+                "${reason_id}" \
+                "$(
+                  printf '%s' "${saved_build_log}" | \
+                    base64 -w0
+                )"
+              break
+            fi
+          done
+      done | \
+        sed 's/,$//'
+      printf ';\n'
+      printf 'INSERT INTO `failed_builds` (`build_slave`,`build_assignment`,`date`,`reason`,`log_file`)'
+      printf ' SELECT '
+      printf '`build_slaves`.`%s`,' \
+        'id' 'currently_building'
+      printf '`failures`.`%s`,' \
+        'date' 'reason' 'log_file' | \
+        sed 's/,$//'
+      printf ' FROM `build_slaves` JOIN `failures`'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+        "$(
+          printf '%s' "${slave}" | \
+            base64 -w0
+        )"
+      printf 'DROP TABLE `failures`;\n'
+    fi
     printf 'UPDATE `build_assignments`'
     printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
     printf ' SET `build_assignments`.`is_broken`=1, `build_slaves`.`currently_building`=NULL'
