@@ -9,6 +9,8 @@
 
 # TODO: Find out, why sometimes package updates are missed.
 
+# TODO: mark loops in mysql database
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''

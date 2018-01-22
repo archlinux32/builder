@@ -23,6 +23,9 @@
 # TODO: fully integrate database (in other scripts too) - e.g. rely on
 # info in db instead of state-files
 
+# TODO: add possibility to manually clone a (binary) package (e.g.
+# for build-support) - this should also be possible via email
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
