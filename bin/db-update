@@ -342,7 +342,7 @@ move_packages() {
             "${tmp_dir}/tmp/${package}.to_repo"
         )"
       printf ' WHERE'
-      printf ' `architectures`.`name`=from_base64("%s")' \
+      printf ' `repositories`.`name`=from_base64("%s")' \
         "$(
           base64_encode_each < \
             "${tmp_dir}/tmp/${package}.from_repo"
@@ -364,12 +364,9 @@ move_packages() {
               'pkgver' '\3' \
               'pkgrel' '\4' \
               'sub_pkgrel' '\5'
-            printf ' AND `architectures`.`name`=from_base64("\6")'
+            printf ' AND `architectures`.`name`=from_base64("\\6")'
           )"',
         '
-      printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
-        'epoch' "$(
-        )"
       printf ';\n'
     done < \
       "${tmp_dir}/tmp/${package}.parts"
