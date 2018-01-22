@@ -425,6 +425,7 @@ find "${work_dir}/package-states" \
     -name '*.tested' \
   \) \
   -exec sed '
+    1!d
     s@^.*-\([^-]\+\)-\([^-.]\+\)\.pkg\.tar\.xz$@{} \1 \2 \0@
     s@^\S*/@@
     s/^\(\S\+\)\.\(done\|testing\|tested\) /\1 /
