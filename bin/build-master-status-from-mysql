@@ -4,8 +4,6 @@
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
-# shellcheck source=bin/mysql-functions
-. "${base_dir}/bin/mysql-functions"
 
 # shellcheck disable=SC2016
 {

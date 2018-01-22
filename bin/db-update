@@ -29,8 +29,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-. "${base_dir}/bin/mysql-functions"
-
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''

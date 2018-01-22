@@ -2,8 +2,6 @@
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
-# shellcheck source=bin/mysql-functions
-. "${base_dir}/bin/mysql-functions"
 
 tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
