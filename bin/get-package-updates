@@ -98,10 +98,10 @@ delete_package() {
       'build_assignments' 'build_assignments' 'build_assignment'
     printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
       'package_sources' 'package_sources' 'build_assignments' 'package_source'
+    printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
     printf ' WHERE `repositories`.`name`="build-list"'
-    printf ' AND `package_sources`.`pkgbase`=from_base64("%s")' \
+    printf ' AND `package_sources`.`pkgbase`=from_base64("%s");' \
       "$(printf '%s' "$1" | base64 -w0)"
-    printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list");'
   } | \
     ${mysql_command}
 }
