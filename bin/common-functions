@@ -1233,6 +1233,7 @@ next_sub_pkgrel() {
     git_repo=$(find_git_repository_to_package_repository "${repository}")
 
     temp_dir=$(mktemp -d 'tmp.common-functions.next_sub_pkgrel.XXXXXXXXXX' --tmpdir)
+    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
     find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
     extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${temp_dir}" '0'
