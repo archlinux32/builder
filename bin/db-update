@@ -323,9 +323,58 @@ move_packages() {
   done < \
     "${tmp_dir}/tmp/packages"
 
-  if ! ${no_action}; then
-    ${dummynator} trigger_mirror_refreshs
-  fi
+  # shellcheck disable=SC2016
+  while read -r package; do
+    while read -r part; do
+      printf 'UPDATE `binary_packages`'
+      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`=from_base64("%s"))' \
+        "$(
+          base64_encode_each < \
+            "${tmp_dir}/tmp/${package}.to_repo"
+        )"
+      printf ' WHERE'
+      printf ' `architectures`.`name`=from_base64("%s")' \
+        "$(
+          base64_encode_each < \
+            "${tmp_dir}/tmp/${package}.from_repo"
+        )"
+      printf '%s\n' "${part}" | \
+        sed '
+          s/\.pkg\.tar\.xz$//
+          s/-\([^-.]\+\)\(-[^-]\+\)$/-\1.0\2/
+          s/-\([^-:]\+\)\(\(-[^-]\+\)\{2\}\)$/-0:\1\2/
+          s/^\(.\+\)-\([^-:]\+\):\([^-:]\+\)-\([^-.]\+\)\.\([^-.]\+\)-\([^-]\+\)$/\1\n\2\n\3\n\4\n\5\n\6/
+        ' | \
+        base64_encode_each | \
+        tr '\n' ' ' | \
+        sed '
+          s,\(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) $,'"$(
+            printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
+              'pkgname' '\1' \
+              'epoch' '\2' \
+              'pkgver' '\3' \
+              'pkgrel' '\4' \
+              'sub_pkgrel' '\5'
+            printf ' AND `architectures`.`name`=from_base64("\6")'
+          )"',
+        '
+      printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
+        'epoch' "$(
+        )"
+      printf ';\n'
+    done < \
+      "${tmp_dir}/tmp/${package}.parts"
+  done < \
+    "${tmp_dir}/tmp/packages" | \
+    if ${no_action}; then
+      sed 's|^|mysql: |'
+    else
+      ${mysql_command}
+    fi
+
+  ${dummynator} trigger_mirror_refreshs
 
   rm -rf --one-file-system "${tmp_dir:?}/tmp"
 
