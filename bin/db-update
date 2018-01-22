@@ -20,6 +20,11 @@
 # track packages in stable, too
 # know _exactly_ in which repository the packages are
 
+# TODO: fully integrate database (in other scripts too) - e.g. rely on
+# info in db instead of state-files
+
+# TODO: remove replaced packages in database, too
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
