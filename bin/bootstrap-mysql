@@ -6,6 +6,22 @@
 tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+exec 9> "${build_list_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'Cannot get build-list lock.'
+  exit 1
+fi
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 9; then
+  >&2 echo 'Cannot get sanity-check lock.'
+  exit 1
+fi
+exec 7> "${package_database_lock_file}"
+if ! flock -s -n 7; then
+  >&2 echo 'Cannot get package-database lock.'
+  exit 1
+fi
+
 for dir in $(ls_master_mirror 'i686'); do
   ls_master_mirror "i686/${dir}" | \
     sed '
