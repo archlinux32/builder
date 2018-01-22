@@ -569,22 +569,20 @@ remove_old_package_versions() {
       s/ \([^-.]\+\):\([^-:]\+\)-\([^-.]\+\)\.\([^-.]\+\)-\([^-]\+\)$/ \1 \2 \3 \4 \5/
     ' "${tmp_dir}/packages-to-delete" | \
       while read -r repo pkgname epoch pkgver pkgrel sub_pkgrel arch; do
-        printf 'DELETE FROM `binary_packages`'
-        printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
-        printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
-        printf ' WHERE'
+        printf 'DELETE FROM `binary_packages` WHERE'
+        printf ' `binary_packages`.`%s`=(SELECT `%s`.`id` FROM `%s` WHERE `%s`.`name`=from_base64("%s")) AND' \
+          'architecture' 'architectures' 'architectures' 'architectures' "$(printf '%s' "${arch}" | base64 -w0)" \
+          'repository'   'repositories'  'repositories'  'repositories'  "$(printf '%s' "${repo}" | base64 -w0)"
         printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
           'pkgname' "$(printf '%s' "${pkgname}" | base64 -w0)" \
           'epoch' "$(printf '%s' "${epoch}" | base64 -w0)" \
           'pkgver' "$(printf '%s' "${pkgver}" | base64 -w0)" \
           'pkgrel' "$(printf '%s' "${pkgrel}" | base64 -w0)" \
-          'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)"
-        printf ' `repositories`.`name`=from_base64("%s") AND' \
-          "$(printf '%s' "${repo}" | base64 -w0)"
-        printf ' `architectures`.`name`=from_base64("%s")' \
-          "$(printf '%s' "${arch}" | base64 -w0)"
+          'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)" | \
+          sed 's/ AND$//'
         printf ';\n'
-      done
+      done | \
+      ${mysql_command}
 
     sed '
       s| \(\S\+\)$|-\1|
