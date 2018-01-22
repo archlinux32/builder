@@ -90,6 +90,20 @@ delete_package() {
   echo "$1" >> \
     "${work_dir}/deletion-list.new"
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
+  # shellcheck disable=SC2016
+  {
+    printf 'UPDATE `binary_packages`'
+    printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
+      'repositories' 'repositories' 'repository' \
+      'build_assignments' 'build_assignments' 'build_assignment'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'package_sources' 'package_sources' 'build_assignments' 'package_source'
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `package_sources`.`pkgbase`=from_base64("%s")' \
+      "$(printf '%s' "$1" | base64 -w0)"
+    printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list");'
+  } | \
+    ${mysql_command}
 }
 
 # create tmp_dir and trap
