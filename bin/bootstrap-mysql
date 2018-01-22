@@ -111,7 +111,17 @@ if [ ! "$1" = 'slim' ]; then
       ' head VARCHAR(40)' \
       ' UNIQUE name' \
       ' UNIQUE url' \
-      ' UNIQUE directory'
+      ' UNIQUE directory' \
+      'fail_reasons SMALLINT' \
+      ' name VARCHAR(32)' \
+      ' severity SMALLINT' \
+      ' UNIQUE name' \
+      'failed_builds MEDIUMINT' \
+      ' build_slave MEDIUMINT :build_slaves' \
+      ' build_assignment BIGINT :build_assignments' \
+      ' date DATETIME' \
+      ' reason SMALLINT :fail_reasons' \
+      ' log_file VARCHAR(128)'
   )
 
   {
