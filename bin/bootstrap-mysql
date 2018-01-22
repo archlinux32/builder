@@ -63,8 +63,8 @@ if [ ! "$1" = 'slim' ]; then
       ' is_tested BIT' \
       ' pkgname VARCHAR(64)' \
       ' architecture SMALLINT :architectures' \
-      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture' \
-      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture' \
+      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture repository' \
+      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture repository' \
       'repositories MEDIUMINT' \
       ' name VARCHAR(64)' \
       ' stability MEDIUMINT :repository_stabilities' \
