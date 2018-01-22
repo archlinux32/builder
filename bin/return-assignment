@@ -91,7 +91,8 @@ if [ "$5" = 'ERROR' ]; then
       printf 'INSERT INTO `failures` (`date`,`reason`,`log_file`) VALUES'
       fail_reason_identifiers=$(
         printf 'SELECT `fail_reasons`.`id`,to_base64(`fail_reasons`.`identifier`) FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`' | \
-          ${mysql_command} --batch
+          ${mysql_command} --raw --batch | \
+          sed '1d'
       )
       for saved_build_log in ${saved_build_logs}; do
         printf '%s' "${fail_reason_identifiers}" | \
