@@ -160,7 +160,7 @@ move_packages() {
         exit 2
       fi
     done < \
-      "${tmp_dir}/tmp/${package}.parts"
+      "${tmp_dir}/tmp/${package}.parts_and_signatures"
 
     mkdir -p "${tmp_dir}/tmp/${from_repo}"
     mkdir -p "${tmp_dir}/tmp/${to_repo}"
