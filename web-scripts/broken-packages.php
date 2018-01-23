@@ -26,17 +26,8 @@ $result = $mysql -> query(
   "WHERE `build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL"
 );
 if ($result -> num_rows > 0) {
-  print "<table>\n";
-  print "<tr>";
-  print "<th>package</th>";
-  print "<th>git revision</th>";
-  print "<th>modification git revision</th>";
-  print "<th>package repository</th>";
-  print "<th>compilations</th>";
-//  print "<th>dependent</th>";
-  print "<th>build error</th>";
-  print "<th>blocked</th>";
-  print "</tr>\n";
+
+  $count = 0;
 
   while($row = $result->fetch_assoc()) {
 
@@ -53,11 +44,11 @@ if ($result -> num_rows > 0) {
 
     unset($reasons);
     unset($last_log);
-    $trials = $fail_result -> num_rows;
-    if ($trials > 0) {
+    $rows[$count]["trials"] = $fail_result -> num_rows;
+    if ($rows[$count]["trials"] > 0) {
       while($fail_row = $fail_result->fetch_assoc()) {
-        $reasons[$fail_row["name"]]=$fail_row["name"];
-        $last_log=$fail_row["log_file"];
+        $reasons[$fail_row["name"]] = $fail_row["name"];
+        $last_log = $fail_row["log_file"];
       }
     }
     if (isset($reasons)) {
@@ -65,10 +56,62 @@ if ($result -> num_rows > 0) {
       foreach ($reasons as $reason) {
         $to_print=$to_print.", ".$reason;
       }
-      $fail_reasons=substr($to_print,2);
+      $rows[$count]["fail_reasons"]=substr($to_print,2);
     } else {
-      $fail_reasons="&nbsp;";
+      $rows[$count]["fail_reasons"]="&nbsp;";
     }
+
+    $rows[$count]["pkgbase"] = $row["pkgbase"];
+    $rows[$count]["git_revision"] = $row["git_revision"];
+    $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
+    $rows[$count]["name"] = $row["name"];
+    if (isset($rows[$count]["last_log"]))
+      $rows[$count]["print_trials"]="<a href=\"/build-logs/error/".$last_log."\">". $rows[$count]["trials"] ."</a>";
+    else
+      $rows[$count]["print_trials"]=$rows[$count]["trials"];
+    if ($row["is_blocked"]=="") {
+      $rows[$count]["is_blocked"]="&nbsp;";
+    }
+    else {
+      $rows[$count]["is_blocked"] = preg_replace(
+        array (
+          "/FS32#(\\d+)/",
+          "/FS#(\\d+)/"
+        ),
+        array (
+          "<a href=\"https://bugs.archlinux32.org/index.php?do=details&task_id=$1\">$0</a>",
+          "<a href=\"https://bugs.archlinux.org/task/$1\">$0</a>"
+        ),
+        $row["is_blocked"]
+      );
+    }
+    $count++;
+  }
+
+  usort(
+    $rows,
+    function (array $a, array $b) {
+      if ($a["trials"] < $b["trials"])
+        return -1;
+      if ($a["trials"] > $b["trials"])
+        return 1;
+      return strcmp($a["pkgbase"],$b["pkgbase"]);
+    }
+  );
+
+  print "<table>\n";
+  print "<tr>";
+  print "<th>package</th>";
+  print "<th>git revision</th>";
+  print "<th>modification git revision</th>";
+  print "<th>package repository</th>";
+  print "<th>compilations</th>";
+//  print "<th>dependent</th>";
+  print "<th>build error</th>";
+  print "<th>blocked</th>";
+  print "</tr>\n";
+
+  foreach($rows as $row) {
 
     print "<tr>";
 
@@ -76,26 +119,9 @@ if ($result -> num_rows > 0) {
     print "<td><p style=\"font-size:8px\">".$row["git_revision"]."</p></td>";
     print "<td><p style=\"font-size:8px\">".$row["mod_git_revision"]."</p></td>";
     print "<td>".$row["name"]."</td>";
-    if (isset($last_log))
-      print "<td><a href=\"/build-logs/error/".$last_log."\">". $trials ."</a></td>";
-    else
-      print "<td>". $trials ."</td>";
+    print "<td>".$row["print_trials"]."</td>";
 //    <td>0</td>
-    print "<td>".$fail_reasons."</td>";
-    if ($row["is_blocked"]=="") {
-      $row["is_blocked"]="&nbsp;";
-    }
-    $row["is_blocked"] = preg_replace(
-      array (
-        "/FS32#(\\d+)/",
-        "/FS#(\\d+)/"
-      ),
-      array (
-        "<a href=\"https://bugs.archlinux32.org/index.php?do=details&task_id=$1\">$0</a>",
-        "<a href=\"https://bugs.archlinux.org/task/$1\">$0</a>"
-      ),
-      $row["is_blocked"]
-    );
+    print "<td>".$row["fail_reasons"]."</td>";
     print "<td>".$row["is_blocked"]."</td>";
 
     print "</tr>\n";
