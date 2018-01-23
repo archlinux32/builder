@@ -458,6 +458,32 @@ tr ' ' '.' < \
     mysql_generate_package_metadata "${state_file}"
   done
 
+# shellcheck disable=SC2016
+find "${work_dir}/package-states" -name '*.blocked' -printf '%p %f\n' | \
+  sed '
+    s|\.\([^. ]\+\)\.\([^. ]\+\)\.\([^. ]\+\)\.blocked$| \1 \2 \3|
+  ' | \
+  while read -r state_file pkgbase git_revision mod_git_revision repository; do
+    printf 'UPDATE `build_assignments`'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+      'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+    printf ' SET `build_assignments`.`is_blocked`=from_base64("%s")' \
+      "$(
+        tr -d '\n' < \
+          "${state_file}" | \
+          base64 -w0
+      )"
+    printf ' WHERE'
+    printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+      'pkgbase'          "$(printf '%s' "${pkgbase}" |          base64 -w0)" \
+      'git_revision'     "$(printf '%s' "${git_revision}" |     base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "${mod_git_revision}" | base64 -w0)"
+    printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+      "$(printf '%s' "${repository}" | base64 -w0)"
+  done | \
+  ${mysql_command}
+
 grep '^\('"$(
   # shellcheck disable=SC2086
   printf '%s\\|' ${standalone_package_repositories} ${stable_package_repositories}
