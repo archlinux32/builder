@@ -5,33 +5,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# shellcheck disable=SC2016
-{
-  printf 'SELECT `build_slaves`.`name`,`build_slaves`.`operator`,`package_sources`.`pkgbase`,`build_slaves`.`last_connection`'
-  printf ' FROM `build_slaves`'
-  printf ' LEFT JOIN `build_assignments` ON'
-  printf ' `build_slaves`.`currently_building`=`build_assignments`.`id`'
-  printf ' LEFT JOIN `package_sources` ON'
-  printf ' `build_assignments`.`package_source`=`package_sources`.`id`'
-  printf ' ORDER BY `build_slaves`.`last_connection`'
-} | \
-  ${mysql_command} --html | \
-  sed '
-    s,</TR>,\0\n,g
-  ' | \
-  sed '
-    \,</TH></TR>$, {
-      s,<TH>pkgbase</TH>,<TH>currently building</TH>,
-      y,_, ,
-    }
-    \,</TH></TR>$, ! {
-      s,<TD>NULL</TD>,<TD>\&nbsp;</TD>,
-    }
-    1 i <html><head><title>list of build slaves</title></head><body>
-    $ a </body></html>
-  ' | \
-  sponge "${webserver_directory}/build-slaves.html"
-
 {
   mysql_sanity_check || true
   {
