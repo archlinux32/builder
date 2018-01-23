@@ -220,6 +220,9 @@ if [ ! "$1" = 'slim' ]; then
       'SELECT' 'buildmaster.*' \
       'UPDATE' 'buildmaster.*' \
       'RELOAD' '*.*'
+    printf 'GRANT %s ON %s TO '"'"'http'"'"'@'"'"'localhost'"'"';\n' \
+      'SHOW VIEW' 'buildmaster.*' \
+      'SELECT' 'buildmaster.*'
     printf 'FLUSH PRIVILEGES;\n'
   } | \
     mysql -u root -p buildmaster
