@@ -292,7 +292,7 @@ mysql_generate_package_metadata() {
     } | \
       while read -r arch; do
         printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`,`is_blocked`)'
-        printf ' SELECT `package_sources`.`id`,`architectures`.`id`,0'
+        printf ' SELECT `package_sources`.`id`,`architectures`.`id`,NULL'
         printf ' FROM `architectures` JOIN `package_sources`'
         printf ' WHERE `architectures`.`name` = from_base64("%s")' \
           "$(
