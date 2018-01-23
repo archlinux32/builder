@@ -11,6 +11,8 @@
 
 # TODO: mark loops in mysql database
 
+# TODO: test_exclusion does not yet cooperate with the database
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
@@ -56,7 +58,7 @@ do
     -x|--test-exclusion)
       shift
       if [ -n "${test_exclusion}" ]; then
-        >&2 printf 'I already have --test-exlusion=%s and you gave me another one.\n' "${test_exclusion}"
+        >&2 printf 'I already have --test-exclusion=%s and you gave me another one.\n' "${test_exclusion}"
         >&2 printf 'But I can only handle one exclusion test at a time.\n'
         exit 2
       fi
