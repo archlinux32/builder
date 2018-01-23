@@ -87,17 +87,33 @@ if [ "$5" = 'ERROR' ]; then
         'reason' 'SMALLINT' \
         'log_file' 'VARCHAR(512)' | \
         sed 's/,$//'
-      printf ');'
+      printf ');\n'
       printf 'INSERT INTO `failures` (`date`,`reason`,`log_file`) VALUES'
       fail_reason_identifiers=$(
-        printf 'SELECT `fail_reasons`.`id`,to_base64(`fail_reasons`.`identifier`) FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`' | \
+        {
+          printf 'SELECT `fail_reasons`.`id`,to_base64(`fail_reasons`.`identifier`),"%%END%%"'
+          printf ' FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`'
+        } | \
           ${mysql_command} --raw --batch | \
-          sed '1d'
+          sed '
+            1d
+            :start
+            s/\s%END%$//
+            t
+            N
+            s/\n//g
+            b start
+          '
       )
       for saved_build_log in ${saved_build_logs}; do
         printf '%s' "${fail_reason_identifiers}" | \
           while read -r reason_id identifier; do
-            if zgrep -q "^$(printf '%s' "${identifier}" | base64 -d)\$" "${build_log_directory}/error/$1.$2.$3.$4.${saved_build_log}"; then
+            if zgrep -q "^$(
+                printf '%s' "${identifier}" | \
+                  base64 -d
+              )\$" \
+              "${build_log_directory}/error/$1.$2.$3.$4.${saved_build_log}"; then
+
               printf ' (from_base64("%s"),%s,from_base64("%s")),' \
                 "$(
                   printf '%s' "${saved_build_log}" | \
