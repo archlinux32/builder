@@ -269,7 +269,11 @@ fi
     "$(
       printf '%s' '==> ERROR: Running makepkg as root is not allowed as it can cause permanent,.*' | \
         base64 -w0
-    )" 'run-as-root' 1 | \
+    )" 'run-as-root' 1 \
+    "$(
+      printf '.*' | \
+        base64 -w0
+    )" 'unknown' 100 | \
     sed 's|,$||'
   printf ';\n'
   # shellcheck disable=SC2016
