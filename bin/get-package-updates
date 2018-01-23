@@ -290,7 +290,7 @@ done | \
       {
         # delete old build assignment and associated binary packages
         # which are not yet build or on the deletion list
-        printf 'DELETE `build_assignments`,`binary_pacakges`'
+        printf 'DELETE `build_assignments`,`binary_packages`'
         printf ' FROM `binary_packages`'
         printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
           'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
