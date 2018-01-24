@@ -19,7 +19,20 @@ $result = $mysql -> query(
   "`package_sources`.`pkgbase`," .
   "`package_sources`.`git_revision`," .
   "`package_sources`.`mod_git_revision`," .
-  "`upstream_repositories`.`name` " .
+  "`upstream_repositories`.`name`," .
+  "EXISTS (SELECT * " .
+    "FROM `binary_packages` `broken_bin` " .
+    "JOIN `dependencies` ON `dependencies`.`dependent` = `broken_bin`.`id` " .
+    "JOIN `install_target_providers` ON `install_target_providers`.`install_target` = `dependencies`.`depending_on` " .
+    "JOIN `binary_packages` `to_be_built` ON `to_be_built`.`id` = `install_target_providers`.`package` " .
+    "JOIN `repositories` ON `to_be_built`.`repository` = `repositories`.`id` " .
+    "WHERE `broken_bin`.`build_assignment`=`build_assignments`.`id` ".
+    "AND `repositories`.`name`=\"community-testing\"" .
+  ") AS `dependencies_pending`," .
+  "(SELECT count(*) " .
+    "FROM `build_dependency_loops` " .
+    "WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`" .
+  ") AS `loops` " .
   "FROM `build_assignments` " .
   "JOIN `package_sources` ON `build_assignments`.`package_source` = `package_sources`.`id` " .
   "JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id` " .
@@ -30,6 +43,8 @@ if ($result -> num_rows > 0) {
   $count = 0;
 
   while($row = $result->fetch_assoc()) {
+
+foreach ($row as $key => $val)
 
     $fail_result = $mysql -> query(
       "SELECT " .
@@ -61,7 +76,12 @@ if ($result -> num_rows > 0) {
       $rows[$count]["fail_reasons"]="&nbsp;";
     }
 
+    $rows[$count]["loops"] = $row["loops"];
     $rows[$count]["pkgbase"] = $row["pkgbase"];
+    if ($row["dependencies_pending"]=="1")
+      $rows[$count]["pkgbase_print"] = "(" . $rows[$count]["pkgbase"] . ")";
+    else
+      $rows[$count]["pkgbase_print"] = $rows[$count]["pkgbase"];
     $rows[$count]["git_revision"] = $row["git_revision"];
     $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
     $rows[$count]["name"] = $row["name"];
@@ -106,6 +126,7 @@ if ($result -> num_rows > 0) {
   print "<th>modification git revision</th>";
   print "<th>package repository</th>";
   print "<th>compilations</th>";
+  print "<th>loops</th>";
 //  print "<th>dependent</th>";
   print "<th>build error</th>";
   print "<th>blocked</th>";
@@ -115,11 +136,12 @@ if ($result -> num_rows > 0) {
 
     print "<tr>";
 
-    print "<td><a href=\"/graphs/".$row["pkgbase"].".png\">".$row["pkgbase"]."</a></td>";
+    print "<td><a href=\"/graphs/".$row["pkgbase"].".png\">".$row["pkgbase_print"]."</a></td>";
     print "<td><p style=\"font-size:8px\">".$row["git_revision"]."</p></td>";
     print "<td><p style=\"font-size:8px\">".$row["mod_git_revision"]."</p></td>";
     print "<td>".$row["name"]."</td>";
     print "<td>".$row["print_trials"]."</td>";
+    print "<td>".$row["loops"]."</td>";
 //    <td>0</td>
     print "<td>".$row["fail_reasons"]."</td>";
     print "<td>".$row["is_blocked"]."</td>";
