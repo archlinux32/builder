@@ -65,7 +65,7 @@ if ($result -> num_rows > 0) {
     $rows[$count]["git_revision"] = $row["git_revision"];
     $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
     $rows[$count]["name"] = $row["name"];
-    if (isset($rows[$count]["last_log"]))
+    if (isset($last_log))
       $rows[$count]["print_trials"]="<a href=\"/build-logs/error/".$last_log."\">". $rows[$count]["trials"] ."</a>";
     else
       $rows[$count]["print_trials"]=$rows[$count]["trials"];
