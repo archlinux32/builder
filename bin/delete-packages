@@ -13,6 +13,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: finish this
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''

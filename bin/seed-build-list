@@ -5,6 +5,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: put new packages also in mysql database
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
@@ -281,6 +283,11 @@ if ${update}; then
   awk '{print $4 " " $1 " " $2 " " $3}' \
     "${tmp_dir}/build-list.new" | \
     tee -a "${work_dir}/build-list"
+
+  while read -r git_revision mod_git_revision repository pkgbase; do
+    mysql_generate_package_metadata "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
+  done < \
+    "${tmp_dir}/build-list.new"
 
   # Remove the lock file
 

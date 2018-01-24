@@ -4,36 +4,32 @@
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
-# shellcheck source=bin/mysql-functions
-. "${base_dir}/bin/mysql-functions"
 
-# shellcheck disable=SC2016
-${mysql_command} -e '
-  SELECT `build_slaves`.`name`,`build_slaves`.`operator`,`package_sources`.`pkgbase`,`build_slaves`.`last_connection`
-  FROM `build_slaves`
-  LEFT JOIN `build_assignments` ON
-  `build_slaves`.`currently_building`=`build_assignments`.`id`
-  LEFT JOIN `package_sources` ON
-  `build_assignments`.`package_source`=`package_sources`.`id`
-  ORDER BY `build_slaves`.`last_connection`
-' --html | \
-  sed '
-    s,</TR>,\0\n,g
-  ' | \
-  sed '
-    \,</TH></TR>$, {
-      s,<TH>pkgbase</TH>,<TH>currently building</TH>,
-      y,_, ,
-    }
-    \,</TH></TR>$, ! {
-      s,<TD>NULL</TD>,<TD>\&nbsp;</TD>,
-    }
-    1 i <html><head><title>list of build slaves</title></head><body>
-    $ a </body></html>
-  ' | \
-  sponge "${webserver_directory}/build-slaves.html"
-
-mysql_sanity_check | \
+{
+  mysql_sanity_check || true
+  {
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
+      printf ' FROM `package_sources`'
+      printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+        'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
+        'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
+        'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
+        'repositories' 'binary_packages' 'repository' 'repositories'
+      printf ' WHERE `repositories`.`name`="build-list"'
+    } | \
+      ${mysql_command} --batch | \
+      sed '
+        1d
+        y/\t/ /
+        s/^/+ /
+      '
+    sed 's/^/- /' "${work_dir}/build-list"
+  } | \
+    sort -k2 -k1,1 | \
+    uniq -uf1
+} | \
   sed '
     s,^-.*$,<font color="#FF0000">\0</font>,
     s,^+.*$,<font color="#00FF00">\0</font>,

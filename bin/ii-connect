@@ -15,8 +15,8 @@ fi
 # register if not yet done
 if tail -n1 "${irc_dir}/nickserv/out" 2> /dev/null | \
   grep -qF 'This nickname is registered. Please choose a different nickname'; then
-  printf 'identify %s\n' "${irc_password}" > \
-    "${irc_dir}/nickserv/in"
+  printf 'identify %s\n' "${irc_password}" | \
+    sponge "${irc_dir}/nickserv/in"
 fi
 
 # join #archlinux-ports if not yet done
@@ -26,8 +26,8 @@ if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
   {
     echo '/j #archlinux-ports'
     echo '/WHO buildmaster'
-  } > \
-    "${irc_dir}/in"
+  } | \
+    sponge "${irc_dir}/in"
 fi
 
 # start watch daemon if not running yet
@@ -69,8 +69,8 @@ if [ "$1" = 'watch' ]; then
                 echo "${reason}" | \
                   head -n5
                 printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
-              fi > \
-                "${out_file%/out}/in"
+              fi | \
+                sponge "${out_file%/out}/in"
             done
           sed -i "/${regex}/d" "${out_file}"
         fi

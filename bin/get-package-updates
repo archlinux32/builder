@@ -9,6 +9,10 @@
 
 # TODO: Find out, why sometimes package updates are missed.
 
+# TODO: mark loops in mysql database
+
+# TODO: test_exclusion does not yet cooperate with the database
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
@@ -54,7 +58,7 @@ do
     -x|--test-exclusion)
       shift
       if [ -n "${test_exclusion}" ]; then
-        >&2 printf 'I already have --test-exlusion=%s and you gave me another one.\n' "${test_exclusion}"
+        >&2 printf 'I already have --test-exclusion=%s and you gave me another one.\n' "${test_exclusion}"
         >&2 printf 'But I can only handle one exclusion test at a time.\n'
         exit 2
       fi
@@ -88,6 +92,20 @@ delete_package() {
   echo "$1" >> \
     "${work_dir}/deletion-list.new"
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
+  # shellcheck disable=SC2016
+  {
+    printf 'UPDATE `binary_packages`'
+    printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
+      'repositories' 'repositories' 'repository' \
+      'build_assignments' 'build_assignments' 'build_assignment'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'package_sources' 'package_sources' 'build_assignments' 'package_source'
+    printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `package_sources`.`pkgbase`=from_base64("%s");' \
+      "$(printf '%s' "$1" | base64 -w0)"
+  } | \
+    ${mysql_command}
 }
 
 # create tmp_dir and trap
@@ -268,6 +286,25 @@ done | \
       echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
         "${work_dir}/build-list.new"
       sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
+      # shellcheck disable=SC2016
+      {
+        # delete old build assignment and associated binary packages
+        # which are not yet build or on the deletion list
+        printf 'DELETE `build_assignments`,`binary_packages`'
+        printf ' FROM `binary_packages`'
+        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+          'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
+          'package_sources'   'package_sources'   'build_assignments' 'package_source' \
+          'repositories'      'repositories'      'binary_packages'   'repository'
+        printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
+          "$(
+            printf '%s' "${package}" | \
+              base64 -w0
+          )"
+        printf ' AND (`repositories`.`name`="build-list" OR `repositories`.`name`="deletion-list");\n'
+      } | \
+        ${mysql_command}
+      mysql_generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
 

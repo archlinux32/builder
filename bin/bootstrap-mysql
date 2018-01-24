@@ -2,11 +2,25 @@
 
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
-# shellcheck source=bin/mysql-functions
-. "${base_dir}/bin/mysql-functions"
 
 tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+exec 9> "${build_list_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'Cannot get build-list lock.'
+  exit 1
+fi
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s -n 9; then
+  >&2 echo 'Cannot get sanity-check lock.'
+  exit 1
+fi
+exec 7> "${package_database_lock_file}"
+if ! flock -s -n 7; then
+  >&2 echo 'Cannot get package-database lock.'
+  exit 1
+fi
 
 for dir in $(ls_master_mirror 'i686'); do
   ls_master_mirror "i686/${dir}" | \
@@ -49,8 +63,8 @@ if [ ! "$1" = 'slim' ]; then
       ' is_tested BIT' \
       ' pkgname VARCHAR(64)' \
       ' architecture SMALLINT :architectures' \
-      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture' \
-      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture' \
+      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture repository' \
+      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture repository' \
       'repositories MEDIUMINT' \
       ' name VARCHAR(64)' \
       ' stability MEDIUMINT :repository_stabilities' \
@@ -97,7 +111,18 @@ if [ ! "$1" = 'slim' ]; then
       ' head VARCHAR(40)' \
       ' UNIQUE name' \
       ' UNIQUE url' \
-      ' UNIQUE directory'
+      ' UNIQUE directory' \
+      'fail_reasons SMALLINT' \
+      ' name VARCHAR(32)' \
+      ' identifier VARCHAR(64)' \
+      ' severity SMALLINT' \
+      ' UNIQUE name' \
+      'failed_builds MEDIUMINT' \
+      ' build_slave MEDIUMINT :build_slaves' \
+      ' build_assignment BIGINT :build_assignments' \
+      ' date DATETIME' \
+      ' reason SMALLINT :fail_reasons' \
+      ' log_file VARCHAR(512)'
   )
 
   {
@@ -195,6 +220,9 @@ if [ ! "$1" = 'slim' ]; then
       'SELECT' 'buildmaster.*' \
       'UPDATE' 'buildmaster.*' \
       'RELOAD' '*.*'
+    printf 'GRANT %s ON %s TO '"'"'http'"'"'@'"'"'localhost'"'"';\n' \
+      'SHOW VIEW' 'buildmaster.*' \
+      'SELECT' 'buildmaster.*'
     printf 'FLUSH PRIVILEGES;\n'
   } | \
     mysql -u root -p buildmaster
@@ -205,6 +233,47 @@ fi
   printf 'INSERT IGNORE INTO `architectures` (`name`) VALUES '
   printf '("%s"),' \
     'any' 'i686' | \
+    sed 's|,$||'
+  printf ';\n'
+  # shellcheck disable=SC2016
+  printf 'INSERT IGNORE INTO `fail_reasons` (`identifier`,`name`,`severity`) VALUES '
+  printf '(from_base64("%s"),"%s",%s),' \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in build()\.' | \
+        base64 -w0
+    )" 'build()' 0 \
+    "$(
+      printf '%s' '==> ERROR: Could not download sources\.' | \
+        base64 -w0
+    )" 'source' 1 \
+    "$(
+      printf '%s' '.*error: failed to commit transaction (invalid or corrupted package)' | \
+        base64 -w0
+    )" 'package-cache' 2 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in prepare()\.' | \
+        base64 -w0
+    )" 'prepare()' 2 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in package\(_\S\+\)\?()\.' | \
+        base64 -w0
+    )" 'package()' 3 \
+    "$(
+      printf '%s' '==> ERROR: A failure occurred in check()\.' | \
+        base64 -w0
+    )" 'check()' 4 \
+    "$(
+      printf '%s' '==> ERROR: '"'"'pacman'"'"' failed to install missing dependencies\.' | \
+        base64 -w0
+    )" 'dependencies' 1 \
+    "$(
+      printf '%s' '==> ERROR: Running makepkg as root is not allowed as it can cause permanent,.*' | \
+        base64 -w0
+    )" 'run-as-root' 1 \
+    "$(
+      printf '.*' | \
+        base64 -w0
+    )" 'unknown' 100 | \
     sed 's|,$||'
   printf ';\n'
   # shellcheck disable=SC2016
@@ -307,7 +376,8 @@ fi
       'testing' '"Packages:Testing"' \
       'staging' 'NULL' \
       'standalone' 'NULL' \
-      'unbuilt' '"Packages:Build-list"'
+      'unbuilt' '"Packages:Build-list"' \
+      'forbidden' 'NULL'
     printf ';\n'
   } | \
     sed 's|,;|;|'
@@ -321,7 +391,8 @@ fi
     'community-testing:testing:AQ==' \
     'staging:staging:AQ==' \
     'community-staging:staging:AQ==' \
-    'build-list:unbuilt:AA=='; do
+    'build-list:unbuilt:AA==' \
+    'deletion-list:forbidden:AA=='; do
     # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
     # shellcheck disable=SC2016
@@ -363,6 +434,7 @@ find "${work_dir}/package-states" \
     -name '*.tested' \
   \) \
   -exec sed '
+    1!d
     s@^.*-\([^-]\+\)-\([^-.]\+\)\.pkg\.tar\.xz$@{} \1 \2 \0@
     s@^\S*/@@
     s/^\(\S\+\)\.\(done\|testing\|tested\) /\1 /
@@ -389,6 +461,32 @@ tr ' ' '.' < \
   while read -r state_file; do
     mysql_generate_package_metadata "${state_file}"
   done
+
+# shellcheck disable=SC2016
+find "${work_dir}/package-states" -name '*.blocked' -printf '%p %f\n' | \
+  sed '
+    s|\.\([^. ]\+\)\.\([^. ]\+\)\.\([^. ]\+\)\.blocked$| \1 \2 \3|
+  ' | \
+  while read -r state_file pkgbase git_revision mod_git_revision repository; do
+    printf 'UPDATE `build_assignments`'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+      'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+    printf ' SET `build_assignments`.`is_blocked`=from_base64("%s")' \
+      "$(
+        tr -d '\n' < \
+          "${state_file}" | \
+          base64 -w0
+      )"
+    printf ' WHERE'
+    printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+      'pkgbase'          "$(printf '%s' "${pkgbase}" |          base64 -w0)" \
+      'git_revision'     "$(printf '%s' "${git_revision}" |     base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "${mod_git_revision}" | base64 -w0)"
+    printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+      "$(printf '%s' "${repository}" | base64 -w0)"
+  done | \
+  ${mysql_command}
 
 grep '^\('"$(
   # shellcheck disable=SC2086
