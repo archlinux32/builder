@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# copy the given package(s) into build-support
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# shellcheck disable=SC2016
+{
+  to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
+  printf '%s\n' "$@" | \
+    sed -n '
+      s/.\+/\0 \0/
+      T
+      s/\.pkg\.tar\.xz$//
+      s/\(-[0-9]\+\)\(-[^- ]\+\)$/\1.0\2/
+      s/-\([^-: ]\+\)\(\(-[^- ]\+\)\{2\}\)$/-0:\1\2/
+      s/-\([^-: ]\+\):\([^-: ]\+\)-\([^-. ]\+\).\([^-. ]\+\)-\([^- ]\+\)$/ \1 \2 \3 \4 \5/
+      p
+    ' | \
+    while read -r package pkgname epoch pkgver pkgrel sub_pkgrel architecture; do
+
+      # TODO: move packages on master mirror, too!
+
+      printf 'INSERT IGNORE INTO `binary_packages`'
+      printf ' (`repository`'
+      # shellcheck disable=SC2086
+      printf ',`%s`' ${to_copy}
+      printf ')'
+      printf ' SELECT'
+      printf ' (SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="build-support")'
+      # shellcheck disable=SC2086
+      printf ',`binary_packages`.`%s`' ${to_copy}
+      printf ' FROM `binary_packages`'
+      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      printf ' WHERE'
+      printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+        'epoch' "$(printf '%s' "${epoch}" | base64 -w0)" \
+        'pkgver' "$(printf '%s' "${pkgver}" | base64 -w0)" \
+        'pkgrel' "$(printf '%s' "${pkgrel}" | base64 -w0)" \
+        'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)" \
+        'pkgname' "$(printf '%s' "${pkgname}" | base64 -w0)"
+      printf ' `architectures`.`name`=from_base64("%s")' \
+        "$(printf '%s' "${architecture}" | base64 -w0)"
+      printf ';\n'
+    done
+} | \
+  ${mysql_command}
