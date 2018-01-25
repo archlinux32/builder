@@ -451,6 +451,16 @@ fi
       printf '%s' "${slave}" | \
         base64 -w0
     )"
+  printf 'CREATE TEMPORARY TABLE `loops_to_delete` (`loop` MEDIUMINT);\n'
+  printf 'INSERT INTO `loops_to_delete`'
+  printf ' SELECT `build_dependency_loops`.`loop` FROM `build_dependency_loops`'
+  printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_dependency_loops`.`build_assignment`'
+  printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+  printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
+  printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('
+  printf 'SELECT * FROM `loops_to_delete` WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'
+  printf ');\n'
+  printf 'DROP TABLE `loops_to_delete`;\n'
 } | \
   ${mysql_command}
 rm -f \
