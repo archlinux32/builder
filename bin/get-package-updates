@@ -556,6 +556,9 @@ else
   rm "${work_dir}/tsort.error"
 fi
 
+# update loop list in database
+mysql_find_build_assignment_loops
+
 deletion_list_count=$(
   wc -l < \
     "${work_dir}/deletion-list.new"
