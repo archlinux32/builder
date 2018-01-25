@@ -15,6 +15,9 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: honor manual build order of tool-chain:
+# toolchain build order: linux-api-headers->glibc->binutils->gcc->binutils->glibc
+
 mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
