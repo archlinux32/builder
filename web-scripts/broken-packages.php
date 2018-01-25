@@ -143,7 +143,7 @@ foreach ($row as $key => $val)
     print "<td><p style=\"font-size:8px\">".$row["git_revision"]."</p></td>";
     print "<td><p style=\"font-size:8px\">".$row["mod_git_revision"]."</p></td>";
     print "<td>".$row["name"]."</td>";
-    print "<td>".$row["print_trials"]."</td>";
+    print "<td>".$row["trials"]."</td>";
     print "<td>".$row["loops"]."</td>";
 //    <td>0</td>
     print "<td>".$row["fail_reasons"]."</td>";
