@@ -27,7 +27,7 @@ $result = $mysql -> query(
     "JOIN `binary_packages` `to_be_built` ON `to_be_built`.`id` = `install_target_providers`.`package` " .
     "JOIN `repositories` ON `to_be_built`.`repository` = `repositories`.`id` " .
     "WHERE `broken_bin`.`build_assignment`=`build_assignments`.`id` ".
-    "AND `repositories`.`name`=\"community-testing\"" .
+    "AND `repositories`.`name`=\"build-list\"" .
   ") AS `dependencies_pending`," .
   "(SELECT count(*) " .
     "FROM `build_dependency_loops` " .
@@ -85,10 +85,10 @@ foreach ($row as $key => $val)
 
     $rows[$count]["loops"] = $row["loops"];
     $rows[$count]["pkgbase"] = $row["pkgbase"];
-    if ($row["dependencies_pending"]=="1")
-      $rows[$count]["pkgbase_print"] = "(" . $rows[$count]["pkgbase"] . ")";
-    else
+    if ($row["dependencies_pending"]=="0")
       $rows[$count]["pkgbase_print"] = $rows[$count]["pkgbase"];
+    else
+      $rows[$count]["pkgbase_print"] = "(" . $rows[$count]["pkgbase"] . ")";
     $rows[$count]["git_revision"] = $row["git_revision"];
     $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
     $rows[$count]["name"] = $row["name"];
