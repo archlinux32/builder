@@ -58,18 +58,25 @@ foreach ($row as $key => $val)
     );
 
     unset($reasons);
-    unset($last_log);
     $rows[$count]["trials"] = $fail_result -> num_rows;
     if ($rows[$count]["trials"] > 0) {
       while($fail_row = $fail_result->fetch_assoc()) {
-        $reasons[$fail_row["name"]] = $fail_row["name"];
-        $last_log = $fail_row["log_file"];
+        $reasons[$fail_row["name"]] = $fail_row["log_file"];
       }
     }
     if (isset($reasons)) {
       $to_print="";
-      foreach ($reasons as $reason) {
-        $to_print=$to_print.", ".$reason;
+      foreach ($reasons as $reason => $last_log) {
+        if (file_exists("/srv/http/build-logs/error/".$last_log)) {
+          $to_print= $to_print .
+            ", <a href=\"/build-logs/error/" .
+            $last_log .
+            "\">" .
+            $reason .
+            "</a>";
+        } else {
+          $to_print= $to_print . ", " . $reason;
+        }
       }
       $rows[$count]["fail_reasons"]=substr($to_print,2);
     } else {
@@ -85,10 +92,6 @@ foreach ($row as $key => $val)
     $rows[$count]["git_revision"] = $row["git_revision"];
     $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
     $rows[$count]["name"] = $row["name"];
-    if (isset($last_log))
-      $rows[$count]["print_trials"]="<a href=\"/build-logs/error/".$last_log."\">". $rows[$count]["trials"] ."</a>";
-    else
-      $rows[$count]["print_trials"]=$rows[$count]["trials"];
     if ($row["is_blocked"]=="") {
       $rows[$count]["is_blocked"]="&nbsp;";
     }
