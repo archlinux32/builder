@@ -111,6 +111,51 @@ clean_up() {
 tmp_dir=$(mktemp -d 'tmp.get-assignment.XXXXXXXXXX' --tmpdir)
 trap clean_up EXIT
 
+# shellcheck disable=SC2016
+{
+  printf 'SELECT'
+  printf ' COALESCE('
+    printf '('
+      printf 'SELECT'
+      printf ' `build_slaves`.`currently_building`'
+      printf ' FROM `build_slaves`'
+      printf ' JOIN `build_assignments`'
+      printf ' ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+        "$(printf '%s' "${slave}" | base64 -w0)"
+    printf '),('
+      printf 'SELECT `to_dos`.`id` FROM'
+      printf '('
+        printf 'SELECT'
+        printf ' `build_assignments`.`id`,'
+        printf '('
+          printf 'SELECT COUNT(*)'
+          printf ' FROM `failed_builds`'
+          printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
+        printf ') AS `trials`'
+        printf ' FROM `build_assignments`'
+        printf ' JOIN `binary_packages`'
+        printf ' ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+        printf ' JOIN `repositories`'
+        printf ' ON `binary_packages`.`repository`=`repositories`.`id`'
+        printf ' WHERE `repositories`.`name`="build-list"'
+        printf ' AND NOT EXISTS ('
+          printf ' SELECT *'
+          printf ' FROM `build_slaves`'
+          printf ' WHERE `build_slaves`.`currently_building`=`build_assignments`.`id`'
+        printf ' )'
+        printf ' ORDER BY `trials`, `build_assignments`.`id`'
+        printf ' LIMIT 1'
+      printf ') AS `to_dos`'
+    printf ')'
+  printf ')'
+} | \
+  ${mysql_command} --batch --raw | \
+  sed '
+    1d
+    y/\t/ /
+  ' >&2
+
 # Check if there are any pending packages at all and if the requester
 # has already got an assignment.
 
