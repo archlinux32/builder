@@ -2,7 +2,7 @@
 
 # contains functions used to access mysql db
 
-# shellcheck disable=SC2039
+# shellcheck disable=SC2016,SC2039
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
@@ -24,7 +24,7 @@ base64_encode_each() {
 
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
 
-# shellcheck disable=SC2016,SC2086
+# shellcheck disable=SC2086
 mysql_add_package_source() {
   local names='pkgbase git_revision mod_git_revision upstream_package_repository'
   local values;
@@ -54,7 +54,7 @@ mysql_add_package_source() {
 
 # mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
 
-# shellcheck disable=SC2016,SC2031,SC2086,SC2154
+# shellcheck disable=SC2031,SC2086,SC2154
 mysql_add_binary_package() {
   local names='pkgbase git_revision mod_git_revision upstream_package_repository pkgname sub_pkgrel architecture repository'
   local name
@@ -97,7 +97,7 @@ mysql_add_binary_package() {
 
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
 
-# shellcheck disable=SC2016,SC2031,SC2086,SC2154
+# shellcheck disable=SC2031,SC2086,SC2154
 mysql_show_binary_package() {
   local names='pkgname pkgver pkgrel sub_pkgrel'
   local name
@@ -153,7 +153,7 @@ mysql_show_binary_package() {
 
 # mysql_add_install_target $install_target
 
-# shellcheck disable=SC2016,2086
+# shellcheck disable=2086
 mysql_add_install_target() {
   local install_target
   install_target=$(
@@ -180,7 +180,6 @@ mysql_add_install_target() {
 # if $sub_pkgrel should be forced and the package is currently in $current_repository
 # generate the meta data of a package (dependencies, built packages, ...) in the database
 
-# shellcheck disable=SC2016
 mysql_generate_package_metadata() {
 
   ( # new shell is intentional
@@ -619,7 +618,6 @@ mysql_sanity_check() {
       sort > \
       "${temp_dir}/master-mirror-listing"
 
-    # shellcheck disable=SC2016
     {
       printf 'SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
       printf ' FROM `binary_packages`'
@@ -646,7 +644,6 @@ mysql_sanity_check() {
   )
 }
 
-# shellcheck disable=SC2016
 mysql_find_build_assignment_loops() {
   new_loops=$(
     {
@@ -685,6 +682,27 @@ mysql_find_build_assignment_loops() {
       printf 'INSERT INTO `build_dependency_loops` (`loop`,`build_assignment`) VALUES %s;\n' \
         "${new_loops}"
     fi
+  } | \
+    ${mysql_command}
+}
+
+# mysql_cleanup
+# clean up left overs from mysql database
+mysql_cleanup() {
+  {
+    # remove failed_builds with unbroken build_assignments
+    printf 'DELETE `failed_builds` '
+    printf 'FROM `failed_builds` '
+    printf 'JOIN `build_assignments` '
+    printf 'ON `failed_builds`.`build_assignment`=`build_assignments`.`id` '
+    printf 'WHERE NOT `build_assignment`.`is_broken`;\n'
+    # remove failed_builds w/o build_assignment
+    printf 'DELETE FROM `failed_builds` '
+    printf 'WHERE NOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `build_assignments` '
+      printf 'WHERE `build_assignments`.`id`=`failed_builds`.`build_assignment`'
+    printf ');\n'
   } | \
     ${mysql_command}
 }
