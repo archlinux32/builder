@@ -5,30 +5,62 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+tmp_dir=$(mktemp -d 'tmp.build-master-status-from-mysql.XXXXXXXXXX' --tmpdir)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+# shellcheck disable=SC2016
+{
+  printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
+  printf ' FROM `package_sources`'
+  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+    'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
+    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
+    'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
+    'repositories' 'binary_packages' 'repository' 'repositories'
+  printf ' WHERE `repositories`.`name`="build-list"'
+} | \
+  ${mysql_command} --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' | \
+  sort > \
+  "${tmp_dir}/build-list.mysql"
+sort "${work_dir}/build-list" > \
+  "${tmp_dir}/build-list.file"
+
+# shellcheck disable=SC2016
+{
+  printf 'SELECT `package_sources`.`pkgbase`'
+  printf ' FROM `package_sources`'
+  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
+    'build_dependency_loops' 'build_dependency_loops' 'build_assignment' 'build_assignments'
+  printf ';\n'
+} | \
+  ${mysql_command} --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' | \
+  sort > \
+  "${tmp_dir}/loops.mysql"
+find "${work_dir}/build-list.loops" -regextype grep -mindepth 1 -maxdepth 1 \
+  -regex '.*/loop_[0-9]\+' \
+  -exec 'cat' '{}' \; | \
+  sort > \
+  "${tmp_dir}/loops.file"
+
 {
   mysql_sanity_check || true
-  {
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
-      printf ' FROM `package_sources`'
-      printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-        'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
-        'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
-        'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
-        'repositories' 'binary_packages' 'repository' 'repositories'
-      printf ' WHERE `repositories`.`name`="build-list"'
-    } | \
-      ${mysql_command} --batch | \
-      sed '
-        1d
-        y/\t/ /
-        s/^/+ /
-      '
-    sed 's/^/- /' "${work_dir}/build-list"
-  } | \
-    sort -k2 -k1,1 | \
-    uniq -uf1
+  diff -u \
+    "${tmp_dir}/build-list.file" \
+    "${tmp_dir}/build-list.mysql" || \
+    true
+  diff -u \
+    "${tmp_dir}/loops.file" \
+    "${tmp_dir}/loops.mysql" || \
+    true
 } | \
   sed '
     s,^-.*$,<font color="#FF0000">\0</font>,
