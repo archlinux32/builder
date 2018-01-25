@@ -338,10 +338,13 @@ fi
     ' ~/.ssh/authorized_keys | \
       while read -r name key; do
         case "${name}" in
-          'nlopc'*|'rechenknecht'|'buildknecht'*)
+          'nlopc'*|'rechenknecht')
             operator='deep42thought'
           ;;
-          'eurobuild')
+          'buildknecht'*)
+            operator='deep42thought/vollzornbrot'
+          ;;
+          'eurobuild3')
             operator='abaumann'
           ;;
           *)
