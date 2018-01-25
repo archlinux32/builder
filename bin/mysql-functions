@@ -645,3 +645,46 @@ mysql_sanity_check() {
       "${temp_dir}/mysql-packages"
   )
 }
+
+# shellcheck disable=SC2016
+mysql_find_build_assignment_loops() {
+  new_loops=$(
+    {
+      printf 'SELECT DISTINCT `packages_dependency`.`build_assignment`,`packages_dependent`.`build_assignment`'
+      printf ' FROM `dependencies`'
+      printf ' JOIN `install_target_providers` ON `dependencies`.`depending_on`=`install_target_providers`.`install_target`'
+      printf ' JOIN `binary_packages` `packages_dependent` ON `dependencies`.`dependent`=`packages_dependent`.`id`'
+      printf ' JOIN `binary_packages` `packages_dependency` ON `install_target_providers`.`package`=`packages_dependency`.`id`'
+      printf ' JOIN `repositories` `repositories_%s` ON `packages_%s`.`repository`=`repositories_%s`.`id`' \
+        'dependent' 'dependent' 'dependent' \
+        'dependency' 'dependency' 'dependency'
+      printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
+    } | \
+      ${mysql_command} --raw --batch | \
+      tsort 2>&1 >/dev/null | \
+      sed 's/^tsort:\s*//' | \
+      {
+        loop=0
+        while read -r id; do
+          if [ "x${id}" = 'x-: input contains a loop:' ]; then
+            loop=$((loop+1))
+            continue
+          fi
+          if ! printf '%s' "${id}" | tr '\n' ' ' | grep -q '^[0-9]\+$'; then
+            >&2 printf 'ERROR: non-numeric id "%s"\n' "${id}"
+            continue
+          fi
+          printf '(%s,%s),' "${loop}" "${id}"
+        done | \
+          sed 's/,$//'
+      }
+  )
+  {
+    printf 'DELETE FROM `build_dependency_loops`;\n'
+    if [ -n "${new_loops}" ]; then
+      printf 'INSERT INTO `build_dependency_loops` (`loop`,`build_assignment`) VALUES %s;\n' \
+        "${new_loops}"
+    fi
+  } | \
+    ${mysql_command}
+}
