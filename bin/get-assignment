@@ -111,6 +111,9 @@ clean_up() {
 tmp_dir=$(mktemp -d 'tmp.get-assignment.XXXXXXXXXX' --tmpdir)
 trap clean_up EXIT
 
+# TODO: binary package $x it is not a yet-to-be-built dependency of
+# package $y if $x and $y are built by the same build_assignment!
+
 # shellcheck disable=SC2016
 {
   printf 'SELECT'
