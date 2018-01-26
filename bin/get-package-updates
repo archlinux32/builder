@@ -9,8 +9,6 @@
 
 # TODO: Find out, why sometimes package updates are missed.
 
-# TODO: mark loops in mysql database
-
 # TODO: test_exclusion does not yet cooperate with the database
 
 # shellcheck disable=SC2016
