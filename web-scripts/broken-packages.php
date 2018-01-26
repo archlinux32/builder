@@ -44,8 +44,6 @@ if ($result -> num_rows > 0) {
 
   while($row = $result->fetch_assoc()) {
 
-foreach ($row as $key => $val)
-
     $fail_result = $mysql -> query(
       "SELECT " .
       "`fail_reasons`.`name`, " .
