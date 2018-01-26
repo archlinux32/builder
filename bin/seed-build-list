@@ -5,8 +5,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: put new packages also in mysql database
-
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
