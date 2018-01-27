@@ -13,7 +13,7 @@ if ($mysql->connect_error) {
 }
 
 $result = $mysql -> query(
-  "SELECT " .
+  "SELECT DISTINCT " .
   "`build_assignments`.`id`," .
   "`build_assignments`.`is_blocked`," .
   "`package_sources`.`pkgbase`," .
@@ -36,7 +36,9 @@ $result = $mysql -> query(
   "FROM `build_assignments` " .
   "JOIN `package_sources` ON `build_assignments`.`package_source` = `package_sources`.`id` " .
   "JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id` " .
-  "WHERE `build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL"
+  "JOIN `binary_packages` ON `binary_packages`.`build_assignment` = `build_assignments`.`id` " .
+  "JOIN `repositories` ON `binary_packages`.`repository` = `repositories`.`id` " .
+  "WHERE (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL) AND `repositories`.`name`=\"build-list\""
 );
 if ($result -> num_rows > 0) {
 
