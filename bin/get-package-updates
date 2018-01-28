@@ -564,8 +564,24 @@ deletion_list_count=$(
 if [ "${deletion_list_count}" -gt 1000 ]; then
   >&2 printf 'There are %s > 1000 packages on the deletion-list. This does not seem right.\n' \
     "${deletion_list_count}"
+  if [ ! -s "${work_dir}/told-irc-about-too-many-deletion-list-packages" ]; then
+    {
+      printf '\001ACTION refuses to blacklist %s packages.\001\n' "${deletion_list_count}"
+      for repo_name in ${repo_names}; do
+        if ! diff -q "${work_dir}/${repo_name}.revision" "${work_dir}/${repo_name}.revision.new" >/dev/null; then
+          printf '%s: %s -> %s\n' \
+            "${repo_name}" \
+            "$(cat "${work_dir}/${repo_name}.revision")" \
+            "$(cat "${work_dir}/${repo_name}.revision.new")"
+        fi
+      done
+    } | \
+      tee "${work_dir}/told-irc-about-too-many-deletion-list-packages" | \
+      sponge "${irc_dir}/#archlinux-ports/in"
+  fi
   exit 3
 fi
+rm -f "${work_dir}/told-irc-about-too-many-deletion-list-packages"
 
 # Move the .new-files to the actual files
 
