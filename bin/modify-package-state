@@ -21,7 +21,7 @@ usage() {
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
-# TODO: update database accordingly!
+# TODO: binary packages should not be identified by revisions, but by versions
 
 eval set -- "$(
   getopt -o bfhntu \
@@ -156,6 +156,24 @@ fi
         continue
       fi
     fi
+    repo=$(
+      printf '%s' "${package##*.}" | \
+        base64 -w0
+    )
+    pkgbase="${package%.*}"
+    mod_git_rev=$(
+      printf '%s' "${package##*.}" | \
+        base64 -w0
+    )
+    pkgbase="${pkgbase%.*}"
+    git_rev=$(
+      printf '%s' "${package##*.}" | \
+        base64 -w0
+    )
+    pkgbase=$(
+      printf '%s' "${package%.*}" | \
+        base64 -w0
+    )
     if [ "${action}" = 'block' ] || \
       [ "${action}" = 'unblock' ]; then
       # these packages need to be on the build list
@@ -175,6 +193,22 @@ fi
         else
           echo "${reason}" > \
             "${work_dir}/package-states/${package}.blocked"
+          # shellcheck disable=SC2016
+          {
+            printf 'UPDATE `build_assignments`'
+            printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+            printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+            printf ' SET `build_assignments`.`is_blocked`=from_base64("%s")' \
+              "$(printf '%s' "${reason}" | base64 -w0)"
+            printf ' WHERE'
+            printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+              'pkgbase' "${pkgbase}" \
+              'git_revision' "${git_rev}" \
+              'mod_git_revision' "${mod_git_rev}"
+            printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+              "${repo}"
+          } | \
+            ${mysql_command}
           printf '%s %s\n' "${package}" "${reason}"
         fi
       ;;
@@ -183,6 +217,23 @@ fi
           mv \
             "${work_dir}/package-states/${package}.tested" \
             "${work_dir}/package-states/${package}.testing"
+          # shellcheck disable=SC2016
+          {
+            printf 'UPDATE `binary_packages`'
+            printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+              'build_assignments' 'build_assignments' 'binary_packages' 'build_assignment' \
+              'package_sources' 'package_sources' 'build_assignments' 'package_source' \
+              'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+            printf ' SET `binary_packages`.`has_issues`=1, `binary_packages`.`is_tested`=0'
+            printf ' WHERE'
+            printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+              'pkgbase' "${pkgbase}" \
+              'git_revision' "${git_rev}" \
+              'mod_git_revision' "${mod_git_rev}"
+            printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+              "${repo}"
+          } | \
+            ${mysql_command}
           printf '%s\n' "${package}"
         fi
       ;;
@@ -192,12 +243,44 @@ fi
           mv \
             "${work_dir}/package-states/${package}.testing" \
             "${work_dir}/package-states/${package}.tested"
+          # shellcheck disable=SC2016
+          {
+            printf 'UPDATE `binary_packages`'
+            printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+              'build_assignments' 'build_assignments' 'binary_packages' 'build_assignment' \
+              'package_sources' 'package_sources' 'build_assignments' 'package_source' \
+              'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+            printf ' SET `binary_packages`.`is_tested`=1'
+            printf ' WHERE'
+            printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+              'pkgbase' "${pkgbase}" \
+              'git_revision' "${git_rev}" \
+              'mod_git_revision' "${mod_git_rev}"
+            printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+              "${repo}"
+          } | \
+            ${mysql_command}
           printf '%s\n' "${package}"
         fi
       ;;
       'unblock')
         if [ -f "${work_dir}/package-states/${package}.blocked" ]; then
           rm "${work_dir}/package-states/${package}.blocked"
+          # shellcheck disable=SC2016
+          {
+            printf 'UPDATE `build_assignments`'
+            printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+            printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+            printf ' SET `build_assignments`.`is_blocked`=NULL'
+            printf ' WHERE'
+            printf ' `package_sources`.`%s`=from_base64("%s") AND' \
+              'pkgbase' "${pkgbase}" \
+              'git_revision' "${git_rev}" \
+              'mod_git_revision' "${mod_git_rev}"
+            printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
+              "${repo}"
+          } | \
+            ${mysql_command}
           printf '%s\n' "${package}"
         fi
       ;;
