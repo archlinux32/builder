@@ -21,6 +21,8 @@ usage() {
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
+# TODO: update database accordingly!
+
 eval set -- "$(
   getopt -o bfhntu \
     --long block \
