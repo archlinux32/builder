@@ -162,16 +162,16 @@ fi
     )
     pkgbase="${package%.*}"
     mod_git_rev=$(
-      printf '%s' "${package##*.}" | \
+      printf '%s' "${pkgbase##*.}" | \
         base64 -w0
     )
     pkgbase="${pkgbase%.*}"
     git_rev=$(
-      printf '%s' "${package##*.}" | \
+      printf '%s' "${pkgbase##*.}" | \
         base64 -w0
     )
     pkgbase=$(
-      printf '%s' "${package%.*}" | \
+      printf '%s' "${pkgbase%.*}" | \
         base64 -w0
     )
     if [ "${action}" = 'block' ] || \
@@ -207,7 +207,7 @@ fi
               'mod_git_revision' "${mod_git_rev}"
             printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
               "${repo}"
-          } | \
+          } | tee /dev/stderr | \
             ${mysql_command}
           printf '%s %s\n' "${package}" "${reason}"
         fi
