@@ -4,7 +4,7 @@
 <link rel="stylesheet" type="text/css" href="/static/style.css">
 </head>
 <body>
-<a href="build-logs/">build logs</a><br>
+<a href="/build-logs/">build logs</a><br>
 <?php
 
 $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
