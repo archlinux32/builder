@@ -29,6 +29,27 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 sort "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.file"
 
+
+# shellcheck disable=SC2016
+{
+  printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
+  printf ' FROM `package_sources`'
+  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
+    'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
+    'repositories' 'binary_packages' 'repository' 'repositories'
+  printf ' WHERE `repositories`.`name`="deletion-list";\n'
+} | \
+  ${mysql_command} --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' | \
+  sort > \
+  "${tmp_dir}/deletion-list.mysql"
+sort "${work_dir}/deletion-list" > \
+  "${tmp_dir}/deletion-list.file"
+
 # shellcheck disable=SC2016
 {
   printf 'SELECT `package_sources`.`pkgbase`'
@@ -56,6 +77,10 @@ find "${work_dir}/build-list.loops" -regextype grep -mindepth 1 -maxdepth 1 \
   diff -u \
     "${tmp_dir}/build-list.file" \
     "${tmp_dir}/build-list.mysql" || \
+    true
+  diff -u \
+    "${tmp_dir}/deletion-list.file" \
+    "${tmp_dir}/deletion-list.mysql" || \
     true
   diff -u \
     "${tmp_dir}/loops.file" \
