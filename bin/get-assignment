@@ -211,10 +211,9 @@ next_building=$(
       s/^\S\+ \S\+ //
     '
 )
-# not ready yet!
 if [ -n "${next_building}" ]; then
   # shellcheck disable=SC2086
-  echo hand_out_assignment ${next_building} >&2
+  hand_out_assignment ${next_building}
 fi
 
 # Check if there are any pending packages at all and if the requester
