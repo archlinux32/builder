@@ -421,6 +421,8 @@ fi
   {
     printf '\n  ("%s",%s,%s),' \
       'build' '1' '0' \
+      'check' '0' '0' \
+      'link' '0' '1' \
       'run' '1' '1'
     printf ';\n'
   } | \
