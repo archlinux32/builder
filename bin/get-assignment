@@ -144,6 +144,11 @@ next_building=$(
   # shellcheck disable=SC2016
   {
     printf 'SELECT'
+    printf ' `package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
+      "$(
+        printf '%s' "$1" | \
+          base64 -w0
+      )"
     printf '('
       printf 'SELECT COUNT(*)'
       printf ' FROM `failed_builds`'
@@ -165,17 +170,43 @@ next_building=$(
       printf ' SELECT *'
       printf ' FROM `build_slaves`'
       printf ' WHERE `build_slaves`.`currently_building`=`build_assignments`.`id`'
-      printf ' AND `build_assignments`.`is_blocked` IS NULL'
-# TODO: and is element of loop or not exists unbuilt dependency
-    printf ' )'
-    printf ' ORDER BY `trials`, `build_assignments`.`id`'
+    printf ') AND ('
+      printf '`build_assignments`.`is_blocked` IS NULL'
+      printf ' OR'
+      printf ' `package_sources`.`pkgbase`=from_base64("%s")' \
+        "$(
+          printf '%s' "$1" | \
+            base64 -w0
+        )"
+    printf ') AND ('
+      printf 'EXISTS( '
+        printf 'SELECT * FROM `build_dependency_loops`'
+        printf ' WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`'
+# TODO: ignore loops which contain a build_assignment currently being handed out (?)
+      printf ') OR'
+      printf ' NOT EXISTS ('
+        printf 'SELECT * FROM `binary_packages` as `to_dos`'
+        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`%s`' \
+          'repositories` AS `to_do_repos' 'to_do_repos'  'id'           'to_dos'                   'repository' \
+          'dependencies'                  'to_dos'       'id'           'dependencies'             'dependent' \
+          'install_target_providers'      'dependencies' 'depending_on' 'install_target_providers' 'install_target' \
+          'binary_packages` AS `bin_deps' 'bin_deps'     'id'           'install_target_providers' 'package' \
+          'repositories` AS `dep_repos'   'dep_repos'    'id'           'bin_deps'                 'repository'
+        printf ' WHERE'
+        printf ' `%s`.`name`="build-list" AND' \
+          'dep_repos' 'to_do_repos'
+        printf ' `bin_deps`.`build_assignment`!=`to_dos`.`build_assignment` AND'
+        printf ' `to_dos`.`build_assignment`=`build_assignments`.`id`'
+      printf ')'
+    printf ')'
+    printf ' ORDER BY `requested` DESC, `trials`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
     ${mysql_command} --batch --raw | \
     sed '
       1d
       y/\t/ /
-      s/^\S\+ //
+      s/^\S\+ \S\+ //
     '
 )
 # not ready yet!
