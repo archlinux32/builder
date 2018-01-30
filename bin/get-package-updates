@@ -289,7 +289,7 @@ done | \
       # shellcheck disable=SC2016
       {
         # delete old build assignment and associated binary packages
-        # which are not yet build or on the deletion list
+        # which are not yet built or on the deletion list
         printf 'DELETE `build_assignments`,`binary_packages`'
         printf ' FROM `binary_packages`'
         printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
