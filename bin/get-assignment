@@ -139,7 +139,9 @@ if [ -n "${currently_building}" ]; then
   hand_out_assignment ${currently_building}
 fi
 
-# packages with all dependencies met, ordered by number of failed trials
+# a package with all dependencies met or which is part of a loop,
+#   that we requested or
+#   which has been built the least times
 next_building=$(
   # shellcheck disable=SC2016
   {
