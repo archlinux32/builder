@@ -706,3 +706,48 @@ mysql_cleanup() {
   } | \
     ${mysql_command}
 }
+
+# mysql_query_has_pending_dependencies `build_assignment`.`id`
+# print a mysql query giving wether dependencies are pending
+mysql_query_has_pending_dependencies() {
+  printf 'EXISTS ('
+    printf 'SELECT * FROM `binary_packages` as `to_dos`'
+    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`%s`' \
+      'repositories` AS `to_do_repos' 'to_do_repos'  'id'           'to_dos'                   'repository' \
+      'dependencies'                  'to_dos'       'id'           'dependencies'             'dependent' \
+      'install_target_providers'      'dependencies' 'depending_on' 'install_target_providers' 'install_target' \
+      'binary_packages` AS `bin_deps' 'bin_deps'     'id'           'install_target_providers' 'package' \
+      'repositories` AS `dep_repos'   'dep_repos'    'id'           'bin_deps'                 'repository'
+    printf ' WHERE'
+    printf ' `%s`.`name`="build-list" AND' \
+      'dep_repos' 'to_do_repos'
+    printf ' `bin_deps`.`build_assignment`!=`to_dos`.`build_assignment` AND'
+    printf ' `to_dos`.`build_assignment`=%s' \
+      "$1"
+  printf ')'
+}
+
+# mysql_query_is_part_of_loop `build_assignment`.`id`
+# print a mysql query giving wether the package is part of a loop
+mysql_query_is_part_of_loop() {
+  printf 'EXISTS ('
+    printf 'SELECT * FROM `build_dependency_loops`'
+    printf ' WHERE `build_dependency_loops`.`build_assignment`=%s' \
+      "$1"
+  printf ')'
+}
+
+# mysql_query_select_pkgbase_and_revision
+# print the part of a mysql query giving:
+# pkgbase git_revision mod_git_revision upstream_package_repository
+mysql_query_select_pkgbase_and_revision() {
+  printf '`package_sources`.`%s`,' \
+    'pkgbase' \
+    'git_revision' \
+    'mod_git_revision'
+  printf '`upstream_repositories`.`name`'
+  printf ' FROM `build_assignments`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'package_sources' 'package_sources' 'build_assignments' 'package_source' \
+    'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+}

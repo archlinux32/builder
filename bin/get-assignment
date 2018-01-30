@@ -115,17 +115,10 @@ trap clean_up EXIT
 currently_building=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT'
-    printf ' `package_sources`.`%s`,' \
-      'pkgbase' \
-      'git_revision' \
-      'mod_git_revision'
-    printf '`upstream_repositories`.`name`'
-    printf ' FROM `build_slaves`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'build_assignments' 'build_assignments' 'build_slaves' 'currently_building' \
-      'package_sources' 'package_sources' 'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+    printf 'SELECT '
+    mysql_query_select_pkgbase_and_revision
+    printf ' JOIN `build_slaves`'
+    printf ' ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
       "$(printf '%s' "${slave}" | base64 -w0)"
     printf ' LIMIT 1;\n'
@@ -145,8 +138,8 @@ fi
 next_building=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT'
-    printf ' `package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
+    printf 'SELECT '
+    printf '`package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
       "$(
         printf '%s' "$1" | \
           base64 -w0
@@ -156,16 +149,9 @@ next_building=$(
       printf ' FROM `failed_builds`'
       printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
     printf ') AS `trials`,'
-    printf '`package_sources`.`%s`,' \
-      'pkgbase' \
-      'git_revision' \
-      'mod_git_revision'
-    printf '`upstream_repositories`.`name`'
-    printf ' FROM `binary_packages`'
+    mysql_query_select_pkgbase_and_revision
     printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'build_assignments' 'build_assignments' 'binary_packages' 'build_assignment' \
-      'package_sources' 'package_sources' 'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository' \
+      'binary_packages' 'build_assignments' 'binary_packages' 'build_assignment' \
       'repositories' 'repositories' 'binary_packages' 'repository'
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND NOT EXISTS ('
@@ -181,25 +167,9 @@ next_building=$(
             base64 -w0
         )"
     printf ') AND ('
-      printf 'EXISTS( '
-        printf 'SELECT * FROM `build_dependency_loops`'
-        printf ' WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`'
-# TODO: ignore loops which contain a build_assignment currently being handed out (?)
-      printf ') OR'
-      printf ' NOT EXISTS ('
-        printf 'SELECT * FROM `binary_packages` as `to_dos`'
-        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`%s`' \
-          'repositories` AS `to_do_repos' 'to_do_repos'  'id'           'to_dos'                   'repository' \
-          'dependencies'                  'to_dos'       'id'           'dependencies'             'dependent' \
-          'install_target_providers'      'dependencies' 'depending_on' 'install_target_providers' 'install_target' \
-          'binary_packages` AS `bin_deps' 'bin_deps'     'id'           'install_target_providers' 'package' \
-          'repositories` AS `dep_repos'   'dep_repos'    'id'           'bin_deps'                 'repository'
-        printf ' WHERE'
-        printf ' `%s`.`name`="build-list" AND' \
-          'dep_repos' 'to_do_repos'
-        printf ' `bin_deps`.`build_assignment`!=`to_dos`.`build_assignment` AND'
-        printf ' `to_dos`.`build_assignment`=`build_assignments`.`id`'
-      printf ')'
+      mysql_query_is_part_of_loop '`build_assignments`.`id`'
+      printf ' OR NOT '
+      mysql_query_has_pending_dependencies '`build_assignments`.`id`'
     printf ')'
     printf ' ORDER BY `requested` DESC, `trials`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
