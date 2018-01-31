@@ -27,7 +27,25 @@ base64_encode_each() {
 # shellcheck disable=SC2086
 mysql_add_package_source() {
   local names='pkgbase git_revision mod_git_revision upstream_package_repository'
-  local values;
+  local values
+  local uses_upstream
+  local uses_modification
+
+  if git -C "${repo_paths__archlinux32}" archive "$3" -- "$4/$1" >/dev/null 2>&1; then
+    uses_modification=1
+  else
+    uses_modification=0
+  fi
+  uses_upstream=0
+  for values in ${repo_names}; do
+    if eval 'git -C "${repo_paths__'"${values}"'}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null' | \
+      tar -t 2>/dev/null | \
+      sed 's,-x86_64/,-any/,' | \
+      grep -qFx "$1/repos/$4-any/PKGBUILD"; then
+      uses_upstream=1
+    fi
+  done
+
   for _ in ${names}; do
     values="${values}$(
       printf '%s' "$1" | \
@@ -41,14 +59,15 @@ mysql_add_package_source() {
     printf 'INSERT IGNORE INTO package_sources'
     printf ' ('
     printf '`%s`, ' ${names}
+    printf '`uses_upstream`,`uses_modification`'
     printf ') SELECT'
     printf ' from_base64("%s"), ' ${values% *}
-    printf ' `upstream_repositories`.`id`'
+    printf ' `upstream_repositories`.`id`,%s,%s' \
+      ${uses_upstream} ${uses_modification}
     printf ' FROM `upstream_repositories`'
     printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
       "${values##* }"
   } | \
-    sed 's|, )|)|g' | \
     ${mysql_command}
 }
 
