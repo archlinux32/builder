@@ -144,14 +144,8 @@ while read -r package reason; do
           'repository_stabilities' 'repository_stabilities' 'repositories'    'stability' \
           'architectures'          'architectures'          'binary_packages' 'architecture'
       )
-      # shellcheck disable=SC2016
+      # shellcheck disable=SC2016,SC2031
       selector=$(
-        local pkgname
-        local epoch
-        local pkgver
-        local pkgrel
-        local sub_pkgrel
-        local arch
         extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name "${package}"
         printf 'WHERE `repository_stabilities`.`name`="testing"'
         printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
