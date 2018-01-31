@@ -377,11 +377,11 @@ fi
   printf 'INSERT IGNORE INTO `repository_stabilities` (`name`,`bugtracker_category`) VALUES'
   {
     printf '\n  ("%s",%s),' \
-      'stable' '"Packages:Stable"' \
-      'testing' '"Packages:Testing"' \
+      'stable' '"Packages: Stable"' \
+      'testing' '"Packages: Testing"' \
       'staging' 'NULL' \
       'standalone' 'NULL' \
-      'unbuilt' '"Packages:Build-list"' \
+      'unbuilt' '"Packages: Build-list"' \
       'forbidden' 'NULL'
     printf ';\n'
   } | \
