@@ -188,140 +188,27 @@ if [ -n "${next_building}" ]; then
   hand_out_assignment ${next_building}
 fi
 
-# Check if there are any pending packages at all and if the requester
-# has already got an assignment.
+# Check if there are any pending packages at all
+count_pending=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT count(*)'
+    printf ' FROM `build_assignments`'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'binary_packages' 'build_assignments' 'binary_packages' 'build_assignment' \
+      'repositories' 'repositories' 'binary_packages' 'repository'
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_blocked` IS NULL'
+    printf ';\n'
+  } | \
+    ${mysql_command} --batch --raw | \
+    sed '1d'
+)
 
-pending_packages=false
-
-while read -r package git_revision mod_git_revision repository; do
-
-  generate_package_metadata "${package}.${git_revision}.${mod_git_revision}.${repository}"
-
-  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
-    # has this slave already got or does he prefer this assignment?
-    # note, that the dependencies are met, because this package is already locked
-    if grep -qxF "${slave}" "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" || \
-      printf ',%s,' "$1" | \
-        grep -qF ",${package},"; then
-      hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-    fi
-  elif [ ! -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
-    pending_packages=true
-  fi
-
-done < "${work_dir}/build-list"
-
-if ! ${pending_packages}; then
+if [ "${count_pending}" -eq 0 ]; then
   >&2 echo 'come back after the next run of get-package-updates - currently there are no pending packages'
   exit 3
+else
+  >&2 echo 'come back later - there are still packages to be built, but currently none has all its dependencies ready'
+  exit 2
 fi
-
-# Find first package of build-list whose "dependencies" are all met
-# 1st: prefered packages on the build list which have all dependencies met
-# 2nd: unbroken packages on the build list which have all dependencies met
-# 3rd: unbroken packages breaking a loop
-# 4th: broken packages which have all dependencies met or break a loop
-
-for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
-
-  case "${iteration}" in
-    'prefered')
-      hand_out_blocked=true
-      hand_out_broken=true
-      hand_out_loop=false
-      echo "$1" | \
-        tr ',' '\n' | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'fresh')
-      hand_out_blocked=false
-      hand_out_broken=false
-      hand_out_loop=false
-      {
-        cat "${work_dir}/build-list"
-        find "${work_dir}/package-states" -name '*.broken' -printf '%f\n' | \
-          sed '
-            s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
-            p
-          '
-      } | \
-        sort -k1,1 -k2 | \
-        uniq -u | \
-        cut -d' ' -f1 | \
-        uniq > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'loops')
-      hand_out_blocked=false
-      hand_out_broken=false
-      hand_out_loop=true
-      find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-        -regex '.*/loop_[0-9]\+' \
-        -exec cat {} \; | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'broken')
-      hand_out_blocked=false
-      hand_out_broken=true
-      hand_out_loop=true
-      cut -d' ' -f1 < \
-        "${work_dir}/build-list" | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-  esac
-
-  cat -n "${work_dir}/build-list" | \
-    sort -k2,2 | \
-    join -1 1 -2 2 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/hand-out-only-these-packages" - | \
-    sort -k1,1 | \
-    sed 's|^\s*\S\+\s\+||' > \
-    "${tmp_dir}/try-to-hand-out-these-packages"
-
-  while read -r package git_revision mod_git_revision repository; do
-
-    # package locked? (we have taken care of those in the previous loop)
-    if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
-      continue
-    fi
-
-    # package blocked?
-    if ! ${hand_out_blocked} &&
-      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
-      continue
-    fi
-
-    # package broken?
-    if ! ${hand_out_broken} && \
-      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ]; then
-      continue
-    fi
-
-    # dependencies met?
-    if [ -n "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
-      # do we hand out looped packages?
-      if ! ${hand_out_loop}; then
-        continue
-      fi
-      # is it a looped package?
-      if ! find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-        -regex '.*/loop_[0-9]\+' \
-        -exec cat {} \; | \
-        grep -qxF "${package}"; then
-        continue
-      fi
-    fi
-
-    hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-
-  done < \
-    "${tmp_dir}/try-to-hand-out-these-packages"
-
-done
-
-# Remove the lock file
-
->&2 echo 'come back later - there are still packages to be built, but currently none has all its dependencies ready'
-exit 2
