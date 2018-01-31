@@ -1348,3 +1348,27 @@ trigger_mirror_refreshs() {
     screen -S trigger-mirror-update -d -m curl -L "${trigger_url}"
   done
 }
+
+# extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name
+extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name() {
+  pkgname="$1"
+  pkgname="${pkgname%.pkg.tar.xz}"
+  arch="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  sub_pkgrel="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  pkgrel="${sub_pkgrel%.*}"
+  if [ "${pkgrel}" = "${sub_pkgrel}" ]; then
+    sub_pkgrel='0'
+  else
+    sub_pkgrel="${sub_pkgrel##*.}"
+  fi
+  epoch="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  pkgver="${epoch#*:}"
+  if [ "${pkgver}" = "${epoch}" ]; then
+    epoch='0'
+  else
+    epoch="${epoch%%:*}"
+  fi
+}
