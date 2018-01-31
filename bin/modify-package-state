@@ -235,6 +235,33 @@ while read -r package reason; do
     grep -qxF '1'; then
     printf 'UPDATE %s SET %s %s' "${combiner}" "${modifier}" "${selector}" | \
       ${mysql_command}
+    case "${action}" in
+      'block')
+        printf '%s' "${reason}" > \
+          "${work_dir}/package-states/${package}.blocked"
+      ;;
+      'unblock')
+        rm -f "${work_dir}/package-states/${package}.blocked"
+      ;;
+      'faulty')
+        if [ -f "${work_dir}/package-states/${package}.tested" ]; then
+          mv \
+            "${work_dir}/package-states/${package}.tested" \
+            "${work_dir}/package-states/${package}.testing"
+        fi
+      ;;
+      'tested')
+        if [ -f "${work_dir}/package-states/${package}.testing" ]; then
+          mv \
+            "${work_dir}/package-states/${package}.testing" \
+            "${work_dir}/package-states/${package}.tested"
+        fi
+      ;;
+      *)
+        >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
+        exit 42
+      ;;
+    esac
   fi
 done \
   < "${input_file}" \
