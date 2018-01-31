@@ -343,9 +343,14 @@ black_listed_new=$(
     if [ -n "${test_exclusion}" ]; then
       echo "${test_exclusion}"
     fi
-    find "${work_dir}/package-infos" -maxdepth 1 -name 'lib32-*' -printf '%f\n' | \
-      sed 's|\(\.[^.]\+\)\{4\}$||' | \
-      uniq
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
+      printf ' FROM `package_sources`'
+      printf ' WHERE `package_sources`.`pkgbase` LIKE "lib32-%%"'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '1d'
   } | \
     sort -u
 )
