@@ -149,6 +149,8 @@ next_building=$(
       printf ' FROM `failed_builds`'
       printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
     printf ') AS `trials`,'
+    mysql_query_is_part_of_loop '`build_assignments`.`id`'
+    printf ' AS `part_of_loop`,'
     mysql_query_select_pkgbase_and_revision
     printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
       'binary_packages' 'build_assignments' 'binary_packages' 'build_assignment' \
@@ -171,14 +173,14 @@ next_building=$(
       printf ' OR NOT '
       mysql_query_has_pending_dependencies '`build_assignments`.`id`'
     printf ')'
-    printf ' ORDER BY `requested` DESC, `trials`, `build_assignments`.`id`'
+    printf ' ORDER BY `requested` DESC, `trials`, `part_of_loop`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
     ${mysql_command} --batch --raw | \
     sed '
       1d
       y/\t/ /
-      s/^\S\+ \S\+ //
+      s/^\(\S\+ \)\{3\}//
     '
 )
 if [ -n "${next_building}" ]; then
