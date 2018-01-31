@@ -19,7 +19,11 @@ $result = $mysql -> query(
   "`package_sources`.`pkgbase`," .
   "`package_sources`.`git_revision`," .
   "`package_sources`.`mod_git_revision`," .
-  "`upstream_repositories`.`name`," .
+  "`package_sources`.`uses_upstream`," .
+  "`package_sources`.`uses_modification`," .
+  "`upstream_repositories`.`name` AS `package_repository`," .
+  "`git_repositories`.`name` AS `git_repository`," .
+  "`architectures`.`name` AS `arch`," .
   "EXISTS (SELECT * " .
     "FROM `binary_packages` `broken_bin` " .
     "JOIN `dependencies` ON `dependencies`.`dependent` = `broken_bin`.`id` " .
@@ -35,8 +39,10 @@ $result = $mysql -> query(
     "WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`" .
   ") AS `loops` " .
   "FROM `build_assignments` " .
+  "JOIN `architectures` ON `build_assignments`.`architecture` = `architectures`.`id` " .
   "JOIN `package_sources` ON `build_assignments`.`package_source` = `package_sources`.`id` " .
   "JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id` " .
+  "JOIN `git_repositories` ON `upstream_repositories`.`git_repository`=`git_repositories`.`id` " .
   "JOIN `binary_packages` ON `binary_packages`.`build_assignment` = `build_assignments`.`id` " .
   "JOIN `repositories` ON `binary_packages`.`repository` = `repositories`.`id` " .
   "WHERE (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL) AND `repositories`.`name`=\"build-list\""
@@ -90,9 +96,33 @@ if ($result -> num_rows > 0) {
       $rows[$count]["pkgbase_print"] = $rows[$count]["pkgbase"];
     else
       $rows[$count]["pkgbase_print"] = "(" . $rows[$count]["pkgbase"] . ")";
-    $rows[$count]["git_revision"] = $row["git_revision"];
-    $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
-    $rows[$count]["name"] = $row["name"];
+    if ($row["uses_upstream"]) {
+      $rows[$count]["git_revision"] =
+        "<a href=\"https://git.archlinux.org/svntogit/" .
+        $row["git_repository"] . ".git/tree/" .
+        $row["pkgbase"] . "/repos/" .
+        $row["package_repository"] . "-";
+      if ($row["arch"]=="any")
+        $rows[$count]["git_revision"] =
+          $rows[$count]["git_revision"] . "any";
+      else
+        $rows[$count]["git_revision"] =
+          $rows[$count]["git_revision"] . "x86_64";
+      $rows[$count]["git_revision"] =
+        $rows[$count]["git_revision"] . "/\">" .
+        $row["git_revision"] . "</a>";
+    } else
+      $rows[$count]["git_revision"] = $row["git_revision"];
+    if ($row["uses_modification"])
+      $rows[$count]["mod_git_revision"] =
+        "<a href=\"https://github.com/archlinux32/packages/tree/" .
+        $row["mod_git_revision"] . "/" .
+        $row["package_repository"] . "/" .
+        $row["pkgbase"] . "\">" .
+        $row["mod_git_revision"] . "</a>";
+    else
+      $rows[$count]["mod_git_revision"] = $row["mod_git_revision"];
+    $rows[$count]["package_repository"] = $row["package_repository"];
     if ($row["is_blocked"]=="") {
       $rows[$count]["is_blocked"]="&nbsp;";
     }
@@ -143,7 +173,7 @@ if ($result -> num_rows > 0) {
     print "<td><a href=\"/graphs/".$row["pkgbase"].".png\">".$row["pkgbase_print"]."</a></td>";
     print "<td><p style=\"font-size:8px\">".$row["git_revision"]."</p></td>";
     print "<td><p style=\"font-size:8px\">".$row["mod_git_revision"]."</p></td>";
-    print "<td>".$row["name"]."</td>";
+    print "<td>".$row["package_repository"]."</td>";
     print "<td>".$row["trials"]."</td>";
     print "<td>".$row["loops"]."</td>";
 //    <td>0</td>
