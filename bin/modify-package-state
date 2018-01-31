@@ -23,8 +23,6 @@ usage() {
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
-# TODO: binary packages should not be identified by revisions, but by versions
-
 eval set -- "$(
   getopt -o bfhntu \
     --long block \
