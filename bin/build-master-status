@@ -540,7 +540,7 @@ if ${web}; then
     # update todos
     # shellcheck disable=SC2016
     while read -r file line desc; do
-      printf 'UPDATE `todos`'
+      printf 'UPDATE IGNORE `todos`'
       printf ' SET `todos`.`line`=from_base64("%s")' \
         "${line}"
       printf ' WHERE `todos`.`file`=from_base64("%s")' \
@@ -548,7 +548,7 @@ if ${web}; then
       printf ' AND `todos`.`description`=from_base64("%s");\n' \
         "${desc}"
 
-      printf 'UPDATE `todos`'
+      printf 'UPDATE IGNORE `todos`'
       printf ' SET `todos`.`description`=from_base64("%s")' \
         "${desc}"
       printf ' WHERE `todos`.`file`=from_base64("%s")' \
@@ -560,19 +560,48 @@ if ${web}; then
       ${mysql_command}
     # insert unfound todos
     # shellcheck disable=SC2016
-    while read -r file line desc; do
-      printf ' ('
-      printf 'from_base64("%s"),' \
-        "${file}" \
-        "${line}" \
-        "${desc}" | \
-        sed 's/,$/),/'
-    done < \
-      "${tmp_dir}/todos" | \
-      sed '
-        1 i INSERT IGNORE INTO `todos` (`file`,`line`,`description`) VALUES
-        s/,$/;\n/
-      ' | \
+    {
+      printf 'CREATE TEMPORARY TABLE `td` ('
+      printf '`file` VARCHAR(64), '
+      printf '`line` MEDIUMINT, '
+      printf '`description` VARCHAR(128), '
+      printf 'UNIQUE KEY `position` (`file`,`line`), '
+      printf 'UNIQUE KEY `content` (`file`,`description`)'
+      printf ');'
+      printf 'INSERT INTO `td` (`file`,`line`,`description`) VALUES '
+      while read -r file line desc; do
+        printf '('
+        printf 'from_base64("%s"),' \
+          "${file}" \
+          "${line}" \
+          "${desc}" | \
+          sed 's/,$/),/'
+      done < \
+        "${tmp_dir}/todos" | \
+        sed '
+          s/,$//
+        '
+      printf ';\n'
+      printf 'INSERT IGNORE INTO `todos` (`file`,`line`,`description`) '
+      printf 'SELECT `td`.`file`,`td`.`line`,`td`.`description` '
+      printf 'FROM `td`;\n'
+      printf 'DELETE FROM `todos` WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `td`'
+      printf ' AND `td`.`%s`=`todos`.`%s`' \
+        'file' 'file' \
+        'line' 'line' \
+        'description' 'description' | \
+        sed 's/^ AND / WHERE /'
+      printf ');'
+      printf 'DROP TABLE `td`;\n'
+      printf 'DELETE FROM `todo_links` WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `todos` '
+      printf 'WHERE `todos`.`id`=`todo_links`.`depending_on`'
+      printf ') OR NOT EXISTS ('
+      printf 'SELECT * FROM `todos` '
+      printf 'WHERE `todos`.`id`=`todo_links`.`dependent`'
+      printf ');\n'
+    } | \
       ${mysql_command}
     rm -f "${tmp_dir}/todos"
   fi
