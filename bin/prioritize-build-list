@@ -32,13 +32,20 @@ fi
 # shellcheck disable=SC2016
 {
   printf 'UPDATE `build_assignments`'
-  printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+    'package_sources' 'build_assignments' 'package_source'   'package_sources' \
+    'binary_packages' 'binary_packages'   'build_assignment' 'build_assignments' \
+    'repositories'    'binary_packages'   'repository'       'repositories'
   printf ' SET `build_assignments`.`priority`=('
-    printf 'SELECT COALESCE(MAX(`others`.`priority`),0)+1'
-    printf ' FROM `build_assignments` AS `others`'
+    printf 'SELECT COALESCE(MAX(`all_priorities`.`priority`),0)+1'
+    printf ' FROM ('
+      printf 'SELECT `others`.`priority`'
+      printf ' FROM `build_assignments` AS `others`'
+    printf ') AS `all_priorities`'
   printf ')'
-  printf ' WHERE `package_sources`.`pkgbase` REGEXP from_base64("%s");\n' \
+  printf ' WHERE `package_sources`.`pkgbase` REGEXP from_base64("%s")' \
     "$(printf '%s' "$1" | base64 -w0)"
+  printf ' AND `repositories`.`name`="build-list";\n'
 } | \
   ${mysql_command}
 
