@@ -128,9 +128,6 @@ if ! flock -s -n 9; then
   exit
 fi
 
-# TODO: handle bug reports, too
-# receive_buglist 'Testing'
-
 while read -r package reason; do
   case "${action}" in
     'faulty'|'tested')
