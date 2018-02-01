@@ -434,6 +434,7 @@ fi
   printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
+  printf ' `build_assignments`.`priority`=0,'
   printf ' `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`=from_base64("%s")),' \
     "$(
       printf '%s' "${destination}" | \
