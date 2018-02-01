@@ -144,6 +144,7 @@ next_building=$(
         printf '%s' "$1" | \
           base64 -w0
       )"
+    printf '`build_assignments`.`priority`,'
     printf '('
       printf 'SELECT COUNT(*)'
       printf ' FROM `failed_builds`'
@@ -173,14 +174,14 @@ next_building=$(
       printf ' OR NOT '
       mysql_query_has_pending_dependencies '`build_assignments`.`id`'
     printf ')'
-    printf ' ORDER BY `requested` DESC, `trials`, `part_of_loop`, `build_assignments`.`id`'
+    printf ' ORDER BY `requested` DESC, `priority` DESC, `trials`, `part_of_loop`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
     ${mysql_command} --batch --raw | \
     sed '
       1d
       y/\t/ /
-      s/^\(\S\+ \)\{3\}//
+      s/^\(\S\+ \)\{4\}//
     '
 )
 if [ -n "${next_building}" ]; then
