@@ -20,8 +20,6 @@
 # track packages in stable, too
 # know _exactly_ in which repository the packages are
 
-# TODO: save information in database
-
 # TODO: read information from database
 
 # shellcheck disable=SC2039
