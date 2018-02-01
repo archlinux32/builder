@@ -11,6 +11,8 @@
 
 # TODO: test_exclusion does not yet cooperate with the database
 
+# TODO: read information from database
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''

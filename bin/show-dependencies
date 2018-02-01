@@ -3,6 +3,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: read information from database
+
 # Create a lock file.
 
 if [ $# -eq 0 ]; then

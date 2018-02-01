@@ -5,6 +5,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: add all (necessary) features from build-master-status
+
 tmp_dir=$(mktemp -d 'tmp.build-master-status-from-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 

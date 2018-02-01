@@ -7,6 +7,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: read information from database
+
 action="$1"
 shift
 

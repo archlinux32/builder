@@ -5,6 +5,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: clean database, too
+
 # we only clean if run interactive or if no one is logged in
 if ! tty -s && \
   [ -n "$(users)" ]; then

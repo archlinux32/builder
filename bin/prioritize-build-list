@@ -3,6 +3,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: save information in database
+
 if [ $# -ne 1 ]; then
   echo 'Usage: prioritize-build-list pkg-regex'
   echo ' moves packages matching pkg-regex to front of build list'

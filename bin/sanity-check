@@ -5,6 +5,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: read information from database
+
 usage() {
   >&2 echo ''
   >&2 echo 'sanity-check [options] [checks]: check sanity of build master'

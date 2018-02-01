@@ -20,11 +20,9 @@
 # track packages in stable, too
 # know _exactly_ in which repository the packages are
 
-# TODO: fully integrate database (in other scripts too) - e.g. rely on
-# info in db instead of state-files
+# TODO: save information in database
 
-# TODO: add possibility to manually clone a (binary) package (e.g.
-# for build-support) - this should also be possible via email
+# TODO: read information from database
 
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf

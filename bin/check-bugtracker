@@ -8,6 +8,8 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: read information from database
+
 tmp_dir=$(mktemp -d 'tmp.check-bugtracker.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
