@@ -3,8 +3,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: save information in database
-
 if [ $# -ne 1 ]; then
   echo 'Usage: prioritize-build-list pkg-regex'
   echo ' moves packages matching pkg-regex to front of build list'
@@ -30,6 +28,19 @@ fi
   sed "/^$1/d" "${work_dir}/build-list"
 } | \
   sponge "${work_dir}/build-list"
+
+# shellcheck disable=SC2016
+{
+  printf 'UPDATE `build_assignments`'
+  printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+  printf ' SET `build_assignments`.`priority`=('
+    printf 'SELECT COALESCE(MAX(`others`.`priority`),0)+1'
+    printf ' FROM `build_assignments` AS `others`'
+  printf ')'
+  printf ' WHERE `package_sources`.`pkgbase` REGEXP from_base64("%s");\n' \
+    "$(printf '%s' "$1" | base64 -w0)"
+} | \
+  ${mysql_command}
 
 # Remove the lock file
 
