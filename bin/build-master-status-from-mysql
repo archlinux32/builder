@@ -110,6 +110,42 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   sort -u > \
   "${tmp_dir}/tested.file"
 
+# shellcheck disable=SC2016
+{
+  printf 'SELECT '
+  printf '`binary_packages`.`%s`,' \
+    'pkgname' \
+    'epoch' \
+    'pkgver' \
+    'pkgrel' \
+    'sub_pkgrel'
+  printf '`architectures`.`name`'
+  printf ' FROM `binary_packages`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'repositories'           'repositories'           'binary_packages' 'repository' \
+    'architectures'          'architectures'          'binary_packages' 'architecture' \
+    'repository_stabilities' 'repository_stabilities' 'repositories'    'stability'
+  printf ' WHERE NOT `binary_packages`.`is_tested`'
+  printf ' AND NOT `binary_packages`.`has_issues`'
+  printf ' AND `repository_stabilities`.`name`="testing"'
+} | \
+  ${mysql_command} --batch | \
+  sed '
+    1d
+    s/^\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)$/\1-\2:\3-\4.\5-\6.pkg.tar.xz/
+  ' | \
+  sort -u > \
+  "${tmp_dir}/testing.mysql"
+find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
+  -name '*.testing' \
+  -exec cat '{}' \; | \
+  sed '
+    s/-\([^-.]\+\)\(-[^-]\+\)$/-\1.0-\2/
+    s/-\([^-:]\+\)\(\(-[^-]\+\)\{2\}\)$/-0:\1\2/
+  ' | \
+  sort -u > \
+  "${tmp_dir}/testing.file"
+
 {
   mysql_sanity_check || true
   diff -u \
@@ -127,6 +163,10 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   diff -u \
     "${tmp_dir}/tested.file" \
     "${tmp_dir}/tested.mysql" || \
+    true
+  diff -u \
+    "${tmp_dir}/testing.file" \
+    "${tmp_dir}/testing.mysql" || \
     true
 } | \
   sed '
