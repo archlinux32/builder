@@ -1,35 +1,65 @@
 #!/bin/sh
 
 # check the bug tracker for packages in testing and community-testing
-# with issues and mark these packages as "testing" if they are currently
-# marked as "tested"
+# with issues and mark these packages as "has_issues" if they are faulty
+# and vice versa
 
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: read information from database
+bug_list=$(
+  curl -LSs 'https://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
+    sed -n '
+      1d
+      s/^[^,]\+,"//
+      T
+      s/^\([^"]\+\)"\(,[^,]\+\)\{2\},"\([^"]\+\)".*$/"\1" "\3"/
+      T
+      p
+    '
+)
 
-tmp_dir=$(mktemp -d 'tmp.check-bugtracker.XXXXXXXXXX' --tmpdir)
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-
-receive_buglist 'Testing' | \
-  tr ' ,;' '\n' | \
-  sed -n '
-    s/^\[//
-    T
-    s/]$//
-    T
-    p
-  ' | \
-  sort -u > \
-  "${tmp_dir}/faulty-packages"
-
-find "${work_dir}/package-states" -name '*.tested' -printf '%f\n' | \
-  sed '
-    s|\.[^.]\+$||
-    s|^\(.*\)\(\.[^.]\+\)\{3\}$|\1 \0|
-  ' | \
-  sort -k1,1 | \
-  join -1 1 -2 1 -o 1.2 - "${tmp_dir}/faulty-packages" | \
-  "${base_dir}/bin/modify-package-state" -n --faulty /dev/stdin
+# shellcheck disable=SC2016
+{
+  printf 'SELECT `repository_stabilities`.`id`,`repository_stabilities`.`bugtracker_category`'
+  printf ' FROM `repository_stabilities`'
+  printf ' WHERE NOT `repository_stabilities`.`bugtracker_category` IS NULL'
+} | \
+  ${mysql_command} --raw --batch | \
+  sed '1d' | \
+  while read -r stability_id category; do
+    for has_issues in '1:' '0:NOT '; do
+      printf 'UPDATE `binary_packages`'
+      printf ' JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`'
+      printf ' SET `has_issues`=%s' \
+        "${has_issues%:*}"
+      printf ' WHERE `repositories`.`stability`=%s' \
+        "${stability_id}"
+      printf ' AND `binary_packages`.`pkgname` %sIN (' \
+        "${has_issues#*:}"
+      printf '%s\n' "${bug_list}" | \
+        sed -n '
+          s/^"'"$(str_to_regex "${category}")"'" //
+          T
+          :a
+            /\[.*]/ {
+              s/^[^[]*\[//
+              T
+              h
+              s/].*$//
+              p
+              x
+              ba
+            }
+        ' | \
+        base64_encode_each | \
+        sed '
+          s/^/from_base64("/
+          s/$/")/
+        ' | \
+        tr '\n' ','
+      printf '"");\n'
+    done
+  done | tee /dev/stderr | \
+  ${mysql_command}
