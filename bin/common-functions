@@ -1234,23 +1234,6 @@ print_list_of_archaic_packages() {
     sort -u
 }
 
-# receive_buglist $category
-# receive the buglist from bugs.archlinux32.org for $category (e.g. 'Testing')
-# and print it to stdout
-
-receive_buglist() {
-  local category
-  category="$1"
-  curl -LSs 'https://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
-    sed '
-      1 d
-      /^[^,]\+,"Packages: '"${category}"'",/ ! d
-      s/^\([^,]\+,\)\{3\}//
-      s/^\("[^"]\+"\|[^"][^,]*\),"//
-      s/".*$//
-    '
-}
-
 # next_sub_pkgrel $package $git_revision $mod_git_revision $repository
 # giv out the next sub-pkgrel of the given package
 
