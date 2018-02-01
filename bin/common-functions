@@ -2,9 +2,13 @@
 
 # contains functions used by more than one script
 
+# shellcheck disable=SC2039
+
 # TODO: include link depenendencies in run-depends metadata
 
-# shellcheck disable=SC2039
+# TODO: have full information (currently in files) in database
+
+# TODO: remove state files / metadata files
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
