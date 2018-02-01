@@ -69,8 +69,20 @@ hand_out_assignment() {
     printf ' `upstream_repositories`.`name` = from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
     printf ')'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");' \
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"
+
+    printf 'UPDATE `build_assignments`'
+    printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+    printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+    printf ' SET `build_assignments`.`priority`=0'
+    printf ' WHERE'
+    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
+      'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision'     "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' `upstream_repositories`.`name` = from_base64("%s");\n' \
+      "$(printf '%s' "$4" | base64 -w0)"
   } | \
     ${mysql_command}
 
