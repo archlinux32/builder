@@ -502,6 +502,7 @@ if ${web}; then
         s/\n[^:\n]\+:[0-9]\+:[^\n]*$/\n/
         p
       ' | \
+      tee "${tmp_dir}/todos" | \
       sed '
         :a
         N
@@ -516,6 +517,62 @@ if ${web}; then
       '</html>'
   } > \
     "${tmp_dir}/todos.html"
+
+  if [ -s "${tmp_dir}/todos" ]; then
+    sed '
+      :a
+      N
+      /\n$/!ba
+      s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n\([0-9]\+\)\n|\1 \3 |
+      s/\n$//
+      s/\n/\\n/g
+    ' -i "${tmp_dir}/todos"
+    while read -r file line desc; do
+      printf '%s %s %s\n' \
+        "$(printf '%s' "${file}" | base64 -w0)" \
+        "$(printf '%s' "${line}" | base64 -w0)" \
+        "$(printf '%s' "${desc}" | base64 -w0)"
+    done < \
+      "${tmp_dir}/todos" | \
+      sponge "${tmp_dir}/todos"
+    # update todos
+    # shellcheck disable=SC2016
+    while read -r file line desc; do
+      printf 'UPDATE TABLE `todos`'
+      printf ' SET `todos`.`line`=from_base64("%s")' \
+        "${line}"
+      printf ' WHERE `todos`.`file`=from_base64("%s")' \
+        "${file}"
+      printf ' AND `todos`.`desc`=from_base64("%s");\n' \
+        "${desc}"
+
+      printf 'UPDATE TABLE `todos`'
+      printf ' SET `todos`.`desc`=from_base64("%s")' \
+        "${desc}"
+      printf ' WHERE `todos`.`file`=from_base64("%s")' \
+        "${file}"
+      printf ' AND `todos`.`line`=from_base64("%s");\n' \
+        "${line}"
+    done | \
+      ${mysql_command}
+    # insert unfound todos
+    # shellcheck disable=SC2016
+    while read -r file line desc; do
+      printf ' ('
+      printf 'from_base64("%s"),' \
+        "${file}" \
+        "${line}" \
+        "${desc}" | \
+        sed 's/,$/),/'
+    done < \
+      "${tmp_dir}/todos" | \
+      sed '
+        1 i INSERT IGNORE INTO `todos` (`file`,`line`,`description`) VALUES
+        s/,$/;\n/
+      ' | \
+      ${mysql_command}
+    rm -f "${tmp_dir}/todos"
+  fi
 
   {
     printf '%s\n' \
