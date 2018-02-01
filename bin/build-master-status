@@ -538,22 +538,23 @@ if ${web}; then
     # update todos
     # shellcheck disable=SC2016
     while read -r file line desc; do
-      printf 'UPDATE TABLE `todos`'
+      printf 'UPDATE `todos`'
       printf ' SET `todos`.`line`=from_base64("%s")' \
         "${line}"
       printf ' WHERE `todos`.`file`=from_base64("%s")' \
         "${file}"
-      printf ' AND `todos`.`desc`=from_base64("%s");\n' \
+      printf ' AND `todos`.`description`=from_base64("%s");\n' \
         "${desc}"
 
-      printf 'UPDATE TABLE `todos`'
-      printf ' SET `todos`.`desc`=from_base64("%s")' \
+      printf 'UPDATE `todos`'
+      printf ' SET `todos`.`description`=from_base64("%s")' \
         "${desc}"
       printf ' WHERE `todos`.`file`=from_base64("%s")' \
         "${file}"
       printf ' AND `todos`.`line`=from_base64("%s");\n' \
         "${line}"
-    done | \
+    done < \
+      "${tmp_dir}/todos" | \
       ${mysql_command}
     # insert unfound todos
     # shellcheck disable=SC2016
