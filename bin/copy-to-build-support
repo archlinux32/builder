@@ -52,6 +52,8 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
       repository="${id#* }"
       id="${id%% *}"
 
+      printf '%s' "${package}" >> \
+        "${tmp_dir}/packages"
       for suffix in '' '.sig'; do
         printf 'ln "i686/%s/%s%s" "i686/build-support/%s%s"\n' \
           "${repository}" \
@@ -113,3 +115,11 @@ ${master_mirror_rsync_command} \
   "${tmp_dir}/build-support.db."* \
   "${tmp_dir}/build-support.files."* \
   "${master_mirror_rsync_directory}/i686/build-support/"
+
+# TODO: This does not work correctly yet!
+if [ -s "${tmp_dir}/packages" ]; then
+  while read -r package; do
+    remove_old_package_versions 'i686' 'build-support' "${package}"
+  done < \
+    "${tmp_dir}/packages"
+fi
