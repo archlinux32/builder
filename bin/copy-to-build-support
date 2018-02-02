@@ -8,71 +8,72 @@
 tmp_dir=$(mktemp -d "${work_dir}/tmp.copy-to-build-support.0.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-# shellcheck disable=SC2016
-{
-  to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
-  printf '%s\n' "$@" | \
-    sed -n '
-      s/.\+/\0 \0/
-      T
-      s/\.pkg\.tar\.xz$//
-      s/\(-[0-9]\+\)\(-[^- ]\+\)$/\1.0\2/
-      s/-\([^-: ]\+\)\(\(-[^- ]\+\)\{2\}\)$/-0:\1\2/
-      s/-\([^-: ]\+\):\([^-: ]\+\)-\([^-. ]\+\).\([^-. ]\+\)-\([^- ]\+\)$/ \1 \2 \3 \4 \5/
-      p
-    ' | \
-    while read -r package pkgname epoch pkgver pkgrel sub_pkgrel architecture; do
+to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
+printf '%s\n' "$@" | \
+  sed -n '
+    s/.\+/\0 \0/
+    T
+    s/\.pkg\.tar\.xz$//
+    s/\(-[0-9]\+\)\(-[^- ]\+\)$/\1.0\2/
+    s/-\([^-: ]\+\)\(\(-[^- ]\+\)\{2\}\)$/-0:\1\2/
+    s/-\([^-: ]\+\):\([^-: ]\+\)-\([^-. ]\+\).\([^-. ]\+\)-\([^- ]\+\)$/ \1 \2 \3 \4 \5/
+    p
+  ' | \
+  while read -r package pkgname epoch pkgver pkgrel sub_pkgrel architecture; do
 
-      id=$(
-        {
-          printf 'SELECT `binary_packages`.`id`,`repositories`.`name`'
-          printf ' FROM `binary_packages`'
-          printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
-          printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
-          printf ' WHERE'
-          printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
-            'epoch' "$(printf '%s' "${epoch}" | base64 -w0)" \
-            'pkgver' "$(printf '%s' "${pkgver}" | base64 -w0)" \
-            'pkgrel' "$(printf '%s' "${pkgrel}" | base64 -w0)" \
-            'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)" \
-            'pkgname' "$(printf '%s' "${pkgname}" | base64 -w0)"
-          printf ' `architectures`.`name`=from_base64("%s")' \
-            "$(printf '%s' "${architecture}" | base64 -w0)"
-          printf ' LIMIT 1;\n'
-        } | \
-          ${mysql_command} --raw --batch | \
-          sed '
-            1d
-            y/\t/ /
-          '
-      )
-      if [ -z "${id}" ]; then
-        continue
-      fi
-      repository="${id#* }"
-      id="${id%% *}"
-
-      printf '%s' "${package}" >> \
-        "${tmp_dir}/packages"
-      for suffix in '' '.sig'; do
-        printf 'ln "i686/%s/%s%s" "i686/build-support/%s%s"\n' \
-          "${repository}" \
-          "${package}" \
-          "${suffix}" \
-          "${package}" \
-          "${suffix}"
-      done >> \
-        "${tmp_dir}/sftp-command"
-      printf '%s/i686/%s/%s\n' \
-        "${master_mirror_rsync_directory}" \
-        "${repository}" \
-        "${package}" | \
+    # shellcheck disable=SC2016
+    id=$(
+      {
+        printf 'SELECT `binary_packages`.`id`,`repositories`.`name`'
+        printf ' FROM `binary_packages`'
+        printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+        printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+        printf ' WHERE'
+        printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+          'epoch' "$(printf '%s' "${epoch}" | base64 -w0)" \
+          'pkgver' "$(printf '%s' "${pkgver}" | base64 -w0)" \
+          'pkgrel' "$(printf '%s' "${pkgrel}" | base64 -w0)" \
+          'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)" \
+          'pkgname' "$(printf '%s' "${pkgname}" | base64 -w0)"
+        printf ' `architectures`.`name`=from_base64("%s")' \
+          "$(printf '%s' "${architecture}" | base64 -w0)"
+        printf ' LIMIT 1;\n'
+      } | \
+        ${mysql_command} --raw --batch | \
         sed '
-          p
-          s/$/.sig/
-        ' >> \
-        "${tmp_dir}/to-copy"
+          1d
+          y/\t/ /
+        '
+    )
+    if [ -z "${id}" ]; then
+      continue
+    fi
+    repository="${id#* }"
+    id="${id%% *}"
 
+    printf '%s\n' "${package}" >> \
+      "${tmp_dir}/packages"
+    for suffix in '' '.sig'; do
+      printf 'ln "i686/%s/%s%s" "i686/build-support/%s%s"\n' \
+        "${repository}" \
+        "${package}" \
+        "${suffix}" \
+        "${package}" \
+        "${suffix}"
+    done >> \
+      "${tmp_dir}/sftp-command"
+    printf '%s/i686/%s/%s\n' \
+      "${master_mirror_rsync_directory}" \
+      "${repository}" \
+      "${package}" | \
+      sed '
+        p
+        s/$/.sig/
+      ' >> \
+      "${tmp_dir}/to-copy"
+
+    # shellcheck disable=SC2016
+    {
       printf 'INSERT IGNORE INTO `binary_packages`'
       printf ' (`repository`'
       # shellcheck disable=SC2086
@@ -87,9 +88,9 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
       printf ' WHERE'
       printf ' `binary_packages`.`id`=%s;\n' \
         "${id}"
-    done
-} | \
-  ${mysql_command}
+    } >> \
+      "${tmp_dir}/mysql-command"
+  done
 
 ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/build-support/build-support.db."* \
@@ -116,7 +117,11 @@ ${master_mirror_rsync_command} \
   "${tmp_dir}/build-support.files."* \
   "${master_mirror_rsync_directory}/i686/build-support/"
 
-# TODO: This does not work correctly yet!
+if [ -s "${tmp_dir}/mysql-command" ]; then
+  ${mysql_command} < \
+    "${tmp_dir}/mysql-command"
+fi
+
 if [ -s "${tmp_dir}/packages" ]; then
   while read -r package; do
     remove_old_package_versions 'i686' 'build-support' "${package}"
