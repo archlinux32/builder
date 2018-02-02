@@ -86,7 +86,8 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-# TODO: Should new deletion-list packages be recorded in the database, too?
+# TODO: New deletion-list packages should be recorded in the database,
+# too - including all binary information (especially dependencies!)
 
 # delete_package package
 # mark $package for deletion
