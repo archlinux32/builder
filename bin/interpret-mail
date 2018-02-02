@@ -23,6 +23,9 @@ if [ $# -ne 0 ]; then
   >&2 echo '  - "block: <state-file> <reason>":'
   >&2 echo '    Block the given packge for the given reason.'
   >&2 echo ''
+  >&2 echo '  - "copy-to-build-support: <pkgname>":'
+  >&2 echo '    Copy the given binary package into [build-support].'
+  >&2 echo ''
   >&2 echo '  - "schedule: <pkgbase>":'
   >&2 echo '    Put the given package on the build list (again).'
   >&2 echo ''
@@ -225,4 +228,15 @@ if [ -s "${tmp_dir}/schedule" ]; then
   ) | \
     sponge "${tmp_dir}/schedule"
   log 'Successfully (re)scheduled %s packages.\n' "$(wc -l < "${tmp_dir}/schedule")"
+fi
+
+if [ -s "${tmp_dir}/copy-to-build-support" ]; then
+  sed -i '
+    /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
+  ' "${tmp_dir}/copy-to-build-support"
+  if run_and_log_on_error "${base_dir}/bin/copy-to-build-support" "${tmp_dir}/copy-to-build-support"; then
+    log 'Successfully copied %s packages to [build-support].\n' "$(wc -l < "${tmp_dir}/copy-to-build-support")"
+  else
+    log 'There was an error while copying the packages to [build-support] - ignoring this message.\n'
+  fi
 fi
