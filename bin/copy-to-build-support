@@ -5,20 +5,25 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+if [ "$#" -ne 1 ]; then
+  >&2 echo 'usage:'
+  >&2 echo '  copy-to-build-support package-list'
+  exit 2
+fi
+
 tmp_dir=$(mktemp -d "${work_dir}/tmp.copy-to-build-support.0.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
-printf '%s\n' "$@" | \
-  sed -n '
-    s/.\+/\0 \0/
-    T
-    s/\.pkg\.tar\.xz$//
-    s/\(-[0-9]\+\)\(-[^- ]\+\)$/\1.0\2/
-    s/-\([^-: ]\+\)\(\(-[^- ]\+\)\{2\}\)$/-0:\1\2/
-    s/-\([^-: ]\+\):\([^-: ]\+\)-\([^-. ]\+\).\([^-. ]\+\)-\([^- ]\+\)$/ \1 \2 \3 \4 \5/
-    p
-  ' | \
+sed -n '
+  s/.\+/\0 \0/
+  T
+  s/\.pkg\.tar\.xz$//
+  s/\(-[0-9]\+\)\(-[^- ]\+\)$/\1.0\2/
+  s/-\([^-: ]\+\)\(\(-[^- ]\+\)\{2\}\)$/-0:\1\2/
+  s/-\([^-: ]\+\):\([^-: ]\+\)-\([^-. ]\+\).\([^-. ]\+\)-\([^- ]\+\)$/ \1 \2 \3 \4 \5/
+  p
+' "$1" | \
   while read -r package pkgname epoch pkgver pkgrel sub_pkgrel architecture; do
 
     # shellcheck disable=SC2016
@@ -127,4 +132,9 @@ if [ -s "${tmp_dir}/packages" ]; then
     remove_old_package_versions 'i686' 'build-support' "${package}"
   done < \
     "${tmp_dir}/packages"
+fi
+
+if [ -w "$1" ]; then
+  cat "${tmp_dir}/packages" > \
+    "$1"
 fi
