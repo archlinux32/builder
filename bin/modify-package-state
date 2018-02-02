@@ -241,18 +241,22 @@ while read -r package reason; do
         rm -f "${work_dir}/package-states/${package}.blocked"
       ;;
       'faulty')
-        if [ -f "${work_dir}/package-states/${package}.tested" ]; then
-          mv \
-            "${work_dir}/package-states/${package}.tested" \
-            "${work_dir}/package-states/${package}.testing"
-        fi
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
+          -name '*.tested' \
+          -exec grep -lxF "${package}" '{}' \; | \
+          while read -r sf; do
+            mv "${sf}" "${sf%ed}ing"
+          done
       ;;
       'tested')
-        if [ -f "${work_dir}/package-states/${package}.testing" ]; then
-          mv \
-            "${work_dir}/package-states/${package}.testing" \
-            "${work_dir}/package-states/${package}.tested"
-        fi
+          echo "pkg: ${package}" >&2
+        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
+          -name '*.testing' \
+          -exec grep -lxF "${package}" '{}' \; | \
+          while read -r sf; do
+          echo "sf:  ${sf}" >&2
+            mv "${sf}" "${sf%ing}ed"
+          done
       ;;
       *)
         >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
