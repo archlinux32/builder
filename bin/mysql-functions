@@ -39,7 +39,7 @@ mysql_add_package_source() {
   fi
   uses_upstream=0
   for repo in ${repo_names}; do
-    if eval 'git -C "${repo_paths__'"${values}"'}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null' | \
+    if eval 'git -C "${repo_paths__'"${repo}"'}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null' | \
       tar -t 2>/dev/null | \
       sed 's,-x86_64/,-any/,' | \
       grep -qFx "$1/repos/$4-any/PKGBUILD"; then
