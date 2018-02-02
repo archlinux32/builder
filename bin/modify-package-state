@@ -249,12 +249,10 @@ while read -r package reason; do
           done
       ;;
       'tested')
-          echo "pkg: ${package}" >&2
         find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
           -name '*.testing' \
           -exec grep -lxF "${package}" '{}' \; | \
           while read -r sf; do
-          echo "sf:  ${sf}" >&2
             mv "${sf}" "${sf%ing}ed"
           done
       ;;
