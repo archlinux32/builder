@@ -400,6 +400,9 @@ ls_master_mirror() {
 
 }
 
+# TODO: the actions of remove_old_package_versions should be done
+# on basis of the information in the database and
+
 # remove_old_package_versions $arch $repository $package_file
 
 # removes all older (not-newer) versions of $package_file
