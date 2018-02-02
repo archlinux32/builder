@@ -133,6 +133,23 @@ mod_repo_rev=$(cat "${work_dir}/archlinux32.revision")
     generate_package_metadata "${pkg}" "${repo_rev}" "${mod_repo_rev}" "${prepo}"
   done
 
+# shellcheck disable=SC2016
+{
+  printf 'SELECT '
+  printf '`package_sources`.`%s`,' \
+    'pkgbase' 'git_revision' 'mod_git_revision'
+  printf '`upstream_repositories`.`name`,`binary_packages`.`pkgname`'
+  printf ' FROM `binary_packages`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
+    'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+    'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
+} | \
+  ${mysql_command} --raw --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' > /dev/null # not yet working (the query works, but the entries are missing)
 find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -exec grep -HF '' "{}" \; | \
   sed '
     s|^.*/||
