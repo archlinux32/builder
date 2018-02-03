@@ -123,18 +123,19 @@ clean_up() {
 tmp_dir=$(mktemp -d 'tmp.get-assignment.XXXXXXXXXX' --tmpdir)
 trap clean_up EXIT
 
-# TODO: only hand out package if it is still yet to be built
-
 # if we're building something already, hand it out (again)
 currently_building=$(
   # shellcheck disable=SC2016
   {
     printf 'SELECT '
     mysql_query_select_pkgbase_and_revision
-    printf ' JOIN `build_slaves`'
-    printf ' ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+      'build_slaves'    'build_slaves'    'currently_building' 'build_assignments' \
+      'binary_packages' 'binary_packages' 'build_assignment'   'build_assignments' \
+      'repositories'    'binary_packages' 'repository'         'repositories'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
       "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' AND `repositories`.`name`="build-list"'
     printf ' LIMIT 1;\n'
   } | \
     ${mysql_command} --batch --raw | \
