@@ -447,9 +447,11 @@ fi
       printf '%s' "${slave}" | \
         base64 -w0
     )"
-  printf 'UPDATE `build_slaves` SET'
-  printf ' `build_slaves`.`currently_building`=NULL'
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+  printf 'UPDATE `build_slaves` AS `to_update`'
+  printf ' JOIN `build_slaves` AS `current_slave`'
+  printf ' ON `to_update`.`currently_building`=`current_slave`.`currently_building`'
+  printf ' SET `to_update`.`currently_building`=NULL'
+  printf ' WHERE `current_slave`.`name`=from_base64("%s");\n' \
     "$(
       printf '%s' "${slave}" | \
         base64 -w0
