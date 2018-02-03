@@ -123,6 +123,8 @@ clean_up() {
 tmp_dir=$(mktemp -d 'tmp.get-assignment.XXXXXXXXXX' --tmpdir)
 trap clean_up EXIT
 
+# TODO: only hand out package if it is still yet to be built
+
 # if we're building something already, hand it out (again)
 currently_building=$(
   # shellcheck disable=SC2016
