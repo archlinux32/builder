@@ -584,7 +584,16 @@ if ${web}; then
       printf ';\n'
       printf 'INSERT IGNORE INTO `todos` (`file`,`line`,`description`) '
       printf 'SELECT `td`.`file`,`td`.`line`,`td`.`description` '
-      printf 'FROM `td`;\n'
+      printf 'FROM `td` '
+      printf 'WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `todos`'
+      printf ' AND `td`.`%s`=`todos`.`%s`' \
+        'file' 'file' \
+        'line' 'line' \
+        'description' 'description' | \
+        sed 's/^ AND / WHERE /'
+      printf ');\n'
+
       printf 'DELETE FROM `todos` WHERE NOT EXISTS ('
       printf 'SELECT * FROM `td`'
       printf ' AND `td`.`%s`=`todos`.`%s`' \
