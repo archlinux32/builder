@@ -7,8 +7,6 @@
 
 # TODO: read information from database (?)
 
-# TODO: did/does not correctly report about the number of blocked packages
-
 if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo 'usage: interpret-mail'

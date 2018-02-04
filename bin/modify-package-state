@@ -261,6 +261,7 @@ while read -r package reason; do
         exit 42
       ;;
     esac
+    printf '%s %s\n' "${action}" "${package}"
   fi
 done \
   < "${input_file}" \
