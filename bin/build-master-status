@@ -561,13 +561,13 @@ if ${web}; then
     # insert unfound todos
     # shellcheck disable=SC2016
     {
-      printf 'CREATE TEMPORARY TABLE `td` ('
-      printf '`file` VARCHAR(64), '
-      printf '`line` MEDIUMINT, '
-      printf '`description` VARCHAR(128), '
-      printf 'UNIQUE KEY `position` (`file`,`line`), '
-      printf 'UNIQUE KEY `content` (`file`,`description`)'
-      printf ');'
+      printf 'SHOW CREATE TABLE `todos`' | \
+        ${mysql_command} --raw --batch | \
+        sed '
+          1d
+          2s/^\S\+\s\+CREATE TABLE `todos` /CREATE TEMPORARY TABLE `td` /
+        '
+      printf ';\n'
       printf 'INSERT INTO `td` (`file`,`line`,`description`) VALUES '
       while read -r file line desc; do
         printf '('
