@@ -805,8 +805,21 @@ mysql_repair_binary_packages_without_build_assignment() {
           grep '"pkgname":\s*"'"$(str_to_regex "${pkgname}")"'"' | \
           tr ',' '\n' | \
           grep '"pkgbase":' | \
-          cut -d'"' -f4
+          cut -d'"' -f4 | \
+          sort -u | \
+          head -n1
       )
+      if [ -z "${pkgbase}" ] && \
+        {
+          printf 'SELECT count(*) FROM `package_sources`'
+          printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
+            "$(printf '%s' "${pkgname}" | base64 -w0)"
+        } | \
+          ${mysql_command} --raw --batch | \
+          sed '1d' | \
+          grep -vxF '0'; then
+        pkgbase="${pkgname}"
+      fi
       if [ -z "${pkgbase}" ]; then
         >&2 printf 'Could not find "%s" upstream.\n' "${pkgname}"
         continue
