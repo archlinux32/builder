@@ -817,7 +817,7 @@ mysql_repair_binary_packages_without_build_assignment() {
         } | \
           ${mysql_command} --raw --batch | \
           sed '1d' | \
-          grep -vxF '0'; then
+          grep -qvxF '0'; then
         pkgbase="${pkgname}"
       fi
       if [ -z "${pkgbase}" ]; then
