@@ -19,68 +19,160 @@ case "${action}" in
 
   'build')
 
-    for pkg in "$@"; do
-      {
-        grep "^$(str_to_regex "${pkg}") " "${work_dir}/build-list" || \
-          >&2 printf '"%s" is not on the build list.\n' "${pkg}"
-      } | \
-        while read -r package git_revision mod_git_revision repository; do
-
-          if [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-            printf '"%s" is locked by ' "$1"
-            sort -u < \
-              "${work_dir}/package-states/$1.$2.$3.$4.locked" \
-              sed '
-                :a
-                  $!{
-                    N
-                    s/\n/, /
-                    ba
-                  }
-                s/$/./
-              '
-            continue
-          fi
-          if [ -f "${work_dir}/package-states/$1.$2.$3.$4.blocked" ]; then
-            printf '"%s" is blocked: "' "${pkg}"
-            tr '[:space:]' ' ' < \
-              "${work_dir}/package-states/$1.$2.$3.$4.blocked" | \
-              sed '
-                s|  \+| |
-                s|^ ||
-                s| $||
-              '
-            printf '"\n'
-            continue
-          fi
-
-          unmet_dependencies=$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")
-          if [ -n "${unmet_dependencies}" ]; then
-            printf '"%s" has unmet dependencies:\n' "${package}"
-            echo "${unmet_dependencies}" | \
-              while read -r dep; do
-                grep -lxF "${dep}" "${work_dir}/package-infos/"*".builds" | \
-                  sed '
-                    s|^.*/||
-                    s|\(\.[^.]\+\)\{4\}||
-                  '
-              done | \
-              sort -u
-            printf '\n'
-
-            continue
-          fi
-
-          if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ]; then
-            printf '"%s" is broken (%sx built), but would be built\n' \
-              "${pkg}" \
-              "$(wc -l < "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken")"
-          else
-            printf '"%s" would be built\n' "${pkg}"
-          fi
-        done
-
-    done
+    # shellcheck disable=SC2016
+    {
+      printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64));\n'
+      printf 'INSERT INTO `pkgbases` VALUES '
+      # shellcheck disable=SC2046
+      printf '(from_base64("%s")),' \
+        $(
+          printf '%s\n' "$@" | \
+            base64_encode_each
+        ) | \
+        sed 's/,$/;\n/'
+      # we select everything which is possibly of any interest:
+      # - id (to see if it actually is on the build-list
+      # - to_build.is_broken
+      # - failed_builds_count
+      # - to_build.is_blocked
+      # - deps.pkgbase (any dependency pending?)
+      # - build_slaves.name (is anyone building this?)
+      # - pkgbase
+      printf 'SELECT DISTINCT `to_build`.`ba_id`,'
+      printf 'If(`to_build`.`is_broken`,1,0),'
+      printf '('
+        printf 'SELECT count(*) FROM `failed_builds`'
+        printf 'WHERE `failed_builds`.`build_assignment`=`to_build`.`ba_id`'
+      printf ')'
+      printf ',replace(to_base64(`%s`.`%s`),"\\n","")' \
+        'to_build' 'is_blocked' \
+        'deps' 'pkgbase' \
+        'build_slaves' 'name' \
+        'pkgbases' 'pkgbase'
+      # at least one row for each given `pkgbase`
+      printf ' FROM `pkgbases`'
+      printf ' LEFT JOIN '
+        printf '('
+        # join the tables for the to-be-built packages:
+        # package_source, build_assignment, binary_package, repostory
+        printf 'SELECT DISTINCT `tb_ps`.`pkgbase`,`tb_bin`.`id` AS `bin_id`,`tb_ba`.`id` AS `ba_id`,`tb_ba`.`is_blocked`,`tb_ba`.`is_broken`'
+        printf ' FROM `package_sources` AS `tb_ps`'
+        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+          'build_assignments` AS `tb_ba' 'tb_ba'  'package_source'   'tb_ps' \
+          'binary_packages` AS `tb_bin'  'tb_bin' 'build_assignment' 'tb_ba' \
+          'repositories` AS `tb_rep'     'tb_bin' 'repository'       'tb_rep'
+        printf ' WHERE `tb_rep`.`name`="build-list"'
+        printf ') AS `to_build`'
+      printf ' ON `to_build`.`pkgbase`=`pkgbases`.`pkgbase`'
+      printf ' LEFT JOIN '
+        printf '('
+        # same join as above, but with different names - for the
+        # potential dependencies
+        printf 'SELECT DISTINCT `dep_ps`.`pkgbase`,`dependencies`.`dependent`'
+        printf ' FROM `package_sources` AS `dep_ps`'
+        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+          'build_assignments` AS `dep_ba' 'dep_ba'                   'package_source'   'dep_ps' \
+          'binary_packages` AS `dep_bin'  'dep_bin'                  'build_assignment' 'dep_ba' \
+          'repositories` AS `dep_rep'     'dep_bin'                  'repository'       'dep_rep' \
+          'install_target_providers'      'install_target_providers' 'package'          'dep_bin'
+        # starting from the line above, we have some additional joins,
+        # because we are interested in dependency relations to `to_build`
+        printf ' JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+          'dependency_types' 'dependencies' 'dependency_type' 'dependency_types'
+        printf ' WHERE `dep_rep`.`name`="build-list"'
+        printf ' AND `dependency_types`.`relevant_for_building`'
+        printf ') AS `deps`'
+      printf ' ON `deps`.`dependent`=`to_build`.`bin_id`'
+      # now we join with build slaves to see if someone builds this
+      printf ' LEFT JOIN `build_slaves` ON `build_slaves`.`currently_building`=`to_build`.`ba_id`'
+      printf ';\n'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '
+        1d
+        y/\t/ /
+      ' | \
+      sort -k7,7 -k6,6 -k5,5 | \
+      sed '
+        / NULL \S\+$/ b multi-dep
+        :multi-slave
+          $!N
+          s/^\(\(\S\+ \)\{5\}\)\(\S\+\)\( \S\+\)\n\(\S\+ \)\{5\}\(\S\+\)\4/\1\3,\6\4/
+          t multi-slave
+          P
+          D
+        :multi-dep
+          / NULL\( \S\+\)\{3\}$/! b
+          $!N
+          s/^\(\(\S\+ \)\{4\}\)\(\S\+\)\(\( \S\+\)\{2\}\)\n\(\S\+ \)\{4\}\(\S\+\)\4/\1\3,\7\4/
+          t multi-dep
+          P
+          D
+      ' | \
+      sed '
+        s/NULL,//g
+      ' | \
+      while read -r id is_broken trials is_blocked dependency slave pkgbase; do
+#      printf '"%s" ' "$id" "$is_broken" "$trials" "$is_blocked" "$dependency" "$slave" "$pkgbase" >&2
+#      printf '\n' >&2
+        pkgbase=$(
+          printf '%s' "${pkgbase}" | \
+            base64 -d
+        )
+        if [ "${id}" = 'NULL' ]; then
+          >&2 printf '"%s" is not on the build list.\n' \
+            "${pkgbase}"
+          continue
+        fi
+        if [ "${slave}" != 'NULL' ]; then
+          # beware: A slave named "5BË" will look exactly like this!
+          printf '"%s" is locked by %s.\n' \
+            "${pkgbase}" \
+            "$(
+              printf '%s\n' "${slave}" | \
+                tr ',' '\n' | \
+                while read -r line; do
+                  printf '%s\n' "${line}" | \
+                    base64 -d
+                  printf ','
+                done | \
+                sed 's/,$//'
+            )"
+          continue
+        fi
+        if [ "${is_blocked}" != 'NULL' ]; then
+          # beware: A block-reason "5BË" will look exactly like this!
+          printf '"%s" is blocked: "%s".\n' \
+            "${pkgbase}" \
+            "$(
+              printf '%s' "${is_blocked}" | \
+                base64 -d
+            )"
+          continue
+        fi
+        if [ "${dependency}" != 'NULL' ]; then
+          printf '"%s" has unmet dependencies:\n' \
+            "${pkgbase}"
+          printf '%s\n' "${dependency}" | \
+            tr ',' '\n' | \
+            while read -r line; do
+              printf '  '
+              printf '%s\n' "${line}" | \
+                base64 -d
+              printf '\n'
+            done
+          continue
+        fi
+        if [ "${is_broken}" = '1' ]; then
+          printf '"%s" is broken (%sx built), but would be built.\n' \
+            "${pkgbase}" \
+            "${trials}"
+          continue
+        fi
+        printf '"%s" would be built.\n' \
+          "${pkgbase}"
+      done
 
   ;;
 
