@@ -474,8 +474,10 @@ while [ -n "${black_listed_new}" ]; do
 done
 echo "${black_listed}" | \
   while read -r package; do
-    [ -n "${package}" ] && \
-      delete_package "${package}"
+    if [ -z "${package}" ]; then
+      continue
+    fi
+    delete_package "${package}"
   done
 
 sort -u "${work_dir}/deletion-list.new" | \
