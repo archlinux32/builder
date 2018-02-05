@@ -587,3 +587,5 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
   } | \
     ${mysql_command}
 fi
+
+mysql_repair_binary_packages_without_build_assignment
