@@ -49,17 +49,38 @@ trap clean_up_lock_file EXIT
 if [ "$5" = 'ERROR' ]; then
 # the build failed on the build slave
 
-  if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
-    ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-    >&2 echo 'Too late, package already outdated, I ignore this error report.'
+  # shellcheck disable=SC2016
+  infos=$(
+    {
+      printf 'SELECT DISTINCT `build_assignments`.`id`,IF(`build_assignments`.`is_broken`,"true","false") FROM `build_slaves`'
+      printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+        'build_assignments'     'build_assignments'     'build_slaves'      'currently_building' \
+        'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+        'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository' \
+        'binary_packages'       'build_assignments'     'binary_packages'   'build_assignment' \
+        'repositories'          'repositories'          'binary_packages'   'repository'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+        "$(
+          # shellcheck disable=SC2154
+          printf '%s' "${slave}" | \
+            base64 -w0
+        )"
+      printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+        'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+        'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+        'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+      printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+        "$(printf '%s' "$4" | base64 -w0)"
+      printf ' AND `repositories`.`name`="build-list"'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '1d'
+  )
+  if [ -z "${infos}" ]; then
+    >&2 echo 'You do not build this package (anymore) - move on.'
     exit 2
   fi
-
-  # shellcheck disable=SC2154
-  if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
-    >&2 echo 'You do not build this package - move on.'
-    exit 2
-  fi
+  was_broken_before="${infos##* }"
 
   # save sent build logs
   saved_build_logs=$(
@@ -70,12 +91,6 @@ if [ "$5" = 'ERROR' ]; then
       --transform="s|^|$1.$2.$3.$4.|" \
       '*.build-log.gz'
   )
-
-  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
-    was_broken_before=true
-  else
-    was_broken_before=false
-  fi
 
   # shellcheck disable=SC2154
   echo "${slave}" >> \
