@@ -125,7 +125,14 @@ if [ ! "$1" = 'slim' ]; then
       ' build_assignment BIGINT :build_assignments' \
       ' date DATETIME' \
       ' reason SMALLINT :fail_reasons' \
-      ' log_file VARCHAR(512)'
+      ' log_file VARCHAR(512)' \
+      'todos MEDIUMINT' \
+      ' file VARCHAR(64)' \
+      ' line MEDIUMINT' \
+      ' description VARCHAR(512)'
+      'todo_links MEDIUMINT' \
+      ' dependent MEDIUMINT' \
+      ' depending_on MEDIUMINT'
   )
 
   {
