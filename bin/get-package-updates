@@ -86,8 +86,12 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-# TODO: New deletion-list packages should be recorded in the database,
-# too - including all binary information (especially dependencies!)
+# TODO: How should new deletion-list packages be handled?
+# - packages deleted upstream should be marked as to-be-deleted if
+#   existent and otherwise be ignored
+# - packages deleted due to black listing should be marked as black
+#   listed - and thus as to-be-deleted, but they should remain in the
+#   database after deletion!
 
 # delete_package package
 # mark $package for deletion
