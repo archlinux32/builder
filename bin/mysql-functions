@@ -194,7 +194,7 @@ mysql_add_install_target() {
 # mysql_generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
 # if sub_pkgrel should be determined automatically and the package is on the build-list
 # and
-# mysql_generate_package_metadata $sub_pkgrel $package $current_repository $git_revision $mod_git_revision $repository
+# mysql_generate_package_metadata $sub_pkgrel $current_repository $package $git_revision $mod_git_revision $repository
 # or
 # mysql_generate_package_metadata $sub_pkgrel $current_repository $package.$git_revision.$mod_git_revision.$repository
 # if $sub_pkgrel should be forced and the package is currently in $current_repository
