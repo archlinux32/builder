@@ -90,10 +90,11 @@ mysql_add_binary_package() {
   {
     printf 'INSERT IGNORE INTO binary_packages'
     printf ' ('
-    printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture'
+    printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture' 'has_issues' 'is_tested' 'is_to_be_deleted'
     printf ') SELECT'
     printf ' from_base64("%s"), ' "${sub_pkgrel}" "${pkgname}"
     printf ' `%s`.`id`,' 'package_sources' 'repositories' 'architectures'
+    printf ' 0, 0, 0'
     printf ' FROM'
     printf ' `%s` JOIN' 'package_sources' 'repositories' 'architectures'
     printf ' `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
@@ -470,7 +471,8 @@ mysql_generate_package_metadata() {
             'pkgname' \
             'sub_pkgrel' \
             'has_issues' \
-            'is_tested'
+            'is_tested' \
+            'is_to_be_deleted'
           printf ') SELECT '
           printf '`%s`.`id`,' \
             'build_assignments' \
@@ -481,7 +483,7 @@ mysql_generate_package_metadata() {
             "${pkgver}" \
             "${pkgrel}" \
             "${pkgname}"
-          printf '%s,0,0 FROM' \
+          printf '%s,0,0,0 FROM' \
             "${sub_pkgrel}"
           printf ' `%s` JOIN' \
             'repositories' \

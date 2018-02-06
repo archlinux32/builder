@@ -61,6 +61,7 @@ if [ ! "$1" = 'slim' ]; then
       ' sub_pkgrel MEDIUMINT' \
       ' has_issues BIT' \
       ' is_tested BIT' \
+      ' is_to_be_deleted BIT' \
       ' pkgname VARCHAR(64)' \
       ' architecture SMALLINT :architectures' \
       ' UNIQUE content build_assignment sub_pkgrel pkgname architecture repository' \
@@ -562,7 +563,7 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
       s/,$/;/
     ' "${tmp_dir}/new-stable-packages"
     # shellcheck disable=SC2016
-    printf 'INSERT IGNORE INTO `binary_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`,`build_assignment`,`has_issues`,`is_tested`)'
+    printf 'INSERT IGNORE INTO `binary_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`,`build_assignment`,`has_issues`,`is_tested`,`is_to_be_deleted`)'
     printf ' SELECT '
     # shellcheck disable=SC2016
     printf '`stable_packages`.`%s`,' \
@@ -576,7 +577,7 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
       'architectures' \
       'repositories'
     # shellcheck disable=SC2016
-    printf -- '-`build_assignment`,0,1 FROM `stable_packages`'
+    printf -- '-`build_assignment`,0,1,0 FROM `stable_packages`'
     # shellcheck disable=SC2016
     printf ' JOIN `%s` ON `stable_packages`.`%s`=`%s`.`name`' \
       'repositories' 'repository' 'repositories' \
