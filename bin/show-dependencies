@@ -32,12 +32,14 @@ if [ $# -eq 0 ]; then
       'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
       'package_sources'   'package_sources'   'build_assignments' 'package_source'
     printf ' ORDER BY `binary_packages`.`pkgname`'
+    # Why can't mysql order in the same way "sort" does!
   } | \
     ${mysql_command} --raw --batch | \
     sed '
       1d
       y/\t/ /
-    ' > \
+    ' | \
+    sort -k2,2 > \
     "${tmp_dir}/builds"
   while ! [ "${new_sum}" = "${sum}" ]; do
     sum="${new_sum}"
