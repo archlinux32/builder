@@ -12,20 +12,19 @@ if ($mysql->connect_error) {
 }
 
 $result = $mysql -> query(
-  "SELECT DISTINCT " .
+  "SELECT " .
   "`repositories`.`name` AS `repo`," .
-  "`is_there`.`pkgname`," .
-  "`is_there`.`epoch`," .
-  "`is_there`.`pkgver`," .
-  "`is_there`.`pkgrel`," .
-  "`is_there`.`sub_pkgrel`," .
+  "`binary_packages`.`pkgname`," .
+  "`binary_packages`.`epoch`," .
+  "`binary_packages`.`pkgver`," .
+  "`binary_packages`.`pkgrel`," .
+  "`binary_packages`.`sub_pkgrel`," .
   "`architectures`.`name` AS `arch` " .
-  "FROM `binary_packages`AS `is_there` " .
-  "JOIN `binary_packages` AS `to_delete` ON `to_delete`.`pkgname`=`is_there`.`pkgname` " .
-  "JOIN `architectures` ON `is_there`.`architecture`=`architectures`.`id` " .
-  "JOIN `repositories` ON `is_there`.`repository`=`repositories`.`id` " .
-  "WHERE `to_delete`.`repository`=10 " .
-  "AND NOT `is_there`.`repository` IN (4,9,10)"
+  "FROM `binary_packages` " .
+  "JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id` " .
+  "JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id` " .
+  "WHERE `binary_packages`.`is_to_be_deleted` " .
+  "AND NOT `repositories`.`name` IN (\"build-support\",\"build-list\",\"deletion-list\")"
 );
 if ($result -> num_rows > 0) {
 
