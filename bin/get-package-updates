@@ -13,6 +13,9 @@
 
 # TODO: read information from database
 
+# TODO: correctly handle if pkgbase of a split package is renamed, e.g.:
+# $a -> ($a,$b)  ==>  $b -> ($a,$b)
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
