@@ -74,7 +74,10 @@ if [ "$5" = 'ERROR' ]; then
       printf ' AND `repositories`.`name`="build-list"'
     } | \
       ${mysql_command} --raw --batch | \
-      sed '1d'
+      sed '
+        1d
+        y/\t/ /
+      '
   )
   if [ -z "${infos}" ]; then
     >&2 echo 'You do not build this package (anymore) - move on.'
