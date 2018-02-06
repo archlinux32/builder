@@ -3,11 +3,12 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-if [ "${SSH_ORIGINAL_COMMAND%% *}" = "get-assignment" ] || \
-  [ "${SSH_ORIGINAL_COMMAND%% *}" = "return-assignment" ]; then
+if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
+  [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xreturn-assignment' ] || \
+  [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xping-from-slave' ]; then
 
   # small check to prevent some shell-injections
-  if echo "${SSH_ORIGINAL_COMMAND}" | \
+  if printf '%s\n' "${SSH_ORIGINAL_COMMAND}" | \
     grep -q '[^-a-zA-Z0-9.+_ ]'; then
 
     >&2 printf 'Invalid command: "%s".\n' "${SSH_ORIGINAL_COMMAND}"

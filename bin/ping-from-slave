@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# should be called periodically on the build-master from the slaves to
+#  - report any update on the build process
+#  - show that the build is still running
+#  - get notified by the build master if the build is not necessary anymore
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# TODO: acutally do something here :-)
