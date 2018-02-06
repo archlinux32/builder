@@ -110,7 +110,7 @@ delete_package() {
       'build_assignments' 'build_assignments' 'build_assignment'
     printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
       'package_sources' 'package_sources' 'build_assignments' 'package_source'
-    printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
+    printf ' SET `binary_packages`.`is_to_be_deleted`=1'
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND `package_sources`.`pkgbase`=from_base64("%s");' \
       "$(printf '%s' "$1" | base64 -w0)"
