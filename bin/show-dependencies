@@ -218,7 +218,7 @@ for target_package in "$@"; do
       sed 's|\(\.[^.]\+\)\{4\}$||' | \
       sort -u | \
       tee "${tmp_dir}/done-packages" | \
-      sed 's|^|0 staging-package |' > \
+      xargs -r printf '4 staging-package %s\n' > \
       "${tmp_dir}/knots"
 
     {
@@ -357,7 +357,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '4 deletion-list-package %s\n' >> \
+    xargs -r printf '5 deletion-list-package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -369,7 +369,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '5 split-package %s\n' >> \
+    xargs -r printf '6 split-package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -380,7 +380,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '6 package %s\n' >> \
+    xargs -r printf '7 package %s\n' >> \
     "${tmp_dir}/knots"
 
   {
@@ -392,7 +392,7 @@ for target_package in "$@"; do
   } | \
     sort | \
     uniq -d | \
-    xargs -r printf '7 group %s\n' >> \
+    xargs -r printf '8 group %s\n' >> \
     "${tmp_dir}/knots"
 
   tr ' ' '\n' < \
