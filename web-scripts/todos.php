@@ -48,9 +48,12 @@ if ($result -> num_rows > 0) {
     $edges=$edges . "\"" . $link["depending_on"] . "\" -> \"" . $link["dependent"] . "\";\n";
 }
 
+$knots = str_replace("\$","\\\$",$knots);
+$edges = str_replace("\$","\\\$",$edges);
+
 header ("Content-type: image/png");
 passthru(
-  "dot -Tpng -o/dev/stdout /dev/stdin <<EOF\n".
+  "dot -Tpng -o/dev/stdout /dev/stdin <<EOF\n" .
   "digraph dependencies {\n" .
   "rankdir=LR;\n" .
   "fontname=dejavu;\n" .
