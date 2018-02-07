@@ -180,12 +180,15 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   ' | \
   sort -u > \
   "${tmp_dir}/build-dependencies.mysql"
-find "${work_dir}/package-infos" -name '*.build-depends' \
-  -exec grep -HF '' {} \; | \
-  sed '
-    s,^.*/,,
-    s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.:]\+\)\.build-depends:\([^:]\+\)$/ \1 \2 \3 \4/
-  ' | \
+{
+  cat "${tmp_dir}/build-dependencies.mysql"
+  find "${work_dir}/package-infos" -name '*.build-depends' \
+    -exec grep -HF '' {} \; | \
+    sed '
+      s,^.*/,,
+      s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.:]\+\)\.build-depends:\([^:]\+\)$/ \1 \2 \3 \4/
+    '
+} | \
   sort -u > \
   "${tmp_dir}/build-dependencies.file"
 
