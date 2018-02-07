@@ -12,7 +12,10 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 # always block if locked
 exec 9> "${build_list_lock_file}"
-flock -s 9
+if ! flock -n -s 9; then
+  >&2 echo 'Mysql-Sanity check skipped, cannot acquire lock.'
+  exit
+fi
 
 # shellcheck disable=SC2016
 {
