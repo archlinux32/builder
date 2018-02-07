@@ -151,6 +151,41 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   sort -u > \
   "${tmp_dir}/testing.file"
 
+# shellcheck disable=SC2016
+{
+  printf 'SELECT '
+  printf '`package_sources`.`%s`,' \
+    'pkgbase' \
+    'git_revision' \
+    'mod_git_revision'
+  printf '`upstream_repositories`.`name`,`install_targets`.`name`'
+  printf ' FROM `binary_packages`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'dependencies'     'binary_packages'  'dependencies' 'dependent' \
+    'dependency_types' 'dependency_types' 'dependencies' 'dependency_type'
+  printf ' AND `dependency_types`.`relevant_for_building`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'install_targets'       'install_targets'       'dependencies'      'depending_on' \
+    'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
+    'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+    'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
+} | \
+  ${mysql_command} --raw --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' | \
+  sort -u > \
+  "${tmp_dir}/build-dependencies.mysql"
+find "${work_dir}/package-infos" -name '*.build-depends' \
+  -exec grep -HF '' {} \; | \
+  sed '
+    s,^.*/,,
+    s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.:]\+\)\.build-depends:\([^:]\+\)$/ \1 \2 \3 \4/
+  ' | \
+  sort -u > \
+  "${tmp_dir}/build-dependencies.file"
+
 {
   mysql_sanity_check || true
   diff -u \
@@ -172,6 +207,10 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   diff -u \
     "${tmp_dir}/testing.file" \
     "${tmp_dir}/testing.mysql" || \
+    true
+  diff -u \
+    "${tmp_dir}/build-dependencies.file" \
+    "${tmp_dir}/build-dependencies.mysql" || \
     true
 } | \
   sed '
