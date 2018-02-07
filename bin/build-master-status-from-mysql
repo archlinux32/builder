@@ -10,6 +10,10 @@
 tmp_dir=$(mktemp -d 'tmp.build-master-status-from-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+# always block if locked
+exec 9> "${build_list_lock_file}"
+flock -s 9
+
 # shellcheck disable=SC2016
 {
   printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
