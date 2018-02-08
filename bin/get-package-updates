@@ -323,6 +323,18 @@ done | \
               base64 -w0
           )"
         printf ' AND (`repositories`.`name`="build-list" OR `repositories`.`name`="deletion-list");\n'
+        # remove is-to-be-deleted marker from old binary packages
+        printf 'UPDATE `binary_packages`'
+        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+          'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
+          'package_sources'   'package_sources'   'build_assignments' 'package_source' \
+          'repositories'      'repositories'      'binary_packages'   'repository'
+        printf ' SET `is_to_be_deleted`=0'
+        printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")\;' \
+          "$(
+            printf '%s' "${package}" | \
+              base64 -w0
+          )"
       } | \
         ${mysql_command}
       mysql_generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
