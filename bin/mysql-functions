@@ -896,3 +896,39 @@ mysql_repair_binary_packages_without_build_assignment() {
     done | \
     ${mysql_command}
 }
+
+# mysql_remove_duplicate_build_order
+# remove _all_ build orders which just increase sub_pkgrel of another package
+# (this may undo "seed-build-list" effects)
+mysql_remove_duplicate_build_order() {
+  {
+    printf 'CREATE TEMPORARY TABLE `ren` (`old` BIGINT, `new` BIGINT);\n'
+    printf 'INSERT INTO `ren` (`old`,`new`)'
+    printf ' SELECT `old`.`id`,`new`.`id`'
+    printf ' FROM `binary_packages` as `old`'
+    printf ' JOIN `binary_packages` as `new` ON'
+    printf ' `old`.`%s`=`new`.`%s` AND' \
+      'pkgname' 'pkgname' \
+      'epoch' 'epoch' \
+      'pkgver' 'pkgver' \
+      'pkgrel' 'pkgrel'
+    printf ' `old`.`sub_pkgrel`+1=`new`.`sub_pkgrel`'
+    printf ' JOIN `repositories` AS `%s` ON `%s`.`id`=`%s`.`repository`' \
+      'orep' 'orep' 'old' \
+      'nrep' 'nrep' 'new'
+    printf ' WHERE `orep`.`name`!="build-list"'
+    printf ' AND `nrep`.`name`="build-list";\n'
+    printf 'UPDATE IGNORE `dependencies`'
+    printf ' JOIN `ren` ON `ren`.`old`=`dependencies`.`dependent`'
+    printf ' SET `dependencies`.`dependent`=`ren`.`new`;\n'
+    printf 'UPDATE IGNORE `install_target_providers`'
+    printf ' JOIN `ren` ON `ren`.`old`=`install_target_providers`.`package`'
+    printf ' SET `install_target_providers`.`package`=`ren`.`new`;\n'
+    printf 'DELETE FROM `binary_packages`'
+    printf ' WHERE EXISTS ('
+      printf 'SELECT * FROM `ren`'
+      printf ' WHERE `ren`.`old`=`binary_packages`.`id`'
+    printf ');\n'
+  } | \
+    ${mysql_command}
+}
