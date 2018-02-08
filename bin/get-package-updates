@@ -330,7 +330,7 @@ done | \
           'package_sources'   'package_sources'   'build_assignments' 'package_source' \
           'repositories'      'repositories'      'binary_packages'   'repository'
         printf ' SET `is_to_be_deleted`=0'
-        printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")\;' \
+        printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");\n' \
           "$(
             printf '%s' "${package}" | \
               base64 -w0
