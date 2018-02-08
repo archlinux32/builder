@@ -367,18 +367,21 @@ echo 'apply blacklisting'
 black_listed=''
 black_listed_new=$(
   {
-    git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision.new")" -- 'blacklist' | \
-      tar -Ox 'blacklist' | \
-      sed '
-        s/\s*#.*$//
-        /^\s*$/d
-      '
-    if [ -n "${test_exclusion}" ]; then
-      echo "${test_exclusion}"
-    fi
+    {
+      git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision.new")" -- 'blacklist' | \
+        tar -Ox 'blacklist' | \
+        sed '
+          s/\s*#.*$//
+          /^\s*$/d
+        '
+      if [ -n "${test_exclusion}" ]; then
+        echo "${test_exclusion}"
+      fi
+    } | \
+      base64_encode_each
     # shellcheck disable=SC2016
     {
-      printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
+      printf 'SELECT DISTINCT replace(to_base64(`package_sources`.`pkgbase`),"\\n","")'
       printf ' FROM `package_sources`'
       printf ' WHERE `package_sources`.`pkgbase` LIKE "lib32-%%"'
     } | \
@@ -388,120 +391,91 @@ black_listed_new=$(
     sort -u
 )
 
-find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' -printf '%f\n' | \
-  grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+\.builds$' | \
-  sed '
-    s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$|\2 \3 \4 \1|
-  ' | \
-  sort -u | \
-  sort -k4,4 > \
-  "${tmp_dir}/packages"
-
-{
-  uniq -f3 -u "${tmp_dir}/packages" | \
-    awk '{print $4 " " $4 "." $1 "." $2 "." $3}'
-  uniq -f3 -D "${tmp_dir}/packages" | \
-    uniq -f3 --group=append | \
-    while read -r rev mod_rev repo pkg; do
-      if [ -z "${rev}" ] && \
-        [ -z "${mod_rev}" ] && \
-        [ -z "${repo}" ] && \
-        [ -z "${pkg}" ]; then
-        # shellcheck disable=SC2031
-        printf '%s %s.%s.%s.%s\n' \
-          "${opkg}" \
-          "${opkg}" \
-          "$(
-            # shellcheck disable=SC2086
-            printf '%s\n' ${revs} | \
-              sort -u | \
-              find_newest_of_git_revisions
-          )" \
-          "$(
-            # shellcheck disable=SC2086
-            printf '%s\n' ${mod_revs} | \
-              sort -u | \
-              find_newest_of_git_revisions
-          )" \
-          "${orepo}" | \
-          grep '\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+$'
-        revs=''
-        mod_revs=''
-        continue
-      fi
-      revs=$(
-        printf '%s\n' \
-          ${revs} \
-          "${rev}"
-      )
-      mod_revs=$(
-        printf '%s\n' \
-          ${mod_revs} \
-          "${mod_rev}"
-      )
-      opkg="${pkg}"
-      orepo="${repo}"
-    done
-} | \
-  sort -k1,1 > \
-  "${tmp_dir}/newest-revisions"
-
-sed '
-  s|^\S\+ |'"${work_dir}"'/package-infos/|
-  s|$|.builds|
-' "${tmp_dir}/newest-revisions" | \
-  xargs -r cat | \
-  sort | \
-  uniq -c > \
-  "${work_dir}/built-packages"
-
-sed '
-  s|^\S\+ |'"${work_dir}"'/package-infos/|
-  s|$|.build-depends|
-' "${tmp_dir}/newest-revisions" | \
-  xargs -r grep -HF '' | \
-  sed '
-    s|\(\.[^.]\+\)\{4\}:\([^:]\+\)$| \2|
-    s|^.*/||
-  ' | \
-  sort -k2,2 > \
-  "${work_dir}/newest-dependencies"
-
 while [ -n "${black_listed_new}" ]; do
   black_listed=$(
-    # shellcheck disable=SC2086
-    printf '%s\n' ${black_listed} ${black_listed_new} | \
+    printf '%s\n' "${black_listed}" "${black_listed_new}" | \
+      grep -vxF '' | \
       sort -u
   )
   black_listed_new=$(
     {
-      # shellcheck disable=SC2086
-      printf '%s\n' ${black_listed} | \
-        sort -k1,1 | \
-        join -j1 -o 2.2 - "${tmp_dir}/newest-revisions" | \
-        sed '
-          s|^|'"${work_dir}"'/package-infos/|
-          s|$|.builds|
-        ' | \
-        xargs -r cat | \
-        sort | \
-        uniq -c
-      cat "${work_dir}/built-packages"
+      printf '%s\n' "${black_listed}" "${black_listed}"
+
+      # shellcheck disable=SC2016
+      {
+        printf 'CREATE TEMPORARY TABLE `bl` (`pkgbase` VARCHAR(64));\n'
+        printf 'INSERT INTO `bl` (`pkgbase`) VALUES '
+        printf '(from_base64("%s")),\n' "${black_listed}" | \
+          sort -u | \
+          sed '
+            $ s/,$/;/
+          '
+        printf 'SELECT replace(to_base64(`a_ps`.`pkgbase`),"\\n","")'
+        printf ' FROM `package_sources` AS `a_ps`'
+        printf ' JOIN `build_assignments` AS `a_ba` ON `a_ba`.`package_source`=`a_ps`.`id`'
+        printf ' JOIN `binary_packages` AS `a_bp` ON `a_bp`.`build_assignment`=`a_ba`.`id`'
+        printf ' JOIN `dependencies` ON `dependencies`.`dependent`=`a_bp`.`id`'
+        printf ' WHERE NOT EXISTS ('
+          printf ' SELECT *'
+          printf ' FROM `install_target_providers`'
+          printf ' WHERE NOT EXISTS ('
+            printf ' SELECT *'
+            printf ' FROM `bl`'
+            printf ' JOIN `package_sources` AS `b_ps` ON `bl`.`pkgbase`=`b_ps`.`pkgbase`'
+            printf ' JOIN `build_assignments` AS `b_ba` ON `b_ba`.`package_source`=`b_ps`.`id`'
+            printf ' JOIN `binary_packages` AS `b_bp` ON `b_bp`.`build_assignment`=`b_ba`.`id`'
+            printf ' WHERE `install_target_providers`.`package`=`b_bp`.`id`'
+            printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+          printf ')'
+        printf ');\n'
+      } | \
+        ${mysql_command} --raw --batch | \
+        sed '1d' | \
+        sort -u
     } | \
-      sort | \
-      uniq -d | \
-      awk '{print $2}' | \
-      sort -k1,1 | \
-      join -1 1 -2 2 -o 2.1 - "${work_dir}/newest-dependencies" | \
-      sort -u
-  )
-  black_listed_new=$(
-    # shellcheck disable=SC2086
-    printf '%s\n' ${black_listed} ${black_listed} ${black_listed_new} | \
+      grep -vxF '' | \
       sort | \
       uniq -u
   )
 done
+
+black_listed=$(
+  printf '%s\n' "${black_listed}" | \
+  while read -r line; do
+    printf '%s' \
+      "${line}" | \
+       base64 -d
+    printf '\n'
+  done
+)
+
+deletion_list_count=$(
+  # shellcheck disable=SC2086
+  printf '%s\n' ${black_listed} | \
+    wc -l
+)
+if [ "${deletion_list_count}" -gt 1000 ]; then
+  >&2 printf 'There are %s > 1000 packages on the deletion-list. This does not seem right.\n' \
+    "${deletion_list_count}"
+  if [ ! -s "${work_dir}/told-irc-about-too-many-deletion-list-packages" ]; then
+    {
+      printf '\001ACTION refuses to blacklist %s packages.\001\n' "${deletion_list_count}"
+      for repo_name in ${repo_names}; do
+        if ! diff -q "${work_dir}/${repo_name}.revision" "${work_dir}/${repo_name}.revision.new" >/dev/null; then
+          printf '%s: %s -> %s\n' \
+            "${repo_name}" \
+            "$(cat "${work_dir}/${repo_name}.revision")" \
+            "$(cat "${work_dir}/${repo_name}.revision.new")"
+        fi
+      done
+    } | \
+      tee "${work_dir}/told-irc-about-too-many-deletion-list-packages" | \
+      sponge "${irc_dir}/#archlinux-ports/in"
+  fi
+  exit 3
+fi
+rm -f "${work_dir}/told-irc-about-too-many-deletion-list-packages"
+
 echo "${black_listed}" | \
   while read -r package; do
     if [ -z "${package}" ]; then
@@ -598,32 +572,6 @@ fi
 
 # update loop list in database
 mysql_find_build_assignment_loops
-
-deletion_list_count=$(
-  wc -l < \
-    "${work_dir}/deletion-list.new"
-)
-if [ "${deletion_list_count}" -gt 1000 ]; then
-  >&2 printf 'There are %s > 1000 packages on the deletion-list. This does not seem right.\n' \
-    "${deletion_list_count}"
-  if [ ! -s "${work_dir}/told-irc-about-too-many-deletion-list-packages" ]; then
-    {
-      printf '\001ACTION refuses to blacklist %s packages.\001\n' "${deletion_list_count}"
-      for repo_name in ${repo_names}; do
-        if ! diff -q "${work_dir}/${repo_name}.revision" "${work_dir}/${repo_name}.revision.new" >/dev/null; then
-          printf '%s: %s -> %s\n' \
-            "${repo_name}" \
-            "$(cat "${work_dir}/${repo_name}.revision")" \
-            "$(cat "${work_dir}/${repo_name}.revision.new")"
-        fi
-      done
-    } | \
-      tee "${work_dir}/told-irc-about-too-many-deletion-list-packages" | \
-      sponge "${irc_dir}/#archlinux-ports/in"
-  fi
-  exit 3
-fi
-rm -f "${work_dir}/told-irc-about-too-many-deletion-list-packages"
 
 # Move the .new-files to the actual files
 
