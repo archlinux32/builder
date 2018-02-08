@@ -623,18 +623,28 @@ mysql_generate_package_metadata() {
 
 mysql_sanity_check() {
   {
-    printf 'SELECT `binary_packages`.`pkgname`'
+    printf 'SELECT CONCAT("\\"any\\" build-assignment building \\"",`bp_arch`.`name`,"\\" binary package: ",`binary_packages`.`pkgname`)'
     printf ' FROM `binary_packages`'
     printf ' JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
     printf ' JOIN `architectures` as `bp_arch` ON `binary_packages`.`architecture`=`bp_arch`.`id`'
     printf ' JOIN `architectures` as `ba_arch` ON `build_assignments`.`architecture`=`ba_arch`.`id`'
     printf ' WHERE `bp_arch`.`name`!="any"'
-    printf ' AND `ba_arch`.`name`="any"'
+    printf ' AND `ba_arch`.`name`="any";\n'
+    printf 'SELECT DISTINCT CONCAT("package multiple times on build list: ",`a`.`pkgname`)'
+    printf ' FROM `binary_packages` AS `a`'
+    printf ' JOIN `binary_packages` AS `b`'
+    printf ' ON `a`.`pkgname`=`b`.`pkgname`'
+    printf ' AND `a`.`repository`=`b`.`repository`'
+    printf ' AND `a`.`id`!=`b`.`id`'
+    printf ' JOIN `repositories`'
+    printf ' ON `a`.`repository`=`repositories`.`id`'
+    printf ' WHERE `repositories`.`name`="build-list";\n'
   } | \
     ${mysql_command} --raw --batch | \
     sed '
-      1d
-      s/^/"any"-build assignment building non-"any" binary package: /
+      /^CONCAT("/d
+      s,^,<font color="#FF0000">,
+      s,$,</font>,
     '
   ( # new shell is intentional
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_sanity_check.XXXXXXXXXX' --tmpdir)
