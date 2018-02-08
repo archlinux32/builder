@@ -622,6 +622,20 @@ mysql_generate_package_metadata() {
 # do a sanity check on the mysql database
 
 mysql_sanity_check() {
+  {
+    printf 'SELECT `binary_packages`.`pkgname`'
+    printf ' FROM `binary_packages`'
+    printf ' JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+    printf ' JOIN `architectures` as `bp_arch` ON `binary_packages`.`architecture`=`bp_arch`.`id`'
+    printf ' JOIN `architectures` as `ba_arch` ON `build_assignments`.`architecture`=`ba_arch`.`id`'
+    printf ' WHERE `bp_arch`.`name`!="any"'
+    printf ' AND `ba_arch`.`name`="any"'
+  } | \
+    ${mysql_command} --raw --batch | \
+    sed '
+      1d
+      s/^/"any"-build assignment building non-"any" binary package: /
+    '
   ( # new shell is intentional
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_sanity_check.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
@@ -712,6 +726,35 @@ mysql_find_build_assignment_loops() {
 # clean up left overs from mysql database
 mysql_cleanup() {
   {
+    # remove dependencies w/o binary_package or install_target
+    printf 'DELETE FROM `dependencies` '
+    printf 'WHERE NOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `binary_packages` '
+      printf 'WHERE `dependencies`.`dependent`=`binary_packages`.`id`'
+    printf ') ORNOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `install_targets` '
+      printf 'WHERE `dependencies`.`depending_on`=`install_targets`.`id`'
+    printf ');\n'
+    # remove install_target_providers w/o binary_package or install_target
+    printf 'DELETE FROM `install_target_providers` '
+    printf 'WHERE NOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `binary_packages` '
+      printf 'WHERE `install_target_providers`.`package`=`binary_packages`.`id`'
+    printf ') ORNOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `install_targets` '
+      printf 'WHERE `install_target_providers`.`install_target`=`install_targets`.`id`'
+    printf ');\n'
+    # remove build_assignments w/o binary_package
+    printf 'DELETE FROM `build_assignments` '
+    printf 'WHERE NOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `binary_packages` '
+      printf 'WHERE `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+    printf ');\n'
     # remove failed_builds with unbroken build_assignments
     printf 'DELETE `failed_builds` '
     printf 'FROM `failed_builds` '
@@ -724,6 +767,13 @@ mysql_cleanup() {
     printf '('
       printf 'SELECT * FROM `build_assignments` '
       printf 'WHERE `build_assignments`.`id`=`failed_builds`.`build_assignment`'
+    printf ');\n'
+    # remove package_sources w/o build_assignment
+    printf 'DELETE FROM `package_sources` '
+    printf 'WHERE NOT EXISTS '
+    printf '('
+      printf 'SELECT * FROM `build_assignments` '
+      printf 'WHERE `build_assignments`.`package_source`=`package_sources`.`id`'
     printf ');\n'
   } | \
     ${mysql_command}
