@@ -376,6 +376,7 @@ done < "${work_dir}/build-list.new"
     ${mysql_command} --raw --batch | \
     sed '
       1d
+      y/\t/ /
     ' | \
     while read -r a b c d; do
       printf '%s ' \
@@ -385,10 +386,8 @@ done < "${work_dir}/build-list.new"
         "$(printf '%s' "${d}" | base64 -d)" | \
         sed 's/ /\n/'
     done | \
-    sed '
-      y/\t/ /
-      p
-    '
+    grep -vxF '' | \
+    sed 'p'
   cat "${work_dir}/build-list.new"
 } | \
   sort | \
