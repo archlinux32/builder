@@ -8,7 +8,7 @@
 # start ii if it is not running
 if ! pgrep -x ii > /dev/null; then
   rm -rf --one-file-system "${irc_dir}"
-  screen -S ii -d -m ii -f buildmaster -n buildmaster
+  screen -S ii -d -m ii -s irc.freenode.net -f buildmaster -n buildmaster
   sleep 10
 fi
 
