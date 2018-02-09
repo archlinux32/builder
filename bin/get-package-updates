@@ -461,8 +461,8 @@ while [ -n "${black_listed_new}" ]; do
             printf ' JOIN `build_assignments` AS `b_ba` ON `b_ba`.`package_source`=`b_ps`.`id`'
             printf ' JOIN `binary_packages` AS `b_bp` ON `b_bp`.`build_assignment`=`b_ba`.`id`'
             printf ' WHERE `install_target_providers`.`package`=`b_bp`.`id`'
-            printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
           printf ')'
+          printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
         printf ');\n'
       } | \
         ${mysql_command} --raw --batch | \
