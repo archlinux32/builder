@@ -912,9 +912,10 @@ mysql_repair_binary_packages_without_build_assignment() {
 
 mysql_remove_duplicate_build_order() {
   {
-    printf 'CREATE TEMPORARY TABLE `ren` (`old` BIGINT, `new` BIGINT, `repo` BIGINT);\n'
-    printf 'INSERT INTO `ren` (`old`,`new`,`repo`)'
-    printf ' SELECT `old`.`id`,`new`.`id`,`old`.`repository`'
+    printf 'CREATE TEMPORARY TABLE `ren`'
+    printf ' (`old` BIGINT, `new` BIGINT, `repo` BIGINT, `sub_pkgrel` BIGINT);\n'
+    printf 'INSERT INTO `ren` (`old`,`new`,`repo`,`sub_pkgrel`)'
+    printf ' SELECT `old`.`id`,`new`.`id`,`old`.`repository`,`old`.`sub_pkgrel`'
     printf ' FROM `binary_packages` as `old`'
     printf ' JOIN `binary_packages` as `new` ON'
     printf ' `old`.`%s`=`new`.`%s` AND' \
@@ -942,7 +943,7 @@ mysql_remove_duplicate_build_order() {
     printf 'UPDATE IGNORE `binary_packages`'
     printf ' JOIN `ren` ON `ren`.`new`=`binary_packages`.`id`'
     printf ' SET `binary_packages`.`repository`=`ren`.`repo`,'
-    printf ' `binary_packages`.`sub_pkgrel`=`binary_packages`.`sub_pkgrel`-1;\n'
+    printf ' `binary_packages`.`sub_pkgrel`=`ren`.`sub_pkgrel`;\n'
   } | \
     ${mysql_command}
 }
