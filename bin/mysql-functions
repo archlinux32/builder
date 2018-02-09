@@ -906,14 +906,15 @@ mysql_repair_binary_packages_without_build_assignment() {
     ${mysql_command}
 }
 
-# mysql_remove_duplicate_build_order
-# remove _all_ build orders which just increase sub_pkgrel of another package
-# (this may undo "seed-build-list" effects)
+# mysql_remove_duplicate_binary_packages
+# remove duplicate binary_packages, matching pkgname, epoch, pkgver, pkgrel,
+# having difference of 1 in sub_pkgrel
+
 mysql_remove_duplicate_build_order() {
   {
-    printf 'CREATE TEMPORARY TABLE `ren` (`old` BIGINT, `new` BIGINT);\n'
-    printf 'INSERT INTO `ren` (`old`,`new`)'
-    printf ' SELECT `old`.`id`,`new`.`id`'
+    printf 'CREATE TEMPORARY TABLE `ren` (`old` BIGINT, `new` BIGINT, `repo` BIGINT);\n'
+    printf 'INSERT INTO `ren` (`old`,`new`,`repo`)'
+    printf ' SELECT `old`.`id`,`new`.`id`,`old`.`repository`'
     printf ' FROM `binary_packages` as `old`'
     printf ' JOIN `binary_packages` as `new` ON'
     printf ' `old`.`%s`=`new`.`%s` AND' \
@@ -925,8 +926,8 @@ mysql_remove_duplicate_build_order() {
     printf ' JOIN `repositories` AS `%s` ON `%s`.`id`=`%s`.`repository`' \
       'orep' 'orep' 'old' \
       'nrep' 'nrep' 'new'
-    printf ' WHERE `orep`.`name`!="build-list"'
-    printf ' AND `nrep`.`name`="build-list";\n'
+    printf ' WHERE `orep`.`name`!="to-be-decided"'
+    printf ' AND `nrep`.`name`="to-be-decided";\n'
     printf 'UPDATE IGNORE `dependencies`'
     printf ' JOIN `ren` ON `ren`.`old`=`dependencies`.`dependent`'
     printf ' SET `dependencies`.`dependent`=`ren`.`new`;\n'
@@ -938,6 +939,10 @@ mysql_remove_duplicate_build_order() {
       printf 'SELECT * FROM `ren`'
       printf ' WHERE `ren`.`old`=`binary_packages`.`id`'
     printf ');\n'
+    printf 'UPDATE IGNORE `binary_packages`'
+    printf ' JOIN `ren` ON `ren`.`new`=`binary_packages`.`id`'
+    printf ' SET `binary_packages`.`repository`=`ren`.`repo`,'
+    printf ' `binary_packages`.`sub_pkgrel`=`binary_packages`.`sub_pkgrel`-1;\n'
   } | \
     ${mysql_command}
 }
