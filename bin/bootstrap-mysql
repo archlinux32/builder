@@ -475,7 +475,7 @@ find "${work_dir}/package-states" \
 tr ' ' '.' < \
   "${work_dir}/build-list" | \
   while read -r state_file; do
-    mysql_generate_package_metadata "${state_file}"
+    mysql_generate_package_metadata 'build-list' "${state_file}"
   done
 
 # shellcheck disable=SC2016

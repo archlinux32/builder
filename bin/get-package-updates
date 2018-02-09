@@ -337,7 +337,7 @@ done | \
           )"
       } | \
         ${mysql_command}
-      mysql_generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
+      mysql_generate_package_metadata 'build-list' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
 
@@ -357,44 +357,6 @@ mkdir -p "${work_dir}/package-infos"
 while read -r package git_revision mod_git_revision repository; do
   generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
 done < "${work_dir}/build-list.new"
-
-{
-  # shellcheck disable=SC2016
-  {
-    printf 'SELECT DISTINCT '
-    printf 'replace(to_base64(`package_sources`.`%s`),"\\n",""),' \
-      'pkgbase' 'git_revision' 'mod_git_revision'
-    printf 'replace(to_base64(`upstream_repositories`.`name`),"\\n","")'
-    printf ' FROM `binary_packages`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'repositories'          'repositories'          'binary_packages'   'repository' \
-      'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
-      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
-    printf ' WHERE `repositories`.`name` in ("build-list","deletion-list")'
-  } | \
-    ${mysql_command} --raw --batch | \
-    sed '
-      1d
-      y/\t/ /
-    ' | \
-    while read -r a b c d; do
-      printf '%s ' \
-        "$(printf '%s' "${a}" | base64 -d)" \
-        "$(printf '%s' "${b}" | base64 -d)" \
-        "$(printf '%s' "${c}" | base64 -d)" \
-        "$(printf '%s' "${d}" | base64 -d)" | \
-        sed 's/ /\n/'
-    done | \
-    grep -vxF '' | \
-    sed 'p'
-  cat "${work_dir}/build-list.new"
-} | \
-  sort | \
-  uniq -u | \
-  while read -r package git_revision mod_git_revision repository; do
-    mysql_generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-  done
 
 echo 'apply blacklisting'
 # ignore blacklisted packages and dependent packages

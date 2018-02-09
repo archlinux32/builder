@@ -305,7 +305,7 @@ if ${update}; then
     tee -a "${work_dir}/build-list"
 
   while read -r git_revision mod_git_revision repository pkgbase; do
-    mysql_generate_package_metadata "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
+    mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
   done < \
     "${tmp_dir}/build-list.new"
 

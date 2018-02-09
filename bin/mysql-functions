@@ -190,15 +190,16 @@ mysql_add_install_target() {
     ${mysql_command}
 }
 
-# mysql_generate_package_metadata $package $git_revision $mod_git_revision $repository
+# mysql_generate_package_metadata $current_repository $package $git_revision $mod_git_revision $repository
 # or
-# mysql_generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
-# if sub_pkgrel should be determined automatically and the package is on the build-list
+# mysql_generate_package_metadata $current_repository $package.$git_revision.$mod_git_revision.$repository
+# if sub_pkgrel should be determined automatically
 # and
 # mysql_generate_package_metadata $sub_pkgrel $current_repository $package $git_revision $mod_git_revision $repository
 # or
 # mysql_generate_package_metadata $sub_pkgrel $current_repository $package.$git_revision.$mod_git_revision.$repository
-# if $sub_pkgrel should be forced and the package is currently in $current_repository
+# if $sub_pkgrel should be forced
+
 # generate the meta data of a package (dependencies, built packages, ...) in the database
 
 mysql_generate_package_metadata() {
@@ -207,10 +208,6 @@ mysql_generate_package_metadata() {
     case "$1" in
       ''|*[!0-9]*)
         unset forced_sub_pkgrel
-        current_repository=$(
-          printf 'build-list' | \
-            base64 -w0
-        )
       ;;
       *)
         forced_sub_pkgrel=$(
@@ -218,21 +215,12 @@ mysql_generate_package_metadata() {
             base64 -w0
         )
         shift
-        current_repository=$(
-          printf '%s' "$1" | \
-            base64 -w0
-        )
-        shift
       ;;
     esac
-    package="$1"
-    git_revision="$2"
-    mod_git_revision="$3"
-    repository="$4"
-    temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
-    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
+    current_repository="$1"
+    package="$2"
 
-    if [ $# -eq 1 ]; then
+    if [ $# -eq 2 ]; then
       # second form
       repository="${package##*.}"
       package="${package%.*}"
@@ -240,7 +228,14 @@ mysql_generate_package_metadata() {
       package="${package%.*}"
       git_revision="${package##*.}"
       package="${package%.*}"
+    else
+      git_revision="$3"
+      mod_git_revision="$4"
+      repository="$5"
     fi
+
+    temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
+    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
     printf '.' >&2
     if ! make_source_info "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${temp_dir}/SRCINFO"; then
@@ -276,6 +271,10 @@ mysql_generate_package_metadata() {
     printf '.' >&2
 
     # now we encode everything in base64
+    current_repository=$(
+      printf '%s' "${current_repository}" | \
+        base64 -w0
+    )
     pkgbase=$(
       printf '%s' "${pkgbase}" | \
         base64 -w0
