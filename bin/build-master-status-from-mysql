@@ -38,6 +38,31 @@ fi
 sort "${work_dir}/build-list" > \
   "${tmp_dir}/build-list.file"
 
+# shellcheck disable=SC2016
+{
+  printf 'SELECT '
+  printf '`package_sources`.`%s`,' \
+    'pkgbase' 'git_revision' 'mod_git_revision'
+  printf '`upstream_repositories`.`name`'
+  printf ' FROM `build_slaves`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'build_assignments' 'build_assignments' 'build_slaves' 'currently_building' \
+    'package_sources' 'package_sources' 'build_assignments' 'package_source' \
+    'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+} | \
+  ${mysql_command} --raw --batch | \
+  sed '
+    1d
+    y/\t/ /
+  ' | \
+  sort > \
+  "${tmp_dir}/locked.mysql"
+find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.locked' -printf '%f\n' | \
+  sed '
+    s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$/ \1 \2 \3/
+  ' | \
+  sort > \
+  "${tmp_dir}/locked.file"
 
 # shellcheck disable=SC2016
 {
@@ -193,6 +218,10 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   "${tmp_dir}/build-dependencies.file"
 
 {
+  diff -u \
+    "${tmp_dir}/locked.file" \
+    "${tmp_dir}/locked.mysql" || \
+    true
   mysql_sanity_check || true
   diff -u \
     "${tmp_dir}/build-list.file" \
