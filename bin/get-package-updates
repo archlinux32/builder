@@ -340,6 +340,7 @@ done | \
       } | \
         ${mysql_command}
       mysql_generate_package_metadata 'build-list' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
+      generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
 
