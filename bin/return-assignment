@@ -373,16 +373,33 @@ package_errors=$(
     # shellcheck disable=SC2086
     printf '%s\n' ${packages} | \
       sed '
-        s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz$@ \2@
-        / any$/{
-          s|any$|i686|
-        }
         s|^|was_built: |
       '
-    sed '
-      s|$| i686|
-      s|^|expected: |
-    ' "${work_dir}/package-infos/$1.$2.$3.$4.packages"
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT CONCAT('
+        printf '"expected: ",'
+        printf '`binary_packages`.`pkgname`,"-",'
+        printf 'if(`binary_packages`.`epoch`=0,"",CONCAT(`binary_packages`.`epoch`,":")),'
+        printf '`binary_packages`.`pkgver`,"-",'
+        printf '`binary_packages`.`pkgrel`,".",'
+        printf '`binary_packages`.`sub_pkgrel`,"-",'
+        printf '`architectures`.`name`,".pkg.tar.xz"'
+      printf ')'
+      printf ' FROM `binary_packages`'
+      printf ' JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`'
+      printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`binary_packages`.`build_assignment`'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+        "$(
+          printf '%s' "${slave}" | \
+            base64 -w0
+        )"
+      printf ';\n'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '
+        1d
+      '
   } | \
     sort -k2 | \
     uniq -u -f1
