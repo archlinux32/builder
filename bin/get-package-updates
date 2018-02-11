@@ -16,6 +16,8 @@
 # TODO: correctly handle if pkgbase of a split package is renamed, e.g.:
 # $a -> ($a,$b)  ==>  $b -> ($a,$b)
 
+# TODO: keep database clean in case of abort
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
