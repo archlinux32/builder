@@ -329,15 +329,19 @@ move_packages() {
   while read -r package; do
     while read -r part; do
       printf 'UPDATE `binary_packages`'
-      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+      printf ' JOIN `repositories` AS `from_repo` ON `binary_packages`.`repository`=`from_repo`.`id`'
       printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
-      printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`=from_base64("%s"))' \
-        "$(
-          base64_encode_each < \
-            "${tmp_dir}/tmp/${package}.to_repo"
-        )"
+      printf ' SET `binary_packages`.`repository`=('
+        printf 'SELECT `to_repo`.`id`'
+        printf ' FROM `repositories` as `to_repo`'
+        printf ' WHERE `to_repo`.`name`=from_base64("%s")' \
+          "$(
+            base64_encode_each < \
+              "${tmp_dir}/tmp/${package}.to_repo"
+          )"
+        printf ')'
       printf ' WHERE'
-      printf ' `repositories`.`name`=from_base64("%s")' \
+      printf ' `from_repo`.`name`=from_base64("%s")' \
         "$(
           base64_encode_each < \
             "${tmp_dir}/tmp/${package}.from_repo"
