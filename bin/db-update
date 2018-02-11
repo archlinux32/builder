@@ -22,6 +22,9 @@
 
 # TODO: read information from database
 
+# TODO: check if package is to be replaced in target repository
+# - this needs some special care in the database.
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
