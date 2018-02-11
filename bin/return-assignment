@@ -265,16 +265,32 @@ clean_up_lock_file() {
   rm -f "${package_database_lock_file}"
 }
 
-if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
-  ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] ||
-  ! [ "$5" = "$(next_sub_pkgrel "$1" "$2" "$3" "$4")" ]; then
+# shellcheck disable=SC2016
+if ! {
+    printf 'SELECT count(*)'
+    printf ' FROM `binary_packages`'
+    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+      'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
+      'build_slaves'          'build_assignments'     'build_slaves'      'currently_building' \
+      'repositories'          'repositories'          'binary_packages'   'repository' \
+      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
+      'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_slaves`.`name`=from_base64("%s")' \
+      "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+      'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+      "$(printf '%s' "$4" | base64 -w0)"
+    printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
+      "$(printf '%s' "$5" | base64 -w0)"
+  } | \
+    ${mysql_command} --raw --batch | \
+    sed '1d' | \
+    grep -vxF '0'; then
   >&2 echo 'Sorry, the sent package is outdated.'
-  exit 2
-fi
-
-# shellcheck disable=SC2154
-if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
-  >&2 echo 'Whoops, this package is not built by this slave.'
   exit 2
 fi
 
