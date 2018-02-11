@@ -403,9 +403,11 @@ while [ -n "${black_listed_new}" ]; do
       {
         printf 'CREATE TEMPORARY TABLE `bl` (`pkgbase` VARCHAR(64));\n'
         printf 'INSERT INTO `bl` (`pkgbase`) VALUES '
-        printf '(from_base64("%s")),\n' "${black_listed}" | \
+        printf '%s\n' "${black_listed}" | \
           sort -u | \
           sed '
+            s/^/(from_base64("/
+            s/$/")),/
             $ s/,$/;/
           '
         printf 'SELECT replace(to_base64(`a_ps`.`pkgbase`),"\\n","")'
