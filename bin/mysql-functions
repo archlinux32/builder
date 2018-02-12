@@ -809,7 +809,11 @@ mysql_cleanup() {
       printf 'SELECT * FROM `build_assignments` '
       printf 'WHERE `build_assignments`.`package_source`=`package_sources`.`id`'
     printf ');\n'
- # TODO: remove handed out build-assignments which are not on the build-list
+    printf 'UPDATE `build_slaves`'
+    printf ' JOIN `binary_packages` ON `build_slaves`.`currently_building`=`binary_packages`.`build_assignment`'
+    printf ' JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`'
+    printf ' SET `currently_building`=NULL'
+    printf ' WHERE `repositories`.`name`!="build-list";\n'
   } | \
     ${mysql_command}
 }
