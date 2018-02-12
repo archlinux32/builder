@@ -638,6 +638,15 @@ mysql_sanity_check() {
     printf ' JOIN `repositories`'
     printf ' ON `a`.`repository`=`repositories`.`id`'
     printf ' WHERE `repositories`.`name`="build-list";\n'
+    printf 'SELECT DISTINCT CONCAT("\\"split-package with differing sub_pkgrels on the build-list: ",`a`.`pkgname`)'
+    printf ' FROM `binary_packages` AS `a`'
+    printf ' JOIN `binary_packages` AS `b` ON `a`.`build_assignment`=`b`.`build_assignment`'
+    printf ' JOIN `repositories` AS `arep` ON `a`.`repository`=`arep`.`id`'
+    printf ' JOIN `repositories` AS `brep` ON `b`.`repository`=`brep`.`id`'
+    printf ' WHERE `a`.`sub_pkgrel`!=`b`.`sub_pkgrel`'
+    printf ' AND `%srep`.`name` = "build-list"' \
+      'a' 'b'
+    printf ';\n'
   } | \
     ${mysql_command} --raw --batch | \
     sed '
