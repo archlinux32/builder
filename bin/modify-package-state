@@ -230,7 +230,21 @@ while read -r package reason; do
     ${mysql_command} --raw --batch | \
     sed '1d' | \
     grep -qxF '1'; then
-    printf 'UPDATE %s SET %s %s' "${combiner}" "${modifier}" "${selector}" | \
+    # shellcheck disable=SC2016
+    {
+      printf 'UPDATE %s SET %s %s' "${combiner}" "${modifier}" "${selector}"
+      printf ';\n'
+      # TODO: remove the below part, once the database if fully functional
+      printf 'UPDATE `binary_packages` AS `a`'
+      printf ' JOIN `binary_packages` AS `b`'
+      printf ' ON `a`.`build_assignment`=`b`.`build_assignment`'
+      printf ' JOIN `repositories`'
+      printf ' ON `b`.`repository`=`repositories`.`id`'
+      printf ' SET `b`.`is_tested`=1'
+      printf ' WHERE `a`.`is_tested`'
+      printf ' AND NOT `b`.`is_tested`'
+      printf ' AND NOT `repositories`.`name`="deletion-list";\n'
+    } | \
       ${mysql_command}
     case "${action}" in
       'block')
