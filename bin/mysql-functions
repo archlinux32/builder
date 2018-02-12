@@ -644,9 +644,25 @@ mysql_sanity_check() {
     printf ' JOIN `repositories` AS `arep` ON `a`.`repository`=`arep`.`id`'
     printf ' JOIN `repositories` AS `brep` ON `b`.`repository`=`brep`.`id`'
     printf ' WHERE `a`.`sub_pkgrel`!=`b`.`sub_pkgrel`'
-    printf ' AND `%srep`.`name` = "build-list"' \
+    printf ' AND `%srep`.`name`="build-list"' \
       'a' 'b'
     printf ';\n'
+    printf 'SELECT DISTINCT CONCAT("package source ",'
+    printf '`package_sources`.`%s`,".",' \
+      'pkgbase' 'git_revision' 'mod_git_revision'
+    printf '`upstream_repositories`.`name`," has parts in ",'
+    printf '`repo_a`.`name`," and ",'
+    printf '`repo_b`.`name`," - which should not be the case!")'
+    printf ' FROM `upstream_repositories`'
+    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+      'package_sources'            'package_sources'   'upstream_package_repository' 'upstream_repositories' \
+      'build_assignments'          'build_assignments' 'package_source'              'package_sources' \
+      'binary_packages` AS `bin_a' 'bin_a'             'build_assignment'            'build_assignments' \
+      'binary_packages` AS `bin_b' 'bin_b'             'build_assignment'            'build_assignments' \
+      'repositories` AS `repo_a'   'bin_a'             'repository'                  'repo_a' \
+      'repositories` AS `repo_b'   'bin_b'             'repository'                  'repo_b'
+    printf ' WHERE `repo_a`.`name` IN ("build-list","deletion-list","to-be-decided")'
+    printf ' AND `bin_a`.`repository`!=`bin_b`.`repository`;\n'
   } | \
     ${mysql_command} --raw --batch | \
     sed '
