@@ -106,7 +106,7 @@ delete_package() {
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
   # shellcheck disable=SC2016
   {
-    # packages from the build-list go straight to the deletion-list
+    # packages from the build-list/to-be-decided go straight to the deletion-list
     printf 'UPDATE `binary_packages`'
     printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
       'repositories' 'repositories' 'repository' \
@@ -114,7 +114,7 @@ delete_package() {
     printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
       'package_sources' 'package_sources' 'build_assignments' 'package_source'
     printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
-    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' WHERE `repositories`.`name` in ("build-list","to-be-decided")'
     printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' \
       "$(printf '%s' "$1" | base64 -w0)"
     # other packages are marked as `is_to_be_deleted`
@@ -350,7 +350,7 @@ done | \
           )"
       } | \
         ${mysql_command}
-      mysql_generate_package_metadata 'build-list' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
+      mysql_generate_package_metadata 'to-be-decided' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
