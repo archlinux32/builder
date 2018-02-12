@@ -185,6 +185,17 @@ if ! flock -s ${block_flag} 8; then
   exit
 fi
 
+# shellcheck disable=SC2016
+{
+  printf 'DELETE FROM `binary_packages`'
+  printf ' WHERE `binary_packages`.`repository`=('
+    printf 'SELECT `repositories`.`id`'
+    printf ' FROM `repositories`'
+    printf ' WHERE `repositories`.`name`="to-be-decided"'
+  printf ')'
+} | \
+  ${mysql_command}
+
 echo 'Check modified packages from the last update, and put them to the build list.'
 
 # Check modified packages from the last update, and put them to the build list.
@@ -572,6 +583,20 @@ if [ -s "${work_dir}/tsort.error" ]; then
 else
   rm "${work_dir}/tsort.error"
 fi
+
+# shellcheck disable=SC2016
+{
+  printf 'UPDATE `binary_packages`'
+  printf ' JOIN `repositories` AS `from_repo`'
+  printf ' ON `binary_packages`.`repository`=`from_repo`.`id`'
+  printf ' SET `repository`=('
+    printf 'SELECT `to_repo`.`id`'
+    printf ' FROM `repositories` AS `to_repo`'
+    printf ' WHERE `to_repo`.`name`="build-list"'
+  printf ')'
+  printf ' WHERE `from_repo`.`name`="to-be-decided";\n'
+} | \
+  ${mysql_command}
 
 # update loop list in database
 mysql_find_build_assignment_loops
