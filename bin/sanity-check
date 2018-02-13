@@ -270,17 +270,18 @@ while [ $# -gt 0 ]; do
 
         errors=$(
           {
-            tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
-              grep '/$' | \
-              sed '
-                s|/$||
-                s|^|in_database |
+            tar -Oxzf "${tmp_dir}/${repo}.db.tar.gz" --wildcards '*/desc' 2>/dev/null | \
+              sed -n '
+                /^%FILENAME%$/ {
+                  N
+                  s/^.*\n/in_database /
+                  p
+                }
               '
             echo "${packages}" | \
-              grep '\S' | \
               sed '
-                s|-[^-]\+$||
-                s|^|in_repository |
+                /\.pkg\.tar\.xz$/ !d
+                s/^/in_repository /
               ' | \
               sort -u
           } | \
