@@ -403,11 +403,13 @@ package_errors=$(
       printf ' FROM `binary_packages`'
       printf ' JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`'
       printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`binary_packages`.`build_assignment`'
+      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
       printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
         "$(
           printf '%s' "${slave}" | \
             base64 -w0
         )"
+      printf ' AND `repositories`.`name`="build-list"'
       printf ';\n'
     } | \
       ${mysql_command} --raw --batch | \
