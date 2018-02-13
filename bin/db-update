@@ -16,10 +16,6 @@
 
 # TODO: handle dependencies of parts of a split package separately
 
-# TODO: improve tracking of packages:
-# track packages in stable, too
-# know _exactly_ in which repository the packages are
-
 # TODO: read information from database
 
 # TODO: check if package is to be replaced in target repository
