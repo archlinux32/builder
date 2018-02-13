@@ -135,8 +135,20 @@ delete_package() {
 }
 
 # create tmp_dir and trap
+clean_up() {
+  rm -rf --one-file-system "${tmp_dir}"
+  # shellcheck disable=SC2016
+  {
+    printf 'DELETE FROM `binary_packages`'
+    printf ' WHERE `binary_packages`.`repository`=('
+      printf 'SELECT `repositories`.`id` FROM `repositories`'
+      printf ' WHERE `repositories`.`name`="to-be-decided"'
+    printf ');\n'
+  } | \
+    ${mysql_command}
+}
 tmp_dir=$(mktemp -d 'tmp.get-package-updates.XXXXXXXXXX' --tmpdir)
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+trap 'clean_up' EXIT
 
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
