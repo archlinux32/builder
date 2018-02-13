@@ -109,7 +109,10 @@ if ($result -> num_rows > 0) {
         $rows[$count]["git_revision"] =
           $rows[$count]["git_revision"] . "x86_64";
       $rows[$count]["git_revision"] =
-        $rows[$count]["git_revision"] . "/\">" .
+        $rows[$count]["git_revision"] . "?id=" .
+        $row["git_revision"];
+      $rows[$count]["git_revision"] =
+        $rows[$count]["git_revision"] . "\">" .
         $row["git_revision"] . "</a>";
     } else
       $rows[$count]["git_revision"] = $row["git_revision"];
