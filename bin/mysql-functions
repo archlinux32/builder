@@ -567,8 +567,6 @@ mysql_generate_package_metadata() {
             printf ' `binary_packages`'
             printf ' JOIN `architectures`'
             printf ' ON `binary_packages`.`architecture` = `architectures`.`id`'
-            printf ' JOIN `repositories`'
-            printf ' ON `binary_packages`.`repository` = `repositories`.`id`'
             printf ' JOIN `install_targets`'
             printf ' JOIN `%s`' "${link}"
             printf ' ON `%s`.`name` = `install_targets`.`name`' "${link}"
@@ -589,10 +587,10 @@ mysql_generate_package_metadata() {
             # b) it is not necessary to do so: if only the sub_pkgrel
             #    changed, the dependencies and provided install_targets
             #    should not have changed
-            printf ' `architectures`.`name` = from_base64("%s") AND' \
+            printf ' `architectures`.`name` = from_base64("%s");\n' \
               "${arch}"
-            printf ' `repositories`.`name` = from_base64("%s");\n' \
-              "${current_repository}"
+            # the repository is of no relevance: it hardly matters for
+            # the dependencies
           done
 
           printf 'DROP TABLE `%s`;\n' \
