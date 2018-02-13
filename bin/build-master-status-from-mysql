@@ -207,8 +207,9 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   "${tmp_dir}/build-dependencies.mysql"
 {
   cat "${tmp_dir}/build-dependencies.mysql"
+  # TODO: consider versions dependencies, too
   find "${work_dir}/package-infos" -name '*.build-depends' \
-    -exec grep -HF '' {} \; | \
+    -exec grep -Hv '[<=>]' {} \; | \
     sed '
       s,^.*/,,
       s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.:]\+\)\.build-depends:\([^:]\+\)$/ \1 \2 \3 \4/
