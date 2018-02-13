@@ -744,12 +744,23 @@ mysql_find_build_assignment_loops() {
     ${mysql_command}
 }
 
-# mysql_cleanup
+# mysql_cleanup [dry]
 # clean up left overs from mysql database
 mysql_cleanup() {
+  local operator
+  if [ "$#" = '0' ]; then
+    operator='DELETE'
+  elif [ "$#" = '1' ] && [ "x$1" = 'xdry' ]; then
+    operator='SELECT COUNT(*)'
+  else
+    >&2 echo 'Unknown parameter'
+    >&2 echo 'Call "mysql_clean_up" or "mysql_clean_up dry".'
+    return 1
+  fi
   {
     # remove dependencies w/o binary_package or install_target
-    printf 'DELETE FROM `dependencies` '
+    printf '%s FROM `dependencies` ' \
+      "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
       printf 'SELECT * FROM `binary_packages` '
@@ -760,7 +771,8 @@ mysql_cleanup() {
       printf 'WHERE `dependencies`.`depending_on`=`install_targets`.`id`'
     printf ');\n'
     # remove install_target_providers w/o binary_package or install_target
-    printf 'DELETE FROM `install_target_providers` '
+    printf '%s FROM `install_target_providers` ' \
+      "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
       printf 'SELECT * FROM `binary_packages` '
@@ -771,27 +783,30 @@ mysql_cleanup() {
       printf 'WHERE `install_target_providers`.`install_target`=`install_targets`.`id`'
     printf ');\n'
     # remove build_assignments w/o binary_package
-    printf 'DELETE FROM `build_assignments` '
+    printf '%s FROM `build_assignments` ' \
+      "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
       printf 'SELECT * FROM `binary_packages` '
       printf 'WHERE `binary_packages`.`build_assignment`=`build_assignments`.`id`'
     printf ');\n'
     # remove failed_builds with unbroken build_assignments
-    printf 'DELETE `failed_builds` '
-    printf 'FROM `failed_builds` '
+    printf '%s FROM `failed_builds` ' \
+      "${operator}"
     printf 'JOIN `build_assignments` '
     printf 'ON `failed_builds`.`build_assignment`=`build_assignments`.`id` '
     printf 'WHERE NOT `build_assignments`.`is_broken`;\n'
     # remove failed_builds w/o build_assignment
-    printf 'DELETE FROM `failed_builds` '
+    printf '%s FROM `failed_builds` ' \
+      "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
       printf 'SELECT * FROM `build_assignments` '
       printf 'WHERE `build_assignments`.`id`=`failed_builds`.`build_assignment`'
     printf ');\n'
     # remove package_sources w/o build_assignment
-    printf 'DELETE FROM `package_sources` '
+    printf '%s FROM `package_sources` ' \
+      "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
       printf 'SELECT * FROM `build_assignments` '
