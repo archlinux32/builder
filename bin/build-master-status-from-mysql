@@ -207,13 +207,32 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   "${tmp_dir}/build-dependencies.mysql"
 {
   cat "${tmp_dir}/build-dependencies.mysql"
-  # TODO: consider versions dependencies, too
-  find "${work_dir}/package-infos" -name '*.build-depends' \
-    -exec grep -Hv '[<=>]' {} \; | \
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT DISTINCT '
+    printf '`package_sources`.`%s`,' \
+      'pkgbase' 'git_revision' 'mod_git_revision'
+    printf '`upstream_repositories`.`name`'
+    printf ' FROM `upstream_repositories`'
+    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+      'package_sources'   'package_sources'   'upstream_package_repository' 'upstream_repositories' \
+      'build_assignments' 'build_assignments' 'package_source'              'package_sources' \
+      'binary_packages'   'binary_packages'   'build_assignment'            'build_assignments'
+  } | \
+    ${mysql_command} --raw --batch | \
     sed '
-      s,^.*/,,
-      s/\.\([^.]\+\)\.\([^.]\+\)\.\([^.:]\+\)\.build-depends:\([^:]\+\)$/ \1 \2 \3 \4/
-    '
+      1d
+      y/\t/ /
+    ' | \
+    while read -r pkgbase git_revision mod_git_revision repository; do
+      if [ -f "${work_dir}/package-infos/${pkgbase}.${git_revision}.${mod_git_revision}.${repository}.build-depends" ]; then
+        # TODO: consider versions dependencies, too
+        grep -v '[<=>]' "${work_dir}/package-infos/${pkgbase}.${git_revision}.${mod_git_revision}.${repository}.build-depends" | \
+          sed '
+            s/^/'"${pkgbase} ${git_revision} ${mod_git_revision} ${repository}"' /
+          '
+      fi
+    done
 } | \
   sort -u > \
   "${tmp_dir}/build-dependencies.file"
