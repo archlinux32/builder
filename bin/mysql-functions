@@ -793,9 +793,11 @@ mysql_cleanup() {
     # remove failed_builds with unbroken build_assignments
     printf '%s FROM `failed_builds` ' \
       "${operator}"
-    printf 'JOIN `build_assignments` '
-    printf 'ON `failed_builds`.`build_assignment`=`build_assignments`.`id` '
-    printf 'WHERE NOT `build_assignments`.`is_broken`;\n'
+    printf 'WHERE ('
+      printf 'SELECT NOT `build_assignments`.`is_broken`'
+      printf ' FROM `build_assignments` '
+      printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
+    printf ');\n'
     # remove failed_builds w/o build_assignment
     printf '%s FROM `failed_builds` ' \
       "${operator}"
