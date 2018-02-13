@@ -16,8 +16,6 @@
 
 # TODO: sign database
 
-# TODO: read information from database
-
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
