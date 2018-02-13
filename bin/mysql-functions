@@ -583,8 +583,12 @@ mysql_generate_package_metadata() {
               'pkgver' "${pkgver}" \
               'pkgrel' "${pkgrel}" \
               'pkgname' "${pkgname}"
-            printf ' `binary_packages`.`sub_pkgrel` = %s AND' \
-              "${sub_pkgrel}"
+            # we do not want to match the sub_pkgrel:
+            # a) it is tedious to do so (because it may be calculated
+            #    dynamically)
+            # b) it is not necessary to do so: if only the sub_pkgrel
+            #    changed, the dependencies and provided install_targets
+            #    should not have changed
             printf ' `architectures`.`name` = from_base64("%s") AND' \
               "${arch}"
             printf ' `repositories`.`name` = from_base64("%s");\n' \
