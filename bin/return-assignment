@@ -393,12 +393,7 @@ package_errors=$(
     {
       printf 'SELECT CONCAT('
         printf '"expected: ",'
-        printf '`binary_packages`.`pkgname`,"-",'
-        printf 'if(`binary_packages`.`epoch`=0,"",CONCAT(`binary_packages`.`epoch`,":")),'
-        printf '`binary_packages`.`pkgver`,"-",'
-        printf '`binary_packages`.`pkgrel`,".",'
-        printf '`binary_packages`.`sub_pkgrel`,"-",'
-        printf '`architectures`.`name`,".pkg.tar.xz"'
+        mysql_package_name_query
       printf ')'
       printf ' FROM `binary_packages`'
       printf ' JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`'
