@@ -456,6 +456,12 @@ while [ -n "${black_listed_new}" ]; do
             printf ' WHERE `install_target_providers`.`package`=`b_bp`.`id`'
           printf ')'
           printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+        printf ') AND EXISTS ('
+        # TODO: This should be corrected at the root: automatic install targets, which are bogus should
+        #       not be added in the first place - but how do we detect that?
+          printf ' SELECT *'
+          printf ' FROM `install_target_providers`'
+          printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
         printf ');\n'
       } | \
         ${mysql_command} --raw --batch | \
