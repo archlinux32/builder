@@ -756,7 +756,7 @@ mysql_cleanup() {
   else
     >&2 echo 'Unknown parameter'
     >&2 echo 'Call "mysql_clean_up" or "mysql_clean_up dry".'
-    return 1
+    exit 2
   fi
   {
     # remove dependencies w/o binary_package or install_target
