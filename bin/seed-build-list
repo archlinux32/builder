@@ -5,8 +5,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: read information from database
-
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
@@ -45,7 +43,6 @@ eval set -- "$(
   )"
 
 touch "${tmp_dir}/mirrors"
-touch "${tmp_dir}/delta-packages"
 touch "${tmp_dir}/package-regexes"
 touch "${tmp_dir}/ignore-packages"
 
@@ -99,220 +96,218 @@ fi
 
 repos="${stable_package_repositories}"
 
-find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f\n' | \
-  sed 's|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|' | \
-  sort -k1,1 > \
-  "${tmp_dir}/known-packages"
-
-mod_repo_rev=$(cat "${work_dir}/archlinux32.revision")
-{
-  for repo in ${repo_names}; do
-    if [ "${repo_names}" = 'archlinux32' ]; then
-      continue
-    fi
-    eval 'repo_path="${repo_paths__'"${repo}"'}"'
-    repo_rev=$(cat "${work_dir}/${repo}.revision")
-    git -C "${repo_path}" archive "$(cat "${work_dir}/${repo}.revision")" | \
-      tar -t | \
-      grep '^[^/]\+/repos/[^/]\+/PKGBUILD$' | \
-      grep -v -- '-i686/PKGBUILD$' | \
-      grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
-      sed '
-        s|^\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|'"${repo_rev}"' \1 \2|
-      '
-  done | \
-    sort -u | \
-    sort -k1,1
-  awk '{print "nothing " $1 " " $4}' "${tmp_dir}/known-packages" | \
-    sort -u | \
-    sed 'p'
-} | \
-  sort -k2,3 | \
-  uniq -uf1 | \
-  while read -r repo_rev pkg prepo; do
-    generate_package_metadata "${pkg}" "${repo_rev}" "${mod_repo_rev}" "${prepo}"
-  done
-
-{
-  # shellcheck disable=SC2016
-  {
-    printf 'SELECT '
-    printf '`package_sources`.`%s`,' \
-      'pkgbase' 'git_revision' 'mod_git_revision'
-    printf '`upstream_repositories`.`name`,`binary_packages`.`pkgname`'
-    printf ' FROM `binary_packages`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
-      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
-  } | \
-    ${mysql_command} --raw --batch | \
-    sed '
-      1d
-      y/\t/ /
-    '
-  find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -exec grep -HF '' "{}" \; | \
-    sed '
-      s|^.*/||
-      s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+:| \1 \2 \3 |
-    '
-} | \
-  sort -u | \
-  sort -k5,5 > \
-  "${tmp_dir}/known-packages"
-
-# generate delta-packages from package-regexes
-while read -r pkg_regex; do
-  if [ -z "${pkg_regex}" ]; then
-    continue
-  fi
-  awk '{print $5}' "${tmp_dir}/known-packages" | \
-    grep "${pkg_regex}" || \
-    true
-done < \
-  "${tmp_dir}/package-regexes" >> \
-  "${tmp_dir}/delta-packages"
-
-# genereate delta_packages from mirror delta
-
-while read -r mirror; do
-  if [ -z "${mirror}" ]; then
-    continue
-  fi
+# genereate must-haves query from mirror delta
+if [ -s "${tmp_dir}/mirrors" ]; then
   {
     # theirs
-    for repo in ${repos}; do
-      curl -sS "${mirror}/${repo}/os/x86_64/${repo}.db.tar.gz" | \
-        tar -tz
-    done | \
-      grep '/$' | \
-      sed '
-        s|/$||
-        s|^\(.*\)-\([^-]\+-[^-]\+\)|theirs \1-\2 \2 \1|
-      '
-
+    while read -r mirror; do
+      if [ -z "${mirror}" ]; then
+        continue
+      fi
+      for repo in ${repos}; do
+        curl -sS "${mirror}/${repo}/os/x86_64/${repo}.db.tar.gz" | \
+          tar -Oxz --wildcards '*/desc' | \
+          sed '
+            /^%FILENAME%$/!d
+            N
+            s/^.*\n//
+            s/-x86_64\(\.pkg\.tar\.xz\)$/-i686\1/
+            s/^\(.*\)-\([^-]\+-[^-]\+\)-\([^-]\+\)/theirs \2 \3 \1/
+          '
+      done
+    done < \
+      "${tmp_dir}/mirrors"
     # ours
-    for repo in $(ls_master_mirror 'i686'); do
-      ls_master_mirror "i686/${repo}" | \
-        grep '\.pkg\.tar\.xz$' | \
-        sed 's|-[^-]\+$||'
-    done | \
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT '
+      mysql_package_name_query
+      printf ' FROM `binary_packages`'
+      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+    } | \
+      ${mysql_command} --raw --batch | \
       sed '
-        s|^\(.*\)-\([^-]\+-[^-]\+\)|ours \1-\2 \2 \1|
+        1d
+        s/^\(.*\)-\([^-]\+-[^-]\+\)-\([^-]\+\)/ours \2 \3 \1/
       '
   } | \
-    expand_version 3 | \
-    sort -k4,4 -k3Vr,3 -k1,1 | \
-    shrink_version 3 | \
-    uniq -f3 | \
-    grep '^theirs ' | \
-    awk '{print $4}' | \
-    sort -k1,1 >> \
-    "${tmp_dir}/delta-packages"
-done < \
-  "${tmp_dir}/mirrors"
-
-sort -k1,1 -u "${tmp_dir}/delta-packages" | \
-  sponge "${tmp_dir}/delta-packages"
-
-cat \
-  "${tmp_dir}/delta-packages" \
-  "${tmp_dir}/ignore-packages" \
-  "${tmp_dir}/ignore-packages" | \
-  sort | \
-  uniq -u | \
-  sponge "${tmp_dir}/delta-packages"
-
-join -1 1 -2 5 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/delta-packages" "${tmp_dir}/known-packages" >> \
-  "${tmp_dir}/append-packages"
-
-{
-  awk '{print $5}' "${tmp_dir}/append-packages"
-  cat "${tmp_dir}/delta-packages"
-} | \
-  sort | \
-  uniq -u | \
-  sponge "${tmp_dir}/delta-packages"
-
-if [ -s "${tmp_dir}/delta-packages" ]; then
-  echo 'There are still packages newer for x86_64 which I cannot identify :-/'
-  cat "${tmp_dir}/delta-packages"
-  exit 2
-fi
-
-rm "${tmp_dir}/delta-packages"
-
-# convert append-packages to build-list.new (add git hashes)
-
-cut -d' ' -f1,4 < \
-  "${tmp_dir}/append-packages" | \
-  sort -u | \
-  while read -r pkg repo; do
-    git_repo=$(find_git_repository_to_package_repository "${repo}")
-    printf '%s %s %s %s\n' \
-      "${pkg}" \
-      "$(cat "${work_dir}/${git_repo}.revision")" \
-      "$(cat "${work_dir}/archlinux32.revision")" \
-      "${repo}"
-  done | \
-  sort -u > \
-  "${tmp_dir}/build-list.append"
-
-# Create a lock file for build list.
-
-if ${update}; then
-  # always block if locked
-  exec 9> "${build_list_lock_file}"
-  flock 9
-
-  exec 8> "${sanity_check_lock_file}"
-  flock -s 8
-fi
-
-{
-  awk '{print $2 " " $3 " " $4 " " $1}' "${tmp_dir}/build-list.append"
-
-  # ignore packages on the build-list
-  awk '{print $2 " " $3 " " $4 " " $1}' < \
-    "${work_dir}/build-list" | \
-    sed 'p'
-
-  # ignore packages on the deletion-list
-  awk '{print "X X X " $1}' "${work_dir}/deletion-list" | \
-    sed 'p'
-
-  # ignore packages on the blacklist
-  git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision")" -- blacklist | \
-    tar -Ox blacklist | \
-    sed '
-      s/\s*#.*$//
-      /^\s*$/d
+    expand_version 2 | \
+    sort -k3,4 -k2Vr,2 -k1,1 | \
+    shrink_version 2 | \
+    uniq -f2 | \
+    sed -n '
+      s/^theirs \(\S\+ \)\{2\}//
+      T
+      p
     ' | \
-    awk '{print "X X X " $1}' | \
-    sed 'p'
-
-  # ignore explicitely ignored packages
-  awk '{print "X X X " $1}' "${tmp_dir}/ignore-packages" | \
-    sed 'p'
-} | \
-  sort -k4,4 | \
-  uniq -uf3 > \
-  "${tmp_dir}/build-list.new"
-
-if ${update}; then
-  awk '{print $4 " " $1 " " $2 " " $3}' \
-    "${tmp_dir}/build-list.new" | \
-    tee -a "${work_dir}/build-list"
-
-  while read -r git_revision mod_git_revision repository pkgbase; do
-    mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
-  done < \
-    "${tmp_dir}/build-list.new"
-
-  # Remove the lock file
-
-  rm -f "${build_list_lock_file}"
-else
-  awk '{print $4 " " $1 " " $2 " " $3}' \
-    "${tmp_dir}/build-list.new"
+    sort -u > \
+    "${tmp_dir}/must-haves"
 fi
+
+# shellcheck disable=SC2016
+{
+  printf 'CREATE TEMPORARY TABLE `ignore_packages` (`pkgname` VARCHAR(64));\n'
+  if [ -s "${tmp_dir}/ignore-packages" ]; then
+    grep -vxF '' "${tmp_dir}/ignore-packages" | \
+      base64_encode_each | \
+      sed '
+        s/^/(from_base64("/
+        s/$/")),/
+        $s/,$/;/
+        1 s/^/INSERT INTO `ignore_packages` (`pkgname`) VALUES \n/
+      '
+  fi
+  # packages on the build-list or deletion-list should be ignored
+  printf 'INSERT IGNORE INTO `ignore_packages` (`pkgname`)'
+  printf ' SELECT DISTINCT `binary_packages`.`pkgname`'
+  printf ' FROM `binary_packages`'
+  printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+  printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list");\n'
+} | \
+  sponge "${tmp_dir}/ignore-packages"
+
+# shellcheck disable=SC2016
+{
+  printf 'CREATE TEMPORARY TABLE `must_haves` (`pkgname` VARCHAR(64));\n'
+  if [ -s "${tmp_dir}/must-haves" ]; then
+    grep -vxF '' "${tmp_dir}/must-haves" | \
+      base64_encode_each | \
+      sed '
+        s/^/(from_base64("/
+        s/$/")),/
+        $s/,$/;/
+        1 s/^/INSERT INTO `must_haves` (`pkgname`) VALUES \n/
+      '
+  fi
+} | \
+  sponge "${tmp_dir}/must-haves"
+
+# fetch unknown must-haves from upstream
+# shellcheck disable=SC2016
+printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` VARCHAR(64));\n' > \
+  "${tmp_dir}/pkgbases"
+# shellcheck disable=SC2016
+{
+  cat "${tmp_dir}/must-haves" "${tmp_dir}/ignore-packages"
+  printf 'SELECT `must_haves`.`pkgname` FROM `must_haves`'
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT * FROM `binary_packages`'
+    printf ' WHERE `binary_packages`.`pkgname`=`must_haves`.`pkgname`'
+  printf ') AND NOT EXISTS ('
+    printf 'SELECT * FROM `ignore_packages`'
+    printf ' WHERE `ignore_packages`.`pkgname`=`must_haves`.`pkgname`'
+  printf ') AND NOT `must_haves`.`pkgname` LIKE "lib32-%%";\n'
+} | \
+  ${mysql_command} --raw --batch | \
+  sed '1d' | \
+  while read -r pkgname; do
+    content=$(
+      curl -Ss 'https://www.archlinux.org/packages/search/json/?name='"${pkgname}" | \
+        tr ',' '\n'
+    )
+    repo=$(
+      printf '%s\n' "${content}" | \
+        sed -n '
+          s/^\s*"repo"\s*:\s*"//
+          T
+          s/".*$//
+          T
+          p
+        '
+    )
+    pkgbase=$(
+      printf '%s\n' "${content}" | \
+        sed -n '
+          s/^\s*"pkgbase"\s*:\s*"//
+          T
+          s/".*$//
+          T
+          p
+        '
+    )
+    if [ -z "${pkgbase}" ] || [ -z "${repo}" ]; then
+      >&2 printf 'Could not find "%s" which is newer on x86_64!?\n' "${pkgname}"
+      exit 2
+    fi
+    printf '(from_base64("%s"),from_base64("%s")),\n' \
+      "$(printf '%s' "${pkgbase}" | base64 -w0)" \
+      "$(printf '%s' "${repo}" | base64 -w0)"
+  done | \
+  sort -u | \
+  sed '
+    1 s/^/INSERT IGNORE INTO `pkgbases` (`pkgbase`,`repository`) VALUES \n/
+    $s/,$/;/
+  ' >> \
+  "${tmp_dir}/pkgbases"
+
+# shellcheck disable=SC2016
+{
+  cat "${tmp_dir}/must-haves" "${tmp_dir}/ignore-packages" "${tmp_dir}/pkgbases"
+  printf 'SELECT '
+  printf '`pkgbases`.`pkgbase`,'
+  printf '`git_repositories`.`head`,'
+  printf '('
+    printf 'SELECT `al32`.`head` FROM `git_repositories` AS `al32`'
+    printf ' WHERE `al32`.`name`="archlinux32"'
+  printf '),'
+  printf '`pkgbases`.`repository`'
+  printf ' FROM `pkgbases`'
+  printf ' JOIN `upstream_repositories` ON `upstream_repositories`.`name`=`pkgbases`.`repository`'
+  printf ' JOIN `git_repositories` ON `git_repositories`.`id`=`upstream_repositories`.`git_repository`'
+  printf ';\n'
+  printf 'SELECT '
+  printf '`package_sources`.`pkgbase`,'
+  printf '`git_repositories`.`head`,'
+  printf '('
+    printf 'SELECT `al32`.`head` FROM `git_repositories` AS `al32`'
+    printf ' WHERE `al32`.`name`="archlinux32"'
+  printf '),'
+  printf '`upstream_repositories`.`name`'
+  printf ' FROM `binary_packages`'
+  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
+    'build_assignments'     'build_assignments'     'binary_packages'       'build_assignment' \
+    'package_sources'       'package_sources'       'build_assignments'     'package_source' \
+    'upstream_repositories' 'upstream_repositories' 'package_sources'       'upstream_package_repository' \
+    'git_repositories'      'git_repositories'      'upstream_repositories' 'git_repository'
+  printf ' WHERE ('
+  if [ -s "${tmp_dir}/package-regexes" ]; then
+    grep -vxF '' "${tmp_dir}/package-regexes" | \
+      base64_encode_each | \
+      sed '
+        s/^/`binary_packages`.`pkgname` REGEXP from_base64("/
+        s/$/") OR /
+      ' | \
+      tr -d '\n'
+  fi
+  printf 'EXISTS ('
+    printf 'SELECT * FROM `must_haves`'
+    printf ' WHERE `must_haves`.`pkgname`=`binary_packages`.`pkgname`'
+  printf ')) AND NOT EXISTS ('
+    printf 'SELECT * FROM `ignore_packages`'
+    printf ' WHERE `ignore_packages`.`pkgname`=`binary_packages`.`pkgname`'
+  printf ');\n'
+} | \
+  ${mysql_command} --raw --batch | \
+  sort -u | \
+  sed '
+    y/\t/ /
+    / [0-9a-f]\{40\} [0-9a-f]\{40\} /!d
+  ' | \
+  if ${update}; then
+    # always block if locked
+    exec 9> "${build_list_lock_file}"
+    flock 9
+
+    exec 8> "${sanity_check_lock_file}"
+    flock -s 8
+
+    while read -r pkgbase git_rev mod_git_rev repo; do
+      printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" >&2
+      mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}"
+      printf '\n' >&2
+    done
+
+    rm -f "${build_list_lock_file}"
+  else
+    cat
+  fi
