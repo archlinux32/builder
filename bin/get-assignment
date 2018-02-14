@@ -22,11 +22,6 @@ mkdir -p "${work_dir}/package-states"
 
 hand_out_assignment() {
 
-  # find out the sub_pkgrel
-  sub_pkgrel=$(
-    next_sub_pkgrel "$1" "$2" "$3" "$4"
-  )
-
   # we don't care anymore if an older version of this package was
   # "locked" or "broken"
   find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
@@ -43,7 +38,33 @@ hand_out_assignment() {
     $ a '"$1 $2 $3 $4" \
     "${work_dir}/build-list"
 
-  echo "$1 $2 $3 $4 ${sub_pkgrel}"
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT '
+    printf '`package_sources`.`%s`,' \
+      'pkgbase' 'git_revision' 'mod_git_revision'
+    printf '`upstream_repositories`.`name`,`binary_packages`.`sub_pkgrel`'
+    printf ' FROM `upstream_repositories`'
+    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
+      'package_sources'   'package_sources'   'upstream_package_repository' 'upstream_repositories' \
+      'build_assignments' 'build_assignments' 'package_source'              'package_sources' \
+      'binary_packages'   'binary_packages'   'build_assignment'            'build_assignments' \
+      'repositories'      'binary_packages'   'repository'                  'repositories'
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+      'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+      "$(printf '%s' "$4" | base64 -w0)"
+    printf ' LIMIT 1;\n'
+  } | \
+    ${mysql_command} --raw --batch | \
+    sed '
+      1d
+      y/\t/ /
+    '
+
   {
     # shellcheck disable=SC2154
     echo "${slave}"
