@@ -424,7 +424,9 @@ mysql_generate_package_metadata() {
         else
           sub_pkgrel=$(
             printf '(SELECT COALESCE('
-            # do not add binary packages which are currently on the build-list
+            # do not add binary packages which are currently on the
+            # build-list or in $current_repository (beware of split
+            # packages!)
             printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
             printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
             printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
@@ -436,7 +438,8 @@ mysql_generate_package_metadata() {
               'pkgname' "${pkgname}"
             printf ' `architectures`.`name`=from_base64("%s")' \
               "${arch}"
-            printf ' AND `repositories`.`name`="build-list"),'
+            printf ' AND `repositories`.`name` IN ("build-list",from_base64("%s"))),' \
+              "${current_repository}"
             # max(sub_pkgrel)+1
             printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
             printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
