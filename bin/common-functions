@@ -183,17 +183,14 @@ generate_package_metadata() {
     sort -u > \
     "${file_prefix}.builds"
 
-  # TODO: checkdepends should be _much_ less important!
-
-  # extract "build-depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \} \setminus "builds"
+  # extract "build-depends" = makedepends \cup depends \cup \{ base, base-devel \} \setminus "builds"
   {
     {
       printf 'all_depend = %s\n' 'base' 'base-devel'
       sed -n "$(
         printf '/^\t%s = /p\n' \
           'depends' \
-          'makedepends' \
-          'checkdepends'
+          'makedepends'
       )" "${file_prefix}.SRCINFO"
     } | \
       cut -d= -f2 | \
