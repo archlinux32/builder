@@ -426,6 +426,91 @@ remove_old_package_versions() {
   local repository="$2"
   local package="$3"
 
+  local pkgname
+  local epoch
+  local pkgver
+  local pkgrel
+  local sub_pkgrel
+  local arch
+  pkgname="${package%.pkg.tar.xz}"
+  arch="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  pkgrel="${pkgname##*-}"
+  sub_pkgrel="${pkgrel##*.}"
+  if [ "${sub_pkgrel}" = "${pkgrel}" ]; then
+    sub_pkgrel='0'
+  else
+    pkgrel="${pkgrel%.*}"
+  fi
+  pkgname="${pkgname%-*}"
+  pkgver="${pkgname##*-}"
+  epoch="${pkgver%%:*}"
+  if [ "${epoch}" = "${pkgver}" ]; then
+    epoch='0'
+  else
+    pkgver="${pkgver#*:}"
+  fi
+  pkgname="${pkgname%-*}"
+
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT "bogus",CONCAT(from_base64("%s"),"/",from_base64("%s")),1,from_base64("%s");\n' \
+      "$(
+        printf '%s' "${repository}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${package}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${package}" | \
+          sed '
+            s/^.*-\([^-]\+-[^-]\+\)-[^-]\+$/\1/
+          ' | \
+          base64 -w0
+      )"
+    printf 'SELECT '
+    printf '`binary_packages`.`id`,'
+    printf 'CONCAT(`repositories`.`name`,"/",'
+    mysql_package_name_query
+    printf '),'
+    # should we delete packages of identical version?
+    printf 'IF((`more_stable_repos`.`id`!=`repositories`.`id`) AND (`more_stable_repos`.`stability`=`repositories`.`stability`),2,0),'
+    printf 'CONCAT('
+      printf 'IF(`binary_packages`.`epoch`=0,"",CONCAT(`binary_packages`.`epoch`,":")),'
+      printf '`binary_packages`.`pkgver`,"-",'
+      printf '`binary_packages`.`pkgrel`,".",'
+      printf '`binary_packages`.`sub_pkgrel`'
+    printf ')'
+    printf ' FROM `binary_packages`'
+    printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
+      'repositories'  'repositories'  'repository' \
+      'architectures' 'architectures' 'architecture'
+    printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
+    printf ' JOIN `repositories` AS `more_stable_repos` ON `repository_stability_relations`.`more_stable`=`more_stable_repos`.`stability`'
+    # name must match
+    printf ' WHERE `binary_packages`.`pkgname`=from_base64("%s")' \
+      "$(printf '%s' "${package%-*-*-*}" | base64 -w0)"
+    # repository, where package should be deleted, should be less stable
+    printf ' AND `more_stable_repos`.`name`=from_base64("%s")' \
+      "$(printf '%s' "${repository}" | base64 -w0)"
+    printf ';\n'
+  } | \
+    ${mysql_command} --raw --batch | \
+    sed '
+      /^\S\+\sCONCAT(/d
+      y/\t/ /
+    ' | \
+    expand_version 4 | \
+    sort -k4V,4 -k3r,3 | \
+    shrink_version 4 | \
+    sed -n '
+      /^bogus /q
+      p
+    ' | \
+    cut -d' ' -f1,2 >&2
+
   # repositories in which older packages should be deleted
   local delete_older_repositories
   # repositories in which not-newer packages should be deleted
