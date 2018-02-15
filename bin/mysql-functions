@@ -549,9 +549,9 @@ mysql_generate_package_metadata() {
             sort -u | \
             grep -vxF '' | \
             sed '
-              1 s/^/INSERT INTO `checkdepends` VALUES \n/
               s|^| (from_base64("|
               s|$|")),|
+              1 s/^/INSERT INTO `checkdepends` VALUES \n/
               $ s/,$/;/
             '
 
