@@ -114,8 +114,6 @@ case "${action}" in
         s/NULL,//g
       ' | \
       while read -r id is_broken trials is_blocked dependency slave pkgbase; do
-#      printf '"%s" ' "$id" "$is_broken" "$trials" "$is_blocked" "$dependency" "$slave" "$pkgbase" >&2
-#      printf '\n' >&2
         pkgbase=$(
           printf '%s' "${pkgbase}" | \
             base64 -d
