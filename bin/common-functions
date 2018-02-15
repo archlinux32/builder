@@ -431,9 +431,6 @@ remove_old_package_versions() {
   local pkgver
   local pkgrel
   local sub_pkgrel
-  local arch
-  pkgname="${package%.pkg.tar.xz}"
-  arch="${pkgname##*-}"
   pkgname="${pkgname%-*}"
   pkgrel="${pkgname##*-}"
   sub_pkgrel="${pkgrel##*.}"
