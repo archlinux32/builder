@@ -133,7 +133,10 @@ if [ ! "$1" = 'slim' ]; then
       ' description VARCHAR(512)'
       'todo_links MEDIUMINT' \
       ' dependent MEDIUMINT' \
-      ' depending_on MEDIUMINT'
+      ' depending_on MEDIUMINT' \
+      'repository_stability_relations MEDIUMINT' \
+      ' more_stable MEDIUMINT :repository_stabilities' \
+      ' less_stable MEDIUMINT :repository_stabilities'
   )
 
   {
@@ -395,6 +398,30 @@ fi
     printf ';\n'
   } | \
     sed 's|,;|;|'
+
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT IGNORE INTO `repository_stability_relations` (`more_stable`,`less_stable`)'
+    printf ' SELECT `ms`.`id`,`ls`.`id`'
+    printf ' FROM `repository_stabilities` AS `ms` JOIN `repository_stabilities` AS `ls`'
+    printf ' WHERE '
+    printf '(`ms`.`name`="%s" AND `ls`.`name`="%s") OR ' \
+      'stable' 'stable' \
+      'stable' 'testing' \
+      'stable' 'staging' \
+      'stable' 'unbuilt' \
+      'stable' 'forbidden' \
+      'testing' 'testing' \
+      'testing' 'staging' \
+      'testing' 'unbuilt' \
+      'testing' 'forbidden' \
+      'staging' 'staging' \
+      'staging' 'unbuilt' \
+      'staging' 'forbidden' \
+      'unbuilt' 'forbidden'
+    printf ';\n'
+  } | \
+    sed 's| OR ;|;|'
 
   for repo in \
     'core:stable:AQ==' \
