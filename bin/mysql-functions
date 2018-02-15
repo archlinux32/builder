@@ -554,7 +554,6 @@ mysql_generate_package_metadata() {
               s|$|")),|
               $ s/,$/;/
             '
-          printf ' ("base-devel");\n'
 
           printf 'INSERT INTO `makedepends` VALUES\n'
           echo "${makedepends}" | \
