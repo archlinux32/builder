@@ -407,8 +407,14 @@ mysql_generate_package_metadata() {
             sed 's/[<>=].*$//' | \
             base64_encode_each
         )
-        builddepends=$(
-          grep '^\(checkdepends\|makedepends\) = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+        makedepends=$(
+          grep '^makedepends = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3 | \
+            sed 's/[<>=].*$//' | \
+            base64_encode_each
+        )
+        checkdepends=$(
+          grep '^checkdepends = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
             sed 's/[<>=].*$//' | \
             base64_encode_each
@@ -514,7 +520,8 @@ mysql_generate_package_metadata() {
         {
           printf 'CREATE TEMPORARY TABLE `%s` (`name` VARCHAR(64));\n' \
             'provides' \
-            'builddepends' \
+            'makedepends' \
+            'checkdepends' \
             'rundepends'
 
           printf 'INSERT INTO `provides` VALUES\n'
@@ -538,8 +545,19 @@ mysql_generate_package_metadata() {
             '
           printf ' ("base");\n'
 
-          printf 'INSERT INTO `builddepends` VALUES\n'
-          echo "${builddepends}" | \
+          echo "${checkdepends}" | \
+            sort -u | \
+            grep -vxF '' | \
+            sed '
+              1 s/^/INSERT INTO `checkdepends` VALUES \n/
+              s|^| (from_base64("|
+              s|$|")),|
+              $ s/,$/;/
+            '
+          printf ' ("base-devel");\n'
+
+          printf 'INSERT INTO `makedepends` VALUES\n'
+          echo "${makedepends}" | \
             sort -u | \
             grep -vxF '' | \
             sed '
@@ -551,17 +569,18 @@ mysql_generate_package_metadata() {
           printf 'INSERT IGNORE INTO `install_targets` (`name`)'
           printf ' SELECT (`name`) FROM `%s` UNION' \
             'provides' \
-            'builddepends' \
+            'makedepends' \
+            'checkdepends' \
             'rundepends' | \
             sed 's| UNION$|;\n|'
 
-          for link in 'provides' 'builddepends' 'rundepends'; do
+          for link in 'provides' 'makedepends' 'checkdepends' 'rundepends'; do
             case "${link}" in
               'provides')
                 printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`) SELECT'
                 printf ' `binary_packages`.`id`,`install_targets`.`id` FROM'
               ;;
-              'builddepends'|'rundepends')
+              'makedepends'|'checkdepends'|'rundepends')
                 printf 'INSERT IGNORE INTO `dependencies` (`dependent`,`depending_on`,`dependency_type`) SELECT'
                 printf ' `binary_packages`.`id`,`install_targets`.`id`,`dependency_types`.`id` FROM'
                 printf ' `dependency_types` JOIN'
@@ -574,7 +593,8 @@ mysql_generate_package_metadata() {
             printf ' JOIN `%s`' "${link}"
             printf ' ON `%s`.`name` = `install_targets`.`name`' "${link}"
             printf ' WHERE'
-            if [ "${link}" = 'builddepends' ] || \
+            if [ "${link}" = 'makedepends' ] || \
+              [ "${link}" = 'checkdepends' ] || \
               [ "${link}" = 'rundepends' ]; then
               printf ' `dependency_types`.`name` = "%s" AND' \
                 "${link%depends}"
@@ -598,7 +618,8 @@ mysql_generate_package_metadata() {
 
           printf 'DROP TABLE `%s`;\n' \
             'provides' \
-            'builddepends' \
+            'makedepends' \
+            'checkdepends' \
             'rundepends'
         } >> \
           "${temp_dir}/add-install-targets-command"

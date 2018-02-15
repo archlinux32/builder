@@ -458,7 +458,7 @@ fi
   printf 'INSERT IGNORE INTO `dependency_types` (`name`,`relevant_for_building`,`relevant_for_binary_packages`) VALUES'
   {
     printf '\n  ("%s",%s,%s),' \
-      'build' '1' '0' \
+      'make' '1' '0' \
       'check' '0' '0' \
       'link' '0' '1' \
       'run' '1' '1'
