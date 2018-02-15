@@ -377,16 +377,6 @@ done | \
 sort -u "${work_dir}/deletion-list.new" | \
   sponge "${work_dir}/deletion-list.new"
 
-echo 'Extract dependencies of packages.'
-
-# First, we extract the dependencies of each package.
-
-mkdir -p "${work_dir}/package-infos"
-
-while read -r package git_revision mod_git_revision repository; do
-  generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-done < "${work_dir}/build-list.new"
-
 echo 'apply blacklisting'
 # ignore blacklisted packages and dependent packages
 # this is the first time when all the information is available and up to date
