@@ -431,7 +431,7 @@ remove_old_package_versions() {
   local pkgver
   local pkgrel
   local sub_pkgrel
-  pkgname="${pkgname%-*}"
+  pkgname="${package%-*}"
   pkgrel="${pkgname##*-}"
   sub_pkgrel="${pkgrel##*.}"
   if [ "${sub_pkgrel}" = "${pkgrel}" ]; then
