@@ -51,10 +51,10 @@ if [ "$1" = 'watch' ]; then
         else
           prefix=''
         fi
-        regex='^\S\+ \S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
+        regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
         if grep -q "${regex}" "${out_file}"; then
           sed -n '
-            s/'"${regex}"'/\1 /
+            s/'"${regex}"'/\2 /
             T
             p
           ' "${out_file}" | \
