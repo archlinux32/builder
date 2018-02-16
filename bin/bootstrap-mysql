@@ -418,7 +418,8 @@ fi
       'staging' 'staging' \
       'staging' 'unbuilt' \
       'staging' 'forbidden' \
-      'unbuilt' 'forbidden'
+      'unbuilt' 'forbidden' \
+      'build-support' 'build-support'
     printf ';\n'
   } | \
     sed 's| OR ;|;|'
