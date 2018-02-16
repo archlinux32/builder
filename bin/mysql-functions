@@ -504,6 +504,7 @@ mysql_generate_package_metadata() {
         } | \
           sed '
             s|,)|)|g
+            s| JOIN JOIN | JOIN |
             s| AND;$|;|
           ' >> \
           "${temp_dir}/add-binary-packages-command"
