@@ -392,12 +392,25 @@ while [ "${count}" -ne 0 ]; do
                   >&2 printf ' failed. Next ...\n'
                 done
             done
+          >&2 printf 'searching for provided libraries\n'
+          find "${tar_content_dir}" -maxdepth 1 \
+            -name '*.pkg.tar.xz' \
+            -printf '%p\n' | \
+            while read -r pkgfile; do
+              pacman -Qqlp "${pkgfile}" | \
+                sed -n '
+                  s,^.*/,,
+                  /\.so\(\..\+\)\?$/p
+                ' > \
+                "${pkgfile}.so.provides"
+            done
+          # TODO: search for required libraries, too
+          >&2 printf 'running namcap ...'
           if [ "${repository}" = 'multilib' ]; then
             x86_64_build_command='multilib-build'
           else
             x86_64_build_command='extra-x86_64-build'
           fi
-          >&2 printf 'running namcap ...'
           # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
           # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
           sudo "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
@@ -429,9 +442,16 @@ while [ "${count}" -ne 0 ]; do
             done
           >&2 printf ' ok.\n'
           if ${upload_to_build_master}; then
-            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
+            find "${tar_content_dir}/" -maxdepth 1 \
+              \( \
+                -name '*.pkg.tar.xz-namcap.log' -o \
+                -name '*.pkg.tar.xz.so.provides' \
+              \) \
+              -execdir gzip '{}' \;
           else
-            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir grep -HF '' '{}' \;
+            find "${tar_content_dir}/" -maxdepth 1 \
+              -name '*.pkg.tar.xz-namcap.log' \
+              -execdir grep -HF '' '{}' \;
           fi
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -C "${tar_content_dir}" -- $(
