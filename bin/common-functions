@@ -368,7 +368,7 @@ repository_of_package() {
 # official_or_community $package.$repo_revision.$mod_repo_revision.$repository $ending
 # print wether the specified package is an official package (print
 # $ending) or a community package (print 'community-$ending') or a
-# build-suppor package (print 'build-support')
+# build-support package (print 'build-support')
 
 official_or_community() {
   local prepo
