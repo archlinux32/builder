@@ -439,29 +439,83 @@ fi
 tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-for package in ${packages_to_force_stabilize}; do
-  # some sanity checks
-  if [ ! -f "${work_dir}/package-states/${package}.tested" ] && \
-    [ ! -f "${work_dir}/package-states/${package}.testing" ] && \
-    [ ! -f "${work_dir}/package-states/${package}.done" ] && \
-    ! tr ' ' '.' < \
-      "${work_dir}/build-list" | \
-      grep -qxF "${package}"; then
-    >&2 printf 'Package "%s" is not in testing, staging or on the build list!\n' "${package}"
-    exit 2
-  fi
-done
+errors=$(
+  {
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT DISTINCT CONCAT('
+      printf '`package_sources`.`%s`,".",' \
+        'pkgbase' 'git_revision' 'mod_git_revision'
+      printf '`upstream_repositories`.`name`)'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      # consider all packages less stable than "testing"
+      printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
+      printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
+      printf ' WHERE `repository_stabilities`.`name` = "testing"'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '
+        1d
+        p
+      '
+    # shellcheck disable=SC2086
+    printf '%s\n' ${packages_to_force_stabilize} | \
+      sort -u
+  } | \
+    grep -vxF '' | \
+    sort | \
+    uniq -u
+)
+if [ -n "${errors}" ]; then
+  # shellcheck disable=SC2086
+  >&2 printf 'Package "%s" is not in testing, staging or on the build list!\n' ${errors}
+  # shellcheck disable=SC2016
+  >&2 printf 'Did you really give it in the form "$pkgbase.$git_rev.$mod_git_rev.$repository"?\n'
+  exit 2
+fi
 
-for package in ${packages_to_force_unstage}; do
-  # some sanity checks
-  if [ ! -f "${work_dir}/package-states/${package}.done" ] && \
-    ! tr ' ' '.' < \
-      "${work_dir}/build-list" | \
-      grep -qxF "${package}"; then
-    >&2 printf 'Package "%s" is not in staging or on the build list!\n' "${package}"
-    exit 2
-  fi
-done
+errors=$(
+  {
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT DISTINCT CONCAT('
+      printf '`package_sources`.`%s`,".",' \
+        'pkgbase' 'git_revision' 'mod_git_revision'
+      printf '`upstream_repositories`.`name`)'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      # consider all packages less stable than "staging"
+      printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
+      printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
+      printf ' WHERE `repository_stabilities`.`name` = "staging"'
+    } | \
+      ${mysql_command} --raw --batch | \
+      sed '
+        1d
+        p
+      '
+    # shellcheck disable=SC2086
+    printf '%s\n' ${packages_to_force_unstage} | \
+      sort -u
+  } | \
+    grep -vxF '' | \
+    sort | \
+    uniq -u
+)
+if [ -n "${errors}" ]; then
+  # shellcheck disable=SC2086
+  >&2 printf 'Package "%s" is not in staging or on the build list!\n' ${errors}
+  # shellcheck disable=SC2016
+  >&2 printf 'Did you really give it in the form "$pkgbase.$git_rev.$mod_git_rev.$repository"?\n'
+  exit 2
+fi
 
 # Create a lock file and a trap.
 
