@@ -166,9 +166,14 @@ if [ -n "${currently_building}" ]; then
   hand_out_assignment ${currently_building}
 fi
 
-# a package with all dependencies met or which is part of a loop,
-#   that we requested or
-#   which has been built the least times
+# TODO: actually implement the below criteria (a.k.a.: "I'm out of time")
+
+# a package with [all dependencies met or which is part of a loop]
+# and which is currently not being built, ordered by:
+# 1: we requested it
+# 2: its priority
+# 3: is not yet built
+# 4: was built the longest time ago
 next_building=$(
   # shellcheck disable=SC2016
   {
