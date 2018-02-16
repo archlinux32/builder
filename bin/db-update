@@ -325,8 +325,8 @@ move_packages() {
   while read -r package; do
     while read -r part; do
       printf 'UPDATE `binary_packages`'
-      printf ' JOIN `repositories` AS `from_repo` ON `binary_packages`.`repository`=`from_repo`.`id`'
-      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      mysql_join_binary_packages_repositories '' 'from_repo'
+      mysql_join_binary_packages_architectures
       printf ' SET `binary_packages`.`repository`=('
         printf 'SELECT `to_repo`.`id`'
         printf ' FROM `repositories` as `to_repo`'

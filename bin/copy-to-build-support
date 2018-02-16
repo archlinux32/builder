@@ -31,8 +31,8 @@ sed -n '
       {
         printf 'SELECT `binary_packages`.`id`,`repositories`.`name`'
         printf ' FROM `binary_packages`'
-        printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
-        printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+        mysql_join_binary_packages_repositories
+        mysql_join_binary_packages_architectures
         printf ' WHERE'
         printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
           'epoch' "$(printf '%s' "${epoch}" | base64 -w0)" \
@@ -89,7 +89,7 @@ sed -n '
       # shellcheck disable=SC2086
       printf ',`binary_packages`.`%s`' ${to_copy}
       printf ' FROM `binary_packages`'
-      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      mysql_join_binary_packages_architectures
       printf ' WHERE'
       printf ' `binary_packages`.`id`=%s;\n' \
         "${id}"

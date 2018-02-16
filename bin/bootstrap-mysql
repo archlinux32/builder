@@ -512,9 +512,8 @@ find "${work_dir}/package-states" -name '*.blocked' -printf '%p %f\n' | \
   ' | \
   while read -r state_file pkgbase git_revision mod_git_revision repository; do
     printf 'UPDATE `build_assignments`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' SET `build_assignments`.`is_blocked`=from_base64("%s")' \
       "$(
         tr -d '\n' < \
@@ -563,10 +562,9 @@ grep '^\('"$(
   "${tmp_dir}/new-stable-packages"
 
 if [ -s "${tmp_dir}/new-stable-packages" ]; then
+  # shellcheck disable=SC2016
   {
-    # shellcheck disable=SC2016
     printf 'CREATE TEMPORARY TABLE `stable_packages` ('
-    # shellcheck disable=SC2016
     printf '`%s` %s,' \
       'pkgname' 'VARCHAR(64)' \
       'epoch' 'MEDIUMINT' \
@@ -576,9 +574,7 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
       'architecture' 'VARCHAR(16)' \
       'repository' 'VARCHAR(64)' \
       'build_assignment' 'BIGINT NOT NULL AUTO_INCREMENT'
-    # shellcheck disable=SC2016
     printf 'PRIMARY KEY (`build_assignment`));\n'
-    # shellcheck disable=SC2016
     sed '
       1~10 ! b not_start
       s/^/INSERT IGNORE INTO `stable_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`) VALUES \n/
@@ -589,28 +585,22 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
       :end
       s/,$/;/
     ' "${tmp_dir}/new-stable-packages"
-    # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `binary_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`,`build_assignment`,`has_issues`,`is_tested`,`is_to_be_deleted`)'
     printf ' SELECT '
-    # shellcheck disable=SC2016
     printf '`stable_packages`.`%s`,' \
       'pkgname' \
       'epoch' \
       'pkgver' \
       'pkgrel' \
       'sub_pkgrel'
-    # shellcheck disable=SC2016
     printf '`%s`.`id`,' \
       'architectures' \
       'repositories'
-    # shellcheck disable=SC2016
     printf -- '-`build_assignment`,0,1,0 FROM `stable_packages`'
-    # shellcheck disable=SC2016
     printf ' JOIN `%s` ON `stable_packages`.`%s`=`%s`.`name`' \
       'repositories' 'repository' 'repositories' \
       'architectures' 'architecture' 'architectures'
     printf ';\n'
-    # shellcheck disable=SC2016
     printf 'DROP TABLE `stable_packages`;\n'
   } | \
     ${mysql_command}

@@ -51,12 +51,11 @@ if [ "$5" = 'ERROR' ]; then
   infos=$(
     {
       printf 'SELECT DISTINCT `build_assignments`.`id`,IF(`build_assignments`.`is_broken`,"true","false") FROM `build_slaves`'
-      printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-        'build_assignments'     'build_assignments'     'build_slaves'      'currently_building' \
-        'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-        'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository' \
-        'binary_packages'       'build_assignments'     'binary_packages'   'build_assignment' \
-        'repositories'          'repositories'          'binary_packages'   'repository'
+      mysql_join_build_assignments_build_slaves
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      mysql_join_build_assignments_binary_packages
+      mysql_join_binary_packages_repositories
       printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
         "$(
           # shellcheck disable=SC2154
@@ -157,7 +156,7 @@ if [ "$5" = 'ERROR' ]; then
       printf 'DROP TABLE `failures`;\n'
     fi
     printf 'UPDATE `build_assignments`'
-    printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+    mysql_join_build_assignments_build_slaves
     printf ' SET `build_assignments`.`is_broken`=1, `build_slaves`.`currently_building`=NULL'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(
@@ -267,12 +266,11 @@ clean_up_lock_file() {
 if ! {
     printf 'SELECT count(*)'
     printf ' FROM `binary_packages`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
-      'build_slaves'          'build_assignments'     'build_slaves'      'currently_building' \
-      'repositories'          'repositories'          'binary_packages'   'repository' \
-      'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-      'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_build_slaves
+    mysql_join_binary_packages_repositories
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND `build_slaves`.`name`=from_base64("%s")' \
       "$(printf '%s' "${slave}" | base64 -w0)"
@@ -396,9 +394,9 @@ package_errors=$(
         mysql_package_name_query
       printf ')'
       printf ' FROM `binary_packages`'
-      printf ' JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`'
-      printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`binary_packages`.`build_assignment`'
-      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+      mysql_join_binary_packages_architectures
+      mysql_join_binary_packages_build_slaves
+      mysql_join_binary_packages_repositories
       printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
         "$(
           printf '%s' "${slave}" | \
@@ -476,9 +474,9 @@ fi
 # shellcheck disable=SC2016
 {
   printf 'UPDATE `build_assignments`'
-  printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
-  printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
-  printf ' JOIN `repositories` AS `old_repo` ON `binary_packages`.`repository`=`old_repo`.`id`'
+  mysql_join_build_assignments_build_slaves
+  mysql_join_build_assignments_binary_packages
+  mysql_join_binary_packages_repositories '' 'old_repo'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
   printf ' `build_assignments`.`priority`=0,'
@@ -507,8 +505,8 @@ fi
   printf 'CREATE TEMPORARY TABLE `loops_to_delete` (`loop` MEDIUMINT);\n'
   printf 'INSERT INTO `loops_to_delete`'
   printf ' SELECT `build_dependency_loops`.`loop` FROM `build_dependency_loops`'
-  printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_dependency_loops`.`build_assignment`'
-  printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+  mysql_join_build_dependency_loops_binary_packages
+  mysql_join_binary_packages_repositories
   printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
   printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('
   printf 'SELECT * FROM `loops_to_delete` WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'

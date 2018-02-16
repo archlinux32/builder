@@ -57,10 +57,9 @@ case "${action}" in
         # package_source, build_assignment, binary_package, repostory
         printf 'SELECT DISTINCT `tb_ps`.`pkgbase`,`tb_bin`.`id` AS `bin_id`,`tb_ba`.`id` AS `ba_id`,`tb_ba`.`is_blocked`,`tb_ba`.`is_broken`'
         printf ' FROM `package_sources` AS `tb_ps`'
-        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-          'build_assignments` AS `tb_ba' 'tb_ba'  'package_source'   'tb_ps' \
-          'binary_packages` AS `tb_bin'  'tb_bin' 'build_assignment' 'tb_ba' \
-          'repositories` AS `tb_rep'     'tb_bin' 'repository'       'tb_rep'
+        mysql_join_package_sources_build_assignments 'tb_ps' 'tb_ba'
+        mysql_join_build_assignments_binary_packages 'tb_ba' 'tb_bin'
+        mysql_join_binary_packages_repositories 'tb_bin' 'tb_rep'
         printf ' WHERE `tb_rep`.`name`="build-list"'
         printf ') AS `to_build`'
       printf ' ON `to_build`.`pkgbase`=`pkgbases`.`pkgbase`'
@@ -70,16 +69,14 @@ case "${action}" in
         # potential dependencies
         printf 'SELECT DISTINCT `dep_ps`.`pkgbase`,`dependencies`.`dependent`'
         printf ' FROM `package_sources` AS `dep_ps`'
-        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-          'build_assignments` AS `dep_ba' 'dep_ba'                   'package_source'   'dep_ps' \
-          'binary_packages` AS `dep_bin'  'dep_bin'                  'build_assignment' 'dep_ba' \
-          'repositories` AS `dep_rep'     'dep_bin'                  'repository'       'dep_rep' \
-          'install_target_providers'      'install_target_providers' 'package'          'dep_bin'
-        # starting from the line above, we have some additional joins,
+        mysql_join_package_sources_build_assignments 'dep_ps' 'dep_ba'
+        mysql_join_build_assignments_binary_packages 'dep_ba' 'dep_bin'
+        mysql_join_binary_packages_repositories 'dep_bin' 'dep_rep'
+        # now we have some (=3) additional joins,
         # because we are interested in dependency relations to `to_build`
-        printf ' JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-        printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-          'dependency_types' 'dependencies' 'dependency_type' 'dependency_types'
+        mysql_join_binary_packages_install_target_providers 'dep_bin'
+        mysql_join_install_target_providers_dependencies
+        mysql_join_dependencies_dependency_types
         printf ' WHERE `dep_rep`.`name`="build-list"'
         printf ' AND `dependency_types`.`relevant_for_building`'
         printf ') AS `deps`'

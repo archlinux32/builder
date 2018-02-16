@@ -21,11 +21,10 @@ fi
 {
   printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
   printf ' FROM `package_sources`'
-  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-    'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
-    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
-    'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
-    'repositories' 'binary_packages' 'repository' 'repositories'
+  mysql_join_package_sources_upstream_repositories
+  mysql_join_package_sources_build_assignments
+  mysql_join_build_assignments_binary_packages
+  mysql_join_binary_packages_repositories
   printf ' WHERE `repositories`.`name`="build-list"'
 } | \
   ${mysql_command} --batch | \
@@ -45,10 +44,9 @@ sort "${work_dir}/build-list" > \
     'pkgbase' 'git_revision' 'mod_git_revision'
   printf '`upstream_repositories`.`name`'
   printf ' FROM `build_slaves`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'build_assignments' 'build_assignments' 'build_slaves' 'currently_building' \
-    'package_sources' 'package_sources' 'build_assignments' 'package_source' \
-    'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+  mysql_join_build_slaves_build_assignments
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
 } | \
   ${mysql_command} --raw --batch | \
   sed '
@@ -68,10 +66,9 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.locked' -prin
 {
   printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
   printf ' FROM `package_sources`'
-  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
-    'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
-    'repositories' 'binary_packages' 'repository' 'repositories'
+  mysql_join_package_sources_build_assignments
+  mysql_join_build_assignments_binary_packages
+  mysql_join_binary_packages_repositories
   printf ' WHERE `repositories`.`name`="deletion-list"'
   printf ' OR `binary_packages`.`is_to_be_deleted`;\n'
 } | \
@@ -89,9 +86,8 @@ sort "${work_dir}/deletion-list" > \
 {
   printf 'SELECT `package_sources`.`pkgbase`'
   printf ' FROM `package_sources`'
-  printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-    'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
-    'build_dependency_loops' 'build_dependency_loops' 'build_assignment' 'build_assignments'
+  mysql_join_package_sources_build_assignments
+  mysql_join_build_assignments_build_dependency_loops
   printf ';\n'
 } | \
   ${mysql_command} --batch | \
@@ -118,10 +114,9 @@ find "${work_dir}/build-list.loops" -regextype grep -mindepth 1 -maxdepth 1 \
     'sub_pkgrel'
   printf '`architectures`.`name`'
   printf ' FROM `binary_packages`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'repositories'           'repositories'           'binary_packages' 'repository' \
-    'architectures'          'architectures'          'binary_packages' 'architecture' \
-    'repository_stabilities' 'repository_stabilities' 'repositories'    'stability'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  mysql_join_repositories_repository_stabilities
   printf ' WHERE `binary_packages`.`is_tested`'
   printf ' AND NOT `binary_packages`.`has_issues`'
   printf ' AND `repository_stabilities`.`name`="testing"'
@@ -154,10 +149,9 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
     'sub_pkgrel'
   printf '`architectures`.`name`'
   printf ' FROM `binary_packages`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'repositories'           'repositories'           'binary_packages' 'repository' \
-    'architectures'          'architectures'          'binary_packages' 'architecture' \
-    'repository_stabilities' 'repository_stabilities' 'repositories'    'stability'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  mysql_join_repositories_repository_stabilities
   printf ' WHERE NOT `binary_packages`.`is_tested`'
   printf ' AND NOT `binary_packages`.`has_issues`'
   printf ' AND `repository_stabilities`.`name`="testing"'
@@ -188,15 +182,13 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
     'mod_git_revision'
   printf '`upstream_repositories`.`name`,`install_targets`.`name`'
   printf ' FROM `binary_packages`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'dependencies'     'binary_packages'  'dependencies' 'dependent' \
-    'dependency_types' 'dependency_types' 'dependencies' 'dependency_type'
-  printf ' AND `dependency_types`.`relevant_for_building`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'install_targets'       'install_targets'       'dependencies'      'depending_on' \
-    'build_assignments'     'build_assignments'     'binary_packages'   'build_assignment' \
-    'package_sources'       'package_sources'       'build_assignments' 'package_source' \
-    'upstream_repositories' 'upstream_repositories' 'package_sources'   'upstream_package_repository'
+  mysql_join_binary_packages_dependencies
+  mysql_join_dependencies_dependency_types
+  mysql_join_dependencies_install_targets
+  mysql_join_binary_packages_build_assignments
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
+  printf ' WHERE `dependency_types`.`relevant_for_building`'
 } | \
   ${mysql_command} --raw --batch | \
   sed '
@@ -214,10 +206,9 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
       'pkgbase' 'git_revision' 'mod_git_revision'
     printf '`upstream_repositories`.`name`'
     printf ' FROM `upstream_repositories`'
-    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-      'package_sources'   'package_sources'   'upstream_package_repository' 'upstream_repositories' \
-      'build_assignments' 'build_assignments' 'package_source'              'package_sources' \
-      'binary_packages'   'binary_packages'   'build_assignment'            'build_assignments'
+    mysql_join_upstream_repositories_package_sources
+    mysql_join_package_sources_build_assignments
+    mysql_join_build_assignments_binary_packages
   } | \
     ${mysql_command} --raw --batch | \
     sed '

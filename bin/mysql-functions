@@ -131,7 +131,6 @@ mysql_show_binary_package() {
     shift
   done
 
-  local joint
   {
     printf 'SELECT'
     printf ' `%s`.`%s`,' \
@@ -146,17 +145,11 @@ mysql_show_binary_package() {
       'package_sources' 'mod_git_revision' \
       'upstream_repositories' 'name'
     printf ' FROM `binary_packages`'
-    for joint in \
-      'architectures:binary_packages:architecture' \
-      'package_sources:binary_packages:package_source' \
-      'repositories:binary_packages:repository' \
-      'upstream_repositories:package_sources:upstream_package_repository'; do
-      printf ' JOIN `%s` ON `%s`.`id` =' \
-        "${joint%%:*}" "${joint%%:*}"
-      joint="${joint#*:}"
-      printf ' `%s`.`%s`' \
-        "${joint%:*}" "${joint#*:}"
-    done
+    mysql_join_binary_packages_architectures
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' WHERE'
     printf ' `%s`.`%s` = from_base64("%s") AND' \
       'binary_packages' 'pkgname' "${pkgname}" \
@@ -434,8 +427,8 @@ mysql_generate_package_metadata() {
             # build-list or in $current_repository (beware of split
             # packages!)
             printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
-            printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
-            printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+            mysql_join_binary_packages_architectures
+            mysql_join_binary_packages_repositories
             printf ' WHERE'
             printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
               'epoch' "${epoch}" \
@@ -448,7 +441,7 @@ mysql_generate_package_metadata() {
               "${current_repository}"
             # max(sub_pkgrel)+1
             printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
-            printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+            mysql_join_binary_packages_architectures
             printf ' WHERE'
             printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
               'epoch' "${epoch}" \
@@ -496,11 +489,9 @@ mysql_generate_package_metadata() {
           printf ' `%s` JOIN' \
             'repositories' \
             'architectures' \
-            'build_assignments' \
-            'package_sources'
-          printf ' ON `build_assignments`.`package_source` = `package_sources`.`id`'
-          printf ' JOIN `upstream_repositories`'
-          printf ' ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
+            'build_assignments'
+          mysql_join_build_assignments_package_sources
+          mysql_join_package_sources_upstream_repositories
           printf ' WHERE'
           printf ' `%s`.`%s` = from_base64("%s") AND' \
             'repositories' 'name' "${current_repository}" \
@@ -513,7 +504,6 @@ mysql_generate_package_metadata() {
         } | \
           sed '
             s|,)|)|g
-            s|JOIN ON|ON|g
             s| AND;$|;|
           ' >> \
           "${temp_dir}/add-binary-packages-command"
@@ -586,8 +576,7 @@ mysql_generate_package_metadata() {
               ;;
             esac
             printf ' `binary_packages`'
-            printf ' JOIN `architectures`'
-            printf ' ON `binary_packages`.`architecture` = `architectures`.`id`'
+            mysql_join_binary_packages_architectures
             printf ' JOIN `install_targets`'
             printf ' JOIN `%s`' "${link}"
             printf ' ON `%s`.`name` = `install_targets`.`name`' "${link}"
@@ -649,9 +638,9 @@ mysql_sanity_check() {
   {
     printf 'SELECT CONCAT("\\"any\\" build-assignment building \\"",`bp_arch`.`name`,"\\" binary package: ",`binary_packages`.`pkgname`)'
     printf ' FROM `binary_packages`'
-    printf ' JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
-    printf ' JOIN `architectures` as `bp_arch` ON `binary_packages`.`architecture`=`bp_arch`.`id`'
-    printf ' JOIN `architectures` as `ba_arch` ON `build_assignments`.`architecture`=`ba_arch`.`id`'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_binary_packages_architectures '' 'bp_arch'
+    mysql_join_build_assignments_architectures '' 'ba_arch'
     printf ' WHERE `bp_arch`.`name`!="any"'
     printf ' AND `ba_arch`.`name`="any";\n'
     printf 'SELECT DISTINCT CONCAT("package multiple times on build list: ",`a`.`pkgname`)'
@@ -660,14 +649,13 @@ mysql_sanity_check() {
     printf ' ON `a`.`pkgname`=`b`.`pkgname`'
     printf ' AND `a`.`repository`=`b`.`repository`'
     printf ' AND `a`.`id`!=`b`.`id`'
-    printf ' JOIN `repositories`'
-    printf ' ON `a`.`repository`=`repositories`.`id`'
+    mysql_join_binary_packages_repositories 'a'
     printf ' WHERE `repositories`.`name`="build-list";\n'
     printf 'SELECT DISTINCT CONCAT("\\"split-package with differing sub_pkgrels on the build-list: ",`a`.`pkgname`)'
     printf ' FROM `binary_packages` AS `a`'
     printf ' JOIN `binary_packages` AS `b` ON `a`.`build_assignment`=`b`.`build_assignment`'
-    printf ' JOIN `repositories` AS `arep` ON `a`.`repository`=`arep`.`id`'
-    printf ' JOIN `repositories` AS `brep` ON `b`.`repository`=`brep`.`id`'
+    mysql_join_binary_packages_repositories 'a' 'arep'
+    mysql_join_binary_packages_repositories 'b' 'brep'
     printf ' WHERE `a`.`sub_pkgrel`!=`b`.`sub_pkgrel`'
     printf ' AND `%srep`.`name`="build-list"' \
       'a' 'b'
@@ -700,8 +688,8 @@ mysql_sanity_check() {
     {
       printf 'SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
       printf ' FROM `binary_packages`'
-      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
-      printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+      mysql_join_binary_packages_architectures
+      mysql_join_binary_packages_repositories
       printf ' WHERE `repositories`.`is_on_master_mirror`'
     } | \
       ${mysql_command} --batch | \
@@ -728,12 +716,11 @@ mysql_find_build_assignment_loops() {
     {
       printf 'SELECT DISTINCT `packages_dependency`.`build_assignment`,`packages_dependent`.`build_assignment`'
       printf ' FROM `dependencies`'
-      printf ' JOIN `install_target_providers` ON `dependencies`.`depending_on`=`install_target_providers`.`install_target`'
-      printf ' JOIN `binary_packages` `packages_dependent` ON `dependencies`.`dependent`=`packages_dependent`.`id`'
-      printf ' JOIN `binary_packages` `packages_dependency` ON `install_target_providers`.`package`=`packages_dependency`.`id`'
-      printf ' JOIN `repositories` `repositories_%s` ON `packages_%s`.`repository`=`repositories_%s`.`id`' \
-        'dependent' 'dependent' 'dependent' \
-        'dependency' 'dependency' 'dependency'
+      mysql_join_dependencies_install_target_providers
+      mysql_join_install_target_providers_binary_packages '' 'packages_dependency'
+      mysql_join_dependencies_binary_packages '' 'packages_dependent'
+      mysql_join_binary_packages_repositories 'packages_dependency' 'repositories_dependency'
+      mysql_join_binary_packages_repositories 'packages_dependent' 'repositories_dependent'
       printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
     } | \
       ${mysql_command} --raw --batch | \
@@ -836,8 +823,8 @@ mysql_cleanup() {
       printf 'WHERE `build_assignments`.`package_source`=`package_sources`.`id`'
     printf ');\n'
     printf 'UPDATE `build_slaves`'
-    printf ' JOIN `binary_packages` ON `build_slaves`.`currently_building`=`binary_packages`.`build_assignment`'
-    printf ' JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`'
+    mysql_join_build_slaves_binary_packages
+    mysql_join_binary_packages_repositories
     printf ' SET `currently_building`=NULL'
     printf ' WHERE `repositories`.`name`!="build-list";\n'
   } | \
@@ -849,12 +836,11 @@ mysql_cleanup() {
 mysql_query_has_pending_dependencies() {
   printf 'EXISTS ('
     printf 'SELECT * FROM `binary_packages` as `to_dos`'
-    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`%s`' \
-      'repositories` AS `to_do_repos' 'to_do_repos'  'id'           'to_dos'                   'repository' \
-      'dependencies'                  'to_dos'       'id'           'dependencies'             'dependent' \
-      'install_target_providers'      'dependencies' 'depending_on' 'install_target_providers' 'install_target' \
-      'binary_packages` AS `bin_deps' 'bin_deps'     'id'           'install_target_providers' 'package' \
-      'repositories` AS `dep_repos'   'dep_repos'    'id'           'bin_deps'                 'repository'
+    mysql_join_binary_packages_repositories 'to_dos' 'to_do_repos'
+    mysql_join_binary_packages_dependencies 'to_dos'
+    mysql_join_dependencies_install_target_providers
+    mysql_join_install_target_providers_binary_packages '' 'bin_deps'
+    mysql_join_binary_packages_repositories 'bin_deps' 'dep_repos'
     printf ' WHERE'
     printf ' `%s`.`name`="build-list" AND' \
       'dep_repos' 'to_do_repos'
@@ -884,9 +870,8 @@ mysql_query_select_pkgbase_and_revision() {
     'mod_git_revision'
   printf '`upstream_repositories`.`name`'
   printf ' FROM `build_assignments`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'package_sources' 'package_sources' 'build_assignments' 'package_source' \
-    'upstream_repositories' 'upstream_repositories' 'package_sources' 'upstream_package_repository'
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
 }
 
 # mysql_repair_binary_packages_without_build_assignment
@@ -900,7 +885,7 @@ mysql_repair_binary_packages_without_build_assignment() {
       '`binary_packages`.`pkgname`' \
       '`architectures`.`name`'
     printf ' FROM `binary_packages`'
-    printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+    mysql_join_binary_packages_architectures
     printf ' WHERE `binary_packages`.`build_assignment`<0'
   } | \
     ${mysql_command} --raw --batch | \
@@ -954,7 +939,7 @@ mysql_repair_binary_packages_without_build_assignment() {
       printf ' LIMIT 1;\n'
       printf 'UPDATE `binary_packages`'
       printf ' JOIN `build_assignments`'
-      printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+      mysql_join_binary_packages_build_assignments
       printf ' SET `binary_packages`.`build_assignment`=`build_assignments`.`id`'
       printf ' WHERE `binary_packages`.`id`=%s' "${id}"
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' "${pkgbase}"
@@ -980,9 +965,8 @@ mysql_remove_duplicate_build_order() {
       'pkgver' 'pkgver' \
       'pkgrel' 'pkgrel'
     printf ' `old`.`sub_pkgrel`+1=`new`.`sub_pkgrel`'
-    printf ' JOIN `repositories` AS `%s` ON `%s`.`id`=`%s`.`repository`' \
-      'orep' 'orep' 'old' \
-      'nrep' 'nrep' 'new'
+    mysql_join_binary_packages_repositories 'old' 'orep'
+    mysql_join_binary_packages_repositories 'new' 'nrep'
     printf ' WHERE `orep`.`name`!="to-be-decided"'
     printf ' AND `nrep`.`name`="to-be-decided";\n'
     printf 'UPDATE IGNORE `dependencies`'
@@ -1004,6 +988,9 @@ mysql_remove_duplicate_build_order() {
     ${mysql_command}
 }
 
+# mysql_package_name_query
+# print a mysql query of the full name of a package file
+
 mysql_package_name_query() {
   printf 'CONCAT('
   printf '`binary_packages`.`pkgname`,"-",'
@@ -1014,3 +1001,82 @@ mysql_package_name_query() {
   printf '`architectures`.`name`,".pkg.tar.xz"'
   printf ')'
 }
+
+# mysql_join_*_*
+# print 'JOIN' part of mysql query to connect the respective tables
+# these functions take 2 optional arguments, acting as aliases for
+# the tables
+
+# mysql_join__generic $table_a $column_a $table_b $column_b
+# create mysql_join_${table_a}_${table_b}() function
+
+mysql_join__generic() {
+  eval "$(
+    printf 'mysql_join_%s_%s() {\n' "$1" "$3"
+    printf '  printf '"'"' JOIN `%s`'"'"'\n' "$3"
+    printf '  if [ -n "$2" ]; then\n'
+    printf '    printf '"'"' AS `%%s`'"'"' "$2"\n'
+    printf '  fi\n'
+    printf '  if [ -n "$1" ]; then\n'
+    printf '    printf '"'"' ON `%%s`.`%s`='"'"' "$1"\n' "$2"
+    printf '  else\n'
+    printf '    printf '"'"' ON `%s`.`%s`='"'"'\n' "$1" "$2"
+    printf '  fi\n'
+    printf '  if [ -n "$2" ]; then\n'
+    printf '    printf '"'"'`%%s`.`%s`'"'"' "$2"\n' "$4"
+    printf '  else\n'
+    printf '    printf '"'"'`%s`.`%s`'"'"'\n' "$3" "$4"
+    printf '  fi\n'
+    printf '}\n'
+  )"
+}
+
+for link in \
+  'binary_packages:architecture:architectures' \
+  'binary_packages:repository:repositories' \
+  'binary_packages:build_assignment:build_assignments' \
+ \
+  'build_assignments:architecture:architectures' \
+  'build_assignments:package_source:package_sources' \
+ \
+  'build_dependency_loops:build_assignment:build_assignments' \
+  'build_dependency_loops:build_assignment build_assignment:binary_packages' \
+ \
+  'build_slaves:currently_building:build_assignments' \
+  'build_slaves:currently_building build_assignment:binary_packages' \
+ \
+  'dependencies:depending_on:install_targets' \
+  'dependencies:dependent:binary_packages' \
+  'dependencies:dependency_type:dependency_types' \
+ \
+  'failed_builds:reason:fail_reason' \
+  'failed_builds:build_assignment:build_assignments' \
+  'failed_builds:build_slave:build_slaves' \
+ \
+  'install_target_providers:package:binary_packages' \
+  'install_target_providers:install_target:install_targets' \
+  'install_target_providers:install_target depending_on:dependencies' \
+ \
+  'package_sources:upstream_package_repository:upstream_repositories' \
+ \
+  'repositories:stability:repository_stabilities' \
+ \
+  'upstream_repositories:git_repository:git_repositories'; do
+# A join for these cannot be done, because it's not clear on what to join:
+#  'repository_stability_relations:more_stable:repository_stabilities'
+#  'repository_stability_relations:less_stable:repository_stabilities'
+
+  table_b="${link##*:}"
+  table_a="${link%:*}"
+  column_b="${table_a##*:}"
+  table_a="${table_a%:*}"
+  column_a="${column_b% *}"
+  if [ "${column_a}" = "${column_b}" ]; then
+    column_b='id'
+  else
+    column_b="${column_b##* }"
+  fi
+
+  mysql_join__generic "${table_a}" "${column_a}" "${table_b}" "${column_b}"
+  mysql_join__generic "${table_b}" "${column_b}" "${table_a}" "${column_a}"
+done

@@ -45,11 +45,10 @@ hand_out_assignment() {
       'pkgbase' 'git_revision' 'mod_git_revision'
     printf '`upstream_repositories`.`name`,`binary_packages`.`sub_pkgrel`'
     printf ' FROM `upstream_repositories`'
-    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-      'package_sources'   'package_sources'   'upstream_package_repository' 'upstream_repositories' \
-      'build_assignments' 'build_assignments' 'package_source'              'package_sources' \
-      'binary_packages'   'binary_packages'   'build_assignment'            'build_assignments' \
-      'repositories'      'binary_packages'   'repository'                  'repositories'
+    mysql_join_upstream_repositories_package_sources
+    mysql_join_package_sources_build_assignments
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND `package_sources`.`%s`=from_base64("%s")' \
       'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
@@ -80,8 +79,8 @@ hand_out_assignment() {
     printf ' SET `currently_building` = ('
     printf ' SELECT `build_assignments`.`id`'
     printf ' FROM `build_assignments`'
-    printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
-    printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' WHERE'
     printf ' `package_sources`.`%s` = from_base64("%s") AND' \
       'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
@@ -94,8 +93,8 @@ hand_out_assignment() {
       "$(printf '%s' "${slave}" | base64 -w0)"
 
     printf 'UPDATE `build_assignments`'
-    printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
-    printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' SET `build_assignments`.`priority`=0'
     printf ' WHERE'
     printf ' `package_sources`.`%s` = from_base64("%s") AND' \
@@ -150,10 +149,9 @@ currently_building=$(
   {
     printf 'SELECT '
     mysql_query_select_pkgbase_and_revision
-    printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-      'build_slaves'    'build_slaves'    'currently_building' 'build_assignments' \
-      'binary_packages' 'binary_packages' 'build_assignment'   'build_assignments' \
-      'repositories'    'binary_packages' 'repository'         'repositories'
+    mysql_join_build_assignments_build_slaves
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
     printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
       "$(printf '%s' "${slave}" | base64 -w0)"
     printf ' AND `repositories`.`name`="build-list"'
@@ -189,9 +187,8 @@ next_building=$(
     mysql_query_is_part_of_loop '`build_assignments`.`id`'
     printf ' AS `part_of_loop`,'
     mysql_query_select_pkgbase_and_revision
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'binary_packages' 'build_assignments' 'binary_packages' 'build_assignment' \
-      'repositories' 'repositories' 'binary_packages' 'repository'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND NOT EXISTS ('
       printf ' SELECT *'
@@ -231,9 +228,8 @@ count_pending=$(
   {
     printf 'SELECT count(*)'
     printf ' FROM `build_assignments`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'binary_packages' 'build_assignments' 'binary_packages' 'build_assignment' \
-      'repositories' 'repositories' 'binary_packages' 'repository'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND `build_assignments`.`is_blocked` IS NULL'
     printf ';\n'

@@ -136,10 +136,9 @@ while read -r package reason; do
       # shellcheck disable=SC2016
       combiner=$(
         printf '`binary_packages`'
-        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-          'repositories'           'repositories'           'binary_packages' 'repository' \
-          'repository_stabilities' 'repository_stabilities' 'repositories'    'stability' \
-          'architectures'          'architectures'          'binary_packages' 'architecture'
+        mysql_join_binary_packages_repositories
+        mysql_join_repositories_repository_stabilities
+        mysql_join_binary_packages_architectures
       )
       # shellcheck disable=SC2016,SC2031
       selector=$(
@@ -161,12 +160,11 @@ while read -r package reason; do
       # shellcheck disable=SC2016
       combiner=$(
         printf '`build_assignments`'
-        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-          'package_sources'        'package_sources'        'build_assignments' 'package_source' \
-          'upstream_repositories'  'upstream_repositories'  'package_sources'   'upstream_package_repository' \
-          'binary_packages'        'build_assignments'      'binary_packages'   'build_assignment' \
-          'repositories'           'repositories'           'binary_packages'   'repository' \
-          'repository_stabilities' 'repository_stabilities' 'repositories'      'stability'
+        mysql_join_build_assignments_package_sources
+        mysql_join_package_sources_upstream_repositories
+        mysql_join_build_assignments_binary_packages
+        mysql_join_binary_packages_repositories
+        mysql_join_repositories_repository_stabilities
       )
       # shellcheck disable=SC2016
       selector=$(
@@ -238,8 +236,7 @@ while read -r package reason; do
       printf 'UPDATE `binary_packages` AS `a`'
       printf ' JOIN `binary_packages` AS `b`'
       printf ' ON `a`.`build_assignment`=`b`.`build_assignment`'
-      printf ' JOIN `repositories`'
-      printf ' ON `b`.`repository`=`repositories`.`id`'
+      mysql_join_binary_packages_repositories 'b'
       printf ' SET `b`.`is_tested`=1'
       printf ' WHERE `a`.`is_tested`'
       printf ' AND NOT `b`.`is_tested`'

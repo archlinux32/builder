@@ -13,7 +13,7 @@ if [ $# -eq 0 ]; then
     {
       printf 'SELECT `package_sources`.`pkgbase`'
       printf ' FROM `package_sources`'
-      printf ' JOIN `build_assignments` ON `build_assignments`.`package_source`=`package_sources`.`id`'
+      mysql_join_package_sources_build_assignments
       printf ' WHERE `build_assignments`.`is_broken`'
     } | \
       ${mysql_command} --raw --batch | \
@@ -28,9 +28,8 @@ if [ $# -eq 0 ]; then
   {
     printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`binary_packages`.`pkgname`'
     printf ' FROM `binary_packages`'
-    printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-      'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
-      'package_sources'   'package_sources'   'build_assignments' 'package_source'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
     printf ' ORDER BY `binary_packages`.`pkgname`'
     # Why can't mysql order in the same way "sort" does!
   } | \

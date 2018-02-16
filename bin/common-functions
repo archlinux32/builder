@@ -478,9 +478,8 @@ remove_old_package_versions() {
       printf '`binary_packages`.`sub_pkgrel`'
     printf ')'
     printf ' FROM `binary_packages`'
-    printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
-      'repositories'  'repositories'  'repository' \
-      'architectures' 'architectures' 'architecture'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_architectures
     printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
     printf ' JOIN `repositories` AS `more_stable_repos` ON `repository_stability_relations`.`more_stable`=`more_stable_repos`.`stability`'
     # name must match

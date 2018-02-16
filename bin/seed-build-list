@@ -123,7 +123,7 @@ if [ -s "${tmp_dir}/mirrors" ]; then
       printf 'SELECT '
       mysql_package_name_query
       printf ' FROM `binary_packages`'
-      printf ' JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`'
+      mysql_join_binary_packages_architectures
     } | \
       ${mysql_command} --raw --batch | \
       sed '
@@ -161,7 +161,7 @@ fi
   printf 'INSERT IGNORE INTO `ignore_packages` (`pkgname`)'
   printf ' SELECT DISTINCT `binary_packages`.`pkgname`'
   printf ' FROM `binary_packages`'
-  printf ' JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`'
+  mysql_join_binary_packages_repositories
   printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list");\n'
 } | \
   sponge "${tmp_dir}/ignore-packages"
@@ -253,7 +253,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   printf '`pkgbases`.`repository`'
   printf ' FROM `pkgbases`'
   printf ' JOIN `upstream_repositories` ON `upstream_repositories`.`name`=`pkgbases`.`repository`'
-  printf ' JOIN `git_repositories` ON `git_repositories`.`id`=`upstream_repositories`.`git_repository`'
+  mysql_join_upstream_repositories_git_repositories
   printf ';\n'
   printf 'SELECT '
   printf '`package_sources`.`pkgbase`,'
@@ -264,11 +264,10 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   printf '),'
   printf '`upstream_repositories`.`name`'
   printf ' FROM `binary_packages`'
-  printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-    'build_assignments'     'build_assignments'     'binary_packages'       'build_assignment' \
-    'package_sources'       'package_sources'       'build_assignments'     'package_source' \
-    'upstream_repositories' 'upstream_repositories' 'package_sources'       'upstream_package_repository' \
-    'git_repositories'      'git_repositories'      'upstream_repositories' 'git_repository'
+  mysql_join_binary_packages_build_assignments
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
+  mysql_join_upstream_repositories_git_repositories
   printf ' WHERE ('
   if [ -s "${tmp_dir}/package-regexes" ]; then
     grep -vxF '' "${tmp_dir}/package-regexes" | \

@@ -110,22 +110,18 @@ delete_package() {
     {
       # packages from the build-list/to-be-decided go straight to the deletion-list
       printf 'UPDATE `binary_packages`'
-      printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
-        'repositories' 'repositories' 'repository' \
-        'build_assignments' 'build_assignments' 'build_assignment'
-      printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-        'package_sources' 'package_sources' 'build_assignments' 'package_source'
+      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
       printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
       printf ' WHERE `repositories`.`name` in ("build-list","to-be-decided")'
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' \
         "$(printf '%s' "$1" | base64 -w0)"
       # other packages are marked as `is_to_be_deleted`
       printf 'UPDATE `binary_packages`'
-      printf ' JOIN `%s` ON `%s`.`id`=`binary_packages`.`%s`' \
-        'repositories' 'repositories' 'repository' \
-        'build_assignments' 'build_assignments' 'build_assignment'
-      printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-        'package_sources' 'package_sources' 'build_assignments' 'package_source'
+      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
       printf ' SET `binary_packages`.`is_to_be_deleted`=1'
       printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");' \
         "$(printf '%s' "$1" | base64 -w0)"
@@ -341,10 +337,9 @@ done | \
         # which are not yet built or on the deletion list
         printf 'DELETE `build_assignments`,`binary_packages`'
         printf ' FROM `binary_packages`'
-        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-          'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
-          'package_sources'   'package_sources'   'build_assignments' 'package_source' \
-          'repositories'      'repositories'      'binary_packages'   'repository'
+        mysql_join_binary_packages_build_assignments
+        mysql_join_build_assignments_package_sources
+        mysql_join_binary_packages_repositories
         printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
           "$(
             printf '%s' "${package}" | \
@@ -353,10 +348,9 @@ done | \
         printf ' AND (`repositories`.`name`="build-list" OR `repositories`.`name`="deletion-list");\n'
         # remove is-to-be-deleted marker from old binary packages
         printf 'UPDATE `binary_packages`'
-        printf ' JOIN `%s` ON `%s`.`id`=`%s`.`%s`' \
-          'build_assignments' 'build_assignments' 'binary_packages'   'build_assignment' \
-          'package_sources'   'package_sources'   'build_assignments' 'package_source' \
-          'repositories'      'repositories'      'binary_packages'   'repository'
+        mysql_join_binary_packages_build_assignments
+        mysql_join_build_assignments_package_sources
+        mysql_join_binary_packages_repositories
         printf ' SET `is_to_be_deleted`=0'
         printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");\n' \
           "$(
@@ -431,9 +425,9 @@ while [ -n "${black_listed_new}" ]; do
           '
         printf 'SELECT replace(to_base64(`a_ps`.`pkgbase`),"\\n","")'
         printf ' FROM `package_sources` AS `a_ps`'
-        printf ' JOIN `build_assignments` AS `a_ba` ON `a_ba`.`package_source`=`a_ps`.`id`'
-        printf ' JOIN `binary_packages` AS `a_bp` ON `a_bp`.`build_assignment`=`a_ba`.`id`'
-        printf ' JOIN `dependencies` ON `dependencies`.`dependent`=`a_bp`.`id`'
+        mysql_join_package_sources_build_assignments 'a_ps' 'a_ba'
+        mysql_join_build_assignments_binary_packages 'a_ba' 'a_bp'
+        mysql_join_binary_packages_dependencies 'a_bp'
         printf ' WHERE NOT EXISTS ('
           printf ' SELECT *'
           printf ' FROM `install_target_providers`'
@@ -441,8 +435,8 @@ while [ -n "${black_listed_new}" ]; do
             printf ' SELECT *'
             printf ' FROM `bl`'
             printf ' JOIN `package_sources` AS `b_ps` ON `bl`.`pkgbase`=`b_ps`.`pkgbase`'
-            printf ' JOIN `build_assignments` AS `b_ba` ON `b_ba`.`package_source`=`b_ps`.`id`'
-            printf ' JOIN `binary_packages` AS `b_bp` ON `b_bp`.`build_assignment`=`b_ba`.`id`'
+            mysql_join_package_sources_build_assignments 'b_ps' 'b_ba'
+            mysql_join_build_assignments_binary_packages 'b_ba' 'b_bp'
             printf ' WHERE `install_target_providers`.`package`=`b_bp`.`id`'
           printf ')'
           printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
@@ -607,8 +601,7 @@ fi
   done
   # move binary_packages from "to-be-decided" to "build-list"
   printf 'UPDATE `binary_packages`'
-  printf ' JOIN `repositories` AS `from_repo`'
-  printf ' ON `binary_packages`.`repository`=`from_repo`.`id`'
+  mysql_join_binary_packages_repositories '' 'from_repo'
   printf ' SET `repository`=('
     printf 'SELECT `to_repo`.`id`'
     printf ' FROM `repositories` AS `to_repo`'
