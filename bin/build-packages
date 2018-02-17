@@ -455,7 +455,14 @@ while [ "${count}" -ne 0 ]; do
           fi
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -C "${tar_content_dir}" -- $(
-            find "${tar_content_dir}/" -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' \) -printf '%f\n'
+            find "${tar_content_dir}/" -maxdepth 1 \
+              \( \
+                -name '*.pkg.tar.xz' -o \
+                -name '*.pkg.tar.xz.sig' -o \
+                -name '*.pkg.tar.xz-namcap.log.gz' \
+                -name '*.pkg.tar.xz.so.provides.gz' \
+              \) \
+              -printf '%f\n'
             )
           while ${upload_to_build_master}; do
             err=0
