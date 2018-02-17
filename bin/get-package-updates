@@ -595,7 +595,7 @@ fi
   for repo in ${repo_names}; do
     printf 'UPDATE `git_repositories`'
     printf ' SET `git_repositories`.`head`=from_base64("%s")' \
-      "$(eval 'printf '"'"'%s'"'"' "${repo_revisions__'"${repo}"'}" | base64 -w0')"
+      "$(eval 'printf '"'"'%s'"'"' "${new_repo_revisions__'"${repo}"'}" | base64 -w0')"
     printf ' WHERE `git_repositories`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${repo}" | base64 -w0)"
   done
