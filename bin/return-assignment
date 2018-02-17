@@ -51,7 +51,7 @@ if [ "$5" = 'ERROR' ]; then
   infos=$(
     {
       printf 'SELECT DISTINCT `build_assignments`.`id`,IF(`build_assignments`.`is_broken`,"true","false") FROM `build_slaves`'
-      mysql_join_build_assignments_build_slaves
+      mysql_join_build_slaves_build_assignments
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
       mysql_join_build_assignments_binary_packages
