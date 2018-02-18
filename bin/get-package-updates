@@ -379,7 +379,7 @@ black_listed=''
 black_listed_new=$(
   {
     {
-      git -C "${repo_paths__archlinux32}" archive "$(cat "${work_dir}/archlinux32.revision.new")" -- 'blacklist' | \
+      git -C "${repo_paths__archlinux32}" archive "${new_repo_revisions__archlinux32}" -- 'blacklist' | \
         tar -Ox 'blacklist' | \
         sed '
           s/\s*#.*$//
