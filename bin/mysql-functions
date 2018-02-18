@@ -725,6 +725,10 @@ mysql_find_build_assignment_loops() {
       printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
     } | \
       ${mysql_command} --raw --batch | \
+      sed '
+        1d
+        y/\t/ /
+      ' | \
       tsort 2>&1 >/dev/null | \
       sed 's/^tsort:\s*//' | \
       {
