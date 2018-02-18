@@ -196,16 +196,8 @@ if ! flock -s ${block_flag} 8; then
   exit
 fi
 
-# shellcheck disable=SC2016
-{
-  printf 'DELETE FROM `binary_packages`'
-  printf ' WHERE `binary_packages`.`repository`=('
-    printf 'SELECT `repositories`.`id`'
-    printf ' FROM `repositories`'
-    printf ' WHERE `repositories`.`name`="to-be-decided"'
-  printf ')'
-} | \
-  ${mysql_command}
+# shellcheck disable=SC2119
+mysql_cleanup
 
 echo 'Check modified packages from the last update, and put them to the build list.'
 
