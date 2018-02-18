@@ -302,6 +302,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
 
     while read -r pkgbase git_rev mod_git_rev repo; do
       printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" >&2
+      generate_package_metadata "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}"
       mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}"
       printf '\n' >&2
     done
