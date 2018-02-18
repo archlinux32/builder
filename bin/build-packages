@@ -459,7 +459,7 @@ while [ "${count}" -ne 0 ]; do
               \( \
                 -name '*.pkg.tar.xz' -o \
                 -name '*.pkg.tar.xz.sig' -o \
-                -name '*.pkg.tar.xz-namcap.log.gz' \
+                -name '*.pkg.tar.xz-namcap.log.gz' -o \
                 -name '*.pkg.tar.xz.so.provides.gz' \
               \) \
               -printf '%f\n'
