@@ -611,7 +611,8 @@ fi
 } | \
   ${mysql_command}
 
-# update loop list in database
+# update loop list in database (beware, the packages are expected to be in "build-list",
+# not "to-be-decided", so we need to run this after moving the packages from "to-be-decided" to the "build-list".
 mysql_find_build_assignment_loops
 
 # Move the .new-files to the actual files
