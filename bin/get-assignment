@@ -166,8 +166,6 @@ if [ -n "${currently_building}" ]; then
   hand_out_assignment ${currently_building}
 fi
 
-# TODO: actually implement the below criteria (a.k.a.: "I'm out of time")
-
 # a package with [all dependencies met or which is part of a loop]
 # and which is currently not being built, ordered by:
 # 1: we requested it
@@ -184,16 +182,16 @@ next_building=$(
           base64 -w0
       )"
     printf '`build_assignments`.`priority`,'
-    printf '('
-      printf 'SELECT COUNT(*)'
-      printf ' FROM `failed_builds`'
-      printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
-    printf ') AS `trials`,'
+    printf 'COALESCE('
+    printf 'MAX(`failed_builds`.`date`),0'
+    printf ') AS `last_trial`,'
     mysql_query_is_part_of_loop '`build_assignments`.`id`'
     printf ' AS `part_of_loop`,'
     mysql_query_select_pkgbase_and_revision
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_repositories
+    printf ' LEFT'
+    mysql_join_build_assignments_failed_builds
     printf ' WHERE `repositories`.`name`="build-list"'
     printf ' AND NOT EXISTS ('
       printf ' SELECT *'
@@ -212,7 +210,8 @@ next_building=$(
       printf ' OR NOT '
       mysql_query_has_pending_dependencies '`build_assignments`.`id`'
     printf ')'
-    printf ' ORDER BY `requested` DESC, `priority` DESC, `trials`, `part_of_loop`, `build_assignments`.`id`'
+    printf ' GROUP BY `build_assignments`.`id`'
+    printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
     ${mysql_command} --batch --raw | \
