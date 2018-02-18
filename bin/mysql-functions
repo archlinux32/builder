@@ -771,6 +771,15 @@ mysql_cleanup() {
     exit 2
   fi
   {
+    # remove to-be-decided binary_packages
+    printf '%s ' \
+      "${operator}"
+    if [ "${operator}" = 'DELETE' ]; then
+      printf '`binary_packages` '
+    fi
+    printf 'FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="to-be-decided";\n'
     # remove dependencies w/o binary_package or install_target
     printf '%s FROM `dependencies` ' \
       "${operator}"
@@ -804,13 +813,15 @@ mysql_cleanup() {
       printf 'WHERE `binary_packages`.`build_assignment`=`build_assignments`.`id`'
     printf ');\n'
     # remove failed_builds with unbroken build_assignments
-    printf '%s FROM `failed_builds` ' \
+    printf '%s ' \
       "${operator}"
-    printf 'WHERE ('
-      printf 'SELECT NOT `build_assignments`.`is_broken`'
-      printf ' FROM `build_assignments` '
-      printf ' WHERE `failed_builds`.`build_assignment`=`build_assignments`.`id`'
-    printf ');\n'
+    if [ "${operator}" = 'DELETE' ]; then
+      printf '`failed_builds` '
+    fi
+    printf 'FROM `failed_builds` '
+    mysql_join_failed_builds_build_assignments
+    printf 'WHERE NOT `build_assignments`.`is_broken`'
+    printf ';\n'
     # remove failed_builds w/o build_assignment
     printf '%s FROM `failed_builds` ' \
       "${operator}"
