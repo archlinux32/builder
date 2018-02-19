@@ -105,7 +105,7 @@ touch "${tmp_dir}/messages"
 trap 'finish' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- git-repositories build-list repos package-database state-files
+  set -- git-repositories build-list mysql repos package-database state-files
 fi
 
 while [ $# -gt 0 ]; do
@@ -382,6 +382,26 @@ while [ $# -gt 0 ]; do
           "${tmp_dir}/messages"
 
       done
+
+    ;;
+
+    mysql)
+
+      [ ${silence} -gt 0 ] || \
+        printf 'checking mysql-sanity-check-file ...' >> \
+        "${tmp_dir}/messages"
+
+      if [ -s "${webserver_directory}/mysql-sanity.html" ]; then
+        if [ ${silence} -le 1 ]; then
+          printf '\nThere is something wrong with the database:\n'
+          cat "${webserver_directory}/mysql-sanity.html"
+        fi
+        i_am_insane
+      fi
+
+      [ ${silence} -gt 0 ] || \
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
