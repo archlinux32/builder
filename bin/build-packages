@@ -307,6 +307,7 @@ while [ "${count}" -ne 0 ]; do
             # we can't improve anything
             continue
           fi
+          # TODO: the below command also overwrites files which are intentionally overwritten by us (e.g. "config" in "core/linux" or "extra/linux-zen")
           tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
         fi
 
