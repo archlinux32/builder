@@ -306,18 +306,33 @@ tar -x \
   --no-wildcards-match-slash \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
-  '*.pkg.tar.xz-namcap.log.gz'
+  '*.pkg.tar.xz-namcap.log.gz' \
+  '*.pkg.tar.xz.so.provides'
 
-# check if all packages are signed and all signatures belong to a package
+# check if all packages come with:
+#  - a package file
+#  - a signature
+#  - a namcap log
+#  - a list of provided libraries
 missing_files=$(
-  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' | \
-    sed '
-      s@\.sig$@ signature@
-      t
-      s@-namcap\.log\.gz$@ namcap@
-      t
-      s@$@ package@
-    ' | \
+  find . -maxdepth 1 \( \
+    \( \
+      -name '*.pkg.tar.xz' \
+      -printf '%f package\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz.sig' \
+      -printf '%f signature\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz-namcap.log' \
+      -printf '%f namcap\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz.so.provides.gz' \
+      -printf '%f provided-libraries\n' \
+    \) \
+  \) | \
     sort -k1,1 -k2,2 | \
     sed '
       :a
@@ -347,11 +362,17 @@ missing_files=$(
         p
         g
       }
+      / provided-libraries /!{
+        h
+        s/^\(\S\+\) .*$/List of by "\1" provided libraries is missing./
+        p
+        g
+      }
     '
 )
 
 if [ -n "${missing_files}" ]; then
-  >&2 echo 'The following packages lack a signature, namcap log or package file:'
+  >&2 echo 'The following packages lack a signature, namcap log, package file or list of provided libraries:'
   >&2 echo "${missing_files}"
   exit 3
 fi
@@ -422,6 +443,45 @@ fi
 
 # move namcap.logs
 find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
+
+# insert provided libraries into database
+# shellcheck disable=SC2016
+{
+  printf 'CREATE TEMPORARY TABLE `pl` (`pkgfile` VARCHAR(64), `lib` VARCHAR(64));\n'
+  find . -maxdepth 1 -name '*.pkg.tar.xz.so.provides.gz' -execdir zgrep -HF '' '{}' \; | \
+    sed -n '
+      s,^\./\(.\+\.pkg\.tar\.xz\)\.so\.provides\.gz:\([^:]\+\)$,\1\n\2,
+      T
+      p
+    ' | \
+    base64_encode_each | \
+    sed '
+      N
+      s/^\(\S\+\)\n\(\S\+\)$/(from_base64("\1"),from_base64("\2")),/
+      $s/,$/;/
+      2 s/^/INSERT INTO `pl` (`pkgfile`,`lib`) VALUES /
+    '
+  printf 'INSERT IGNORE INTO `install_targets` (`name`)'
+  printf ' SELECT DISTINCT `pl`.`lib` FROM `pl`;\n';
+  printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
+  printf ' SELECT `binary_packages`.`id`,`install_targets`.`id`'
+  printf ' FROM `install_targets` JOIN `pl` ON `pl`.`lib`=`install_targets`.`name`'
+  printf ' JOIN `binary_packages`'
+  mysql_join_binary_packages_architectures
+  mysql_join_binary_packages_build_slaves
+  mysql_join_binary_packages_repositories
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+    "$(
+      printf '%s' "${slave}" | \
+        base64 -w0
+    )"
+  printf ' AND `repositories`.`name`="build-list"'
+  printf ' AND '
+  mysql_package_name_query
+  printf '=`pl`.`pkgfile`'
+  printf ';\n'
+} | \
+  ${mysql_command}
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
