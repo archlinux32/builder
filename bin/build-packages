@@ -426,7 +426,21 @@ while [ "${count}" -ne 0 ]; do
                 ' > \
                 "${pkgfile}.so.provides"
             done
-          # TODO: search for required libraries, too
+          >&2 printf 'searching for required libraries\n'
+          package_content_dir=$(mktemp -d "${tmp_dir}/package-content.XXXXXX")
+          find "${tar_content_dir}" -maxdepth 1 \
+            -name '*.pkg.tar.xz' | \
+            while read -r pkgfile; do
+              mkdir "${package_content_dir}/${pkgfile##*/}"
+              tar -C "${package_content_dir}/${pkgfile##*/}" -xJf "${pkgfile}" 2>/dev/null
+              find "${package_content_dir}/${pkgfile##*/}" -type f \
+                -exec objdump -x '{}' \; 2>/dev/null | \
+                grep -w 'NEEDED' | \
+                awk '{print $2}' | \
+                sort -u > \
+                "${pkgfile}.so.needs"
+              rm -rf --one-file-system "${package_content_dir:?}/${pkgfile##*/}"
+            done
           >&2 printf 'running namcap ...'
           if [ "${repository}" = 'multilib' ]; then
             x86_64_build_command='multilib-build'
@@ -467,6 +481,7 @@ while [ "${count}" -ne 0 ]; do
             find "${tar_content_dir}/" -maxdepth 1 \
               \( \
                 -name '*.pkg.tar.xz-namcap.log' -o \
+                -name '*.pkg.tar.xz.so.needs' -o \
                 -name '*.pkg.tar.xz.so.provides' \
               \) \
               -execdir gzip '{}' \;
@@ -482,6 +497,7 @@ while [ "${count}" -ne 0 ]; do
                 -name '*.pkg.tar.xz' -o \
                 -name '*.pkg.tar.xz.sig' -o \
                 -name '*.pkg.tar.xz-namcap.log.gz' -o \
+                -name '*.pkg.tar.xz.so.needs.gz' -o \
                 -name '*.pkg.tar.xz.so.provides.gz' \
               \) \
               -printf '%f\n'
