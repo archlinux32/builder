@@ -462,40 +462,56 @@ find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_
 # insert provided libraries into database
 # shellcheck disable=SC2016
 {
-  printf 'CREATE TEMPORARY TABLE `pl` (`pkgfile` VARCHAR(64), `lib` VARCHAR(64));\n'
-  find . -maxdepth 1 -name '*.pkg.tar.xz.so.provides.gz' -execdir zgrep -HF '' '{}' \; | \
-    sed -n '
-      s,^\./\(.\+\.pkg\.tar\.xz\)\.so\.provides\.gz:\([^:]\+\)$,\1\n\2,
-      T
-      p
-    ' | \
-    base64_encode_each | \
-    sed '
-      N
-      s/^\(\S\+\)\n\(\S\+\)$/(from_base64("\1"),from_base64("\2")),/
-      $s/,$/;/
-      2 s/^/INSERT INTO `pl` (`pkgfile`,`lib`) VALUES /
-    '
-  # TODO: insert needed libraries into database, too
-  printf 'INSERT IGNORE INTO `install_targets` (`name`)'
-  printf ' SELECT DISTINCT `pl`.`lib` FROM `pl`;\n';
-  printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
-  printf ' SELECT `binary_packages`.`id`,`install_targets`.`id`'
-  printf ' FROM `install_targets` JOIN `pl` ON `pl`.`lib`=`install_targets`.`name`'
-  printf ' JOIN `binary_packages`'
-  mysql_join_binary_packages_architectures
-  mysql_join_binary_packages_build_slaves
-  mysql_join_binary_packages_repositories
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
-    "$(
-      printf '%s' "${slave}" | \
-        base64 -w0
-    )"
-  printf ' AND `repositories`.`name`="build-list"'
-  printf ' AND '
-  mysql_package_name_query
-  printf '=`pl`.`pkgfile`'
-  printf ';\n'
+  for lib_link in 'pl:provides' 'nl:needs'; do
+    printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(64));\n' \
+      "${lib_link%:*}"
+    find . -maxdepth 1 -name '*.pkg.tar.xz.so.'"${lib_link#*:}"'.gz' -execdir zgrep -HF '' '{}' \; | \
+      sed -n '
+        s,^\./\(.\+\.pkg\.tar\.xz\)\.so\.'"${lib_link#*:}"'\.gz:\([^:]\+\)$,\1\n\2,
+        T
+        p
+      ' | \
+      base64_encode_each | \
+      sed '
+        N
+        s/^\(\S\+\)\n\(\S\+\)$/(from_base64("\1"),from_base64("\2")),/
+        $s/,$/;/
+        2 s/^/INSERT INTO `'"${lib_link%:*}"'` (`pkgfile`,`lib`) VALUES /
+      '
+    printf 'INSERT IGNORE INTO `install_targets` (`name`)'
+    printf ' SELECT DISTINCT `%s`.`lib` FROM `%s`;\n' \
+      "${lib_link%:*}" "${lib_link%:*}"
+    if [ "${lib_link%:*}" = 'pl' ]; then
+      printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
+    else
+      printf 'INSERT IGNORE INTO `dependencies` (`dependent`,`depending_on`,`dependency_type`)'
+    fi
+    printf ' SELECT `binary_packages`.`id`,`install_targets`.`id`'
+    if [ "${lib_link%:*}" = 'nl' ]; then
+      printf ',`dependency_types`.`id`'
+    fi
+    printf ' FROM `install_targets`'
+    if [ "${lib_link%:*}" = 'nl' ]; then
+      printf ' JOIN `dependency_types` ON `dependency_types`.`name`="link"'
+    fi
+    printf ' JOIN `%s` ON `%s`.`lib`=`install_targets`.`name`' \
+      "${lib_link%:*}" "${lib_link%:*}"
+    printf ' JOIN `binary_packages`'
+    mysql_join_binary_packages_architectures
+    mysql_join_binary_packages_build_slaves
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+      "$(
+        printf '%s' "${slave}" | \
+          base64 -w0
+      )"
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' AND '
+    mysql_package_name_query
+    printf '=`%s`.`pkgfile`' \
+      "${lib_link%:*}"
+    printf ';\n'
+  done
 } | \
   ${mysql_command}
 
