@@ -476,6 +476,7 @@ find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_
       $s/,$/;/
       2 s/^/INSERT INTO `pl` (`pkgfile`,`lib`) VALUES /
     '
+  # TODO: insert needed libraries into database, too
   printf 'INSERT IGNORE INTO `install_targets` (`name`)'
   printf ' SELECT DISTINCT `pl`.`lib` FROM `pl`;\n';
   printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
