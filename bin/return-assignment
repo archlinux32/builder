@@ -307,12 +307,14 @@ tar -x \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
   '*.pkg.tar.xz-namcap.log.gz' \
+  '*.pkg.tar.xz.so.needs.gz' \
   '*.pkg.tar.xz.so.provides.gz'
 
 # check if all packages come with:
 #  - a package file
 #  - a signature
 #  - a namcap log
+#  - a list of needed libraries
 #  - a list of provided libraries
 missing_files=$(
   find . -maxdepth 1 \( \
@@ -329,12 +331,16 @@ missing_files=$(
       -printf '%f namcap\n' \
     \) -o \
     \( \
+      -name '*.pkg.tar.xz.so.needs.gz' \
+      -printf '%f needed-libraries\n' \
+    \) -o \
+    \( \
       -name '*.pkg.tar.xz.so.provides.gz' \
       -printf '%f provided-libraries\n' \
     \) \
   \) | \
     sed '
-      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\.gz\|\.so\.provides\.gz\) /\1 /
+      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\.gz\|\.so\.\(provides\|needs\)\.gz\) /\1 /
     ' | \
     sort -k1,1 -k2,2 | tee /dev/stderr | \
     sed '
@@ -365,6 +371,12 @@ missing_files=$(
         p
         g
       }
+      / needed-libraries /!{
+        h
+        s/^\(\S\+\) .*$/List of libraries needed by "\1" is missing./
+        p
+        g
+      }
       / provided-libraries /!{
         h
         s/^\(\S\+\) .*$/List of libraries provided by "\1" is missing./
@@ -375,7 +387,7 @@ missing_files=$(
 )
 
 if [ -n "${missing_files}" ]; then
-  >&2 echo 'The following packages lack a signature, namcap log, package file or list of provided libraries:'
+  >&2 echo 'The following packages lack a signature, namcap log, package file or list of needed/provided libraries:'
   >&2 echo "${missing_files}"
   exit 3
 fi
