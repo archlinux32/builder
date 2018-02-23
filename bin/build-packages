@@ -307,8 +307,19 @@ while [ "${count}" -ne 0 ]; do
             # we can't improve anything
             continue
           fi
-          # TODO: the below command also overwrites files which are intentionally overwritten by us (e.g. "config" in "core/linux" or "extra/linux-zen")
-          tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
+          # shellcheck disable=SC2046
+          tar -xz --overwrite \
+            -f "${source_name}" \
+            --exclude PKGBUILD \
+            $(
+              if [ -n "${PKGBUILD_mod}" ]; then
+                git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" -- . | \
+                  tar -t | \
+                  sed 's/^/--exclude /'
+              fi
+            ) \
+            --strip-components=1 \
+            || true
         fi
 
         if echo "${straw}" | \
