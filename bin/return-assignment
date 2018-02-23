@@ -307,7 +307,7 @@ tar -x \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
   '*.pkg.tar.xz-namcap.log.gz' \
-  '*.pkg.tar.xz.so.provides'
+  '*.pkg.tar.xz.so.provides.gz'
 
 # check if all packages come with:
 #  - a package file
@@ -325,7 +325,7 @@ missing_files=$(
       -printf '%f signature\n' \
     \) -o \
     \( \
-      -name '*.pkg.tar.xz-namcap.log' \
+      -name '*.pkg.tar.xz-namcap.log.gz' \
       -printf '%f namcap\n' \
     \) -o \
     \( \
@@ -333,7 +333,10 @@ missing_files=$(
       -printf '%f provided-libraries\n' \
     \) \
   \) | \
-    sort -k1,1 -k2,2 | \
+    sed '
+      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\.gz\|\.so\.provides\.gz\) /\1 /
+    ' | \
+    sort -k1,1 -k2,2 | tee /dev/stderr | \
     sed '
       :a
         $!N
@@ -364,7 +367,7 @@ missing_files=$(
       }
       / provided-libraries /!{
         h
-        s/^\(\S\+\) .*$/List of by "\1" provided libraries is missing./
+        s/^\(\S\+\) .*$/List of libraries provided by "\1" is missing./
         p
         g
       }
