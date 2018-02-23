@@ -244,7 +244,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
     true
   diff -u \
     "${tmp_dir}/loops.file" \
-    "${tmp_dir}/loops.mysql" || \
+    "${tmp_dir}/loops.mysql" >&2 || \
     true
   diff -u \
     "${tmp_dir}/tested.file" \
