@@ -52,7 +52,7 @@ git archive "${tree}" | \
 errors=$(
   cd "${tmp_dir}" || \
     echo 'Cannot cd.'
-  find "bin" "conf" -type f -not -executable -not -name '.gitignore'
+  find bin conf lib -type f -not -executable -not -name '.gitignore'
 )
 
 if [ -n "${errors}" ]; then
@@ -63,7 +63,7 @@ fi
 
 errors=$(
 # shellcheck disable=SC2016
-  find bin conf -type f -executable -exec grep -H '="\$(' {} \;
+  find bin conf lib -type f -executable -exec grep -H '="\$(' {} \;
 )
 
 if [ -n "${errors}" ]; then
