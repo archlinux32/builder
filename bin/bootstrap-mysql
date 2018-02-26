@@ -223,6 +223,9 @@ if [ ! "$1" = 'slim' ]; then
       '/*!40014 SET UNIQUE_CHECKS=1 */;' \
       '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;'
 
+    # show_broken_packages_and_dependencies
+    # gives a list of broken packages and their dependencies if they're
+    # still on the build- or deletion-list
     printf 'DROP PROCEDURE IF EXISTS show_broken_packages_and_dependencies;\n'
     printf 'DELIMITER //\n'
     printf 'CREATE PROCEDURE show_broken_packages_and_dependencies()\n'
