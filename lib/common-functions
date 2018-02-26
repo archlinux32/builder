@@ -15,6 +15,15 @@ if [ -z "${base_dir}" ]; then
   . 'conf/default.conf'
 fi
 
+{
+  printf 'sourcing common-functions for %s\n' "$0"
+  printf '%s parameters:' "$#"
+  printf ' "%s"' "$@"
+  printf '\n'
+} >> \
+  "${work_dir}/command-log"
+
+
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision
 # find the PKGBUILD and modification of $package from $repository
 # sets $PKGBUILD and $PKGBUILD_mod
