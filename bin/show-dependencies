@@ -56,8 +56,7 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 for target_package in "$@"; do
 
-#  output="${webserver_directory}/graphs/${target_package}.png"
-  output="${webserver_directory}/test.png"
+  output="${webserver_directory}/graphs/${target_package}.png"
 
   # shellcheck disable=SC2016
   {
