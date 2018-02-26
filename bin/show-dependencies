@@ -9,95 +9,12 @@
 
 if [ $# -eq 0 ]; then
   broken=$(
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT `package_sources`.`pkgbase`'
-      printf ' FROM `package_sources`'
-      mysql_join_package_sources_build_assignments
-      printf ' WHERE `build_assignments`.`is_broken`'
-    } | \
+    printf 'CALL show_broken_packages_and_dependencies;\n' | \
       ${mysql_command} --raw --batch | \
-      sed '1d' | \
-      sort -u
-  )
-  new_sum='x'
-  sum=''
-  tmp_dir=$(mktemp -d 'tmp.show-dependencies.0.XXXXXXXXXX' --tmpdir)
-  trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-  # shellcheck disable=SC2016
-  {
-    printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`binary_packages`.`pkgname`'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_build_assignments
-    mysql_join_build_assignments_package_sources
-    printf ' ORDER BY `binary_packages`.`pkgname`'
-    # Why can't mysql order in the same way "sort" does!
-  } | \
-    ${mysql_command} --raw --batch | \
-    sed '
-      1d
-      y/\t/ /
-    ' | \
-    sort -k2,2 > \
-    "${tmp_dir}/builds"
-  while ! [ "${new_sum}" = "${sum}" ]; do
-    sum="${new_sum}"
-    # shellcheck disable=SC2086
-    printf '%s\n' ${broken} | \
-      sort > \
-      "${tmp_dir}/broken"
-    broken=$(
-      {
-        find "${work_dir}/package-infos" -maxdepth 1 -name '*.build-depends' | \
-          sed 's|^.*/\(.*\)\(\.[^.]\+\)\{4\}$|\1 \0|' | \
-          sort -k1,1 | \
-          join -1 1 -2 1 -o 1.2 - "${tmp_dir}/broken" | \
-          xargs -r cat
-      } | \
-        sort -u | \
-        join -1 1 -2 2 -o 2.1 - "${tmp_dir}/builds"
-    )
-    broken=$(
-      {
-        {
-          # shellcheck disable=SC2086
-          printf '%s\n' ${broken}
-          cat "${tmp_dir}/broken"
-        } | \
-          sort -u
-        cut -d' ' -f1 < \
-          "${work_dir}/build-list" | \
-          sort -u
-      } | \
-        sort | \
-        uniq -d
-    )
-    new_sum=$(
-      # shellcheck disable=SC2086
-      printf '%s\n' ${broken} | \
-        sha512sum
-    )
-  done
-
-  rm -rf --one-file-system "${tmp_dir}"
-  trap - EXIT
-  broken=$(
-    {
-      # shellcheck disable=SC2086
-      printf '%s\n' ${broken} 'ALL'
-      {
-        find "${webserver_directory}/graphs" -maxdepth 1 -name '*.png' -printf '%f\n' | \
-          sed 's|\.png$||'
-        {
-          cut -d' ' -f1 < \
-            "${work_dir}/build-list"
-          cat "${work_dir}/deletion-list"
-        } | \
-          sort -u
-      } | \
-        sort | \
-        uniq -d
-    } | \
+      sed '
+        1d
+        s/\s.*$//
+      ' | \
       sort -u
   )
   # shellcheck disable=SC2086
