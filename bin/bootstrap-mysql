@@ -262,6 +262,40 @@ if [ ! "$1" = 'slim' ]; then
     printf '//\n'
     printf 'DELIMITER ;\n'
 
+    # calculate_dependencies_of_package_upto_first_built_one
+    # save binary packages (only their `id`) in `relevant_binary_packages` and `relevant_binary_packages_copy`
+    printf 'DROP PROCEDURE IF EXISTS calculate_dependencies_of_package_upto_first_built_one;\n'
+    printf 'DELIMITER //\n'
+    printf 'CREATE PROCEDURE calculate_dependencies_of_package_upto_first_built_one(IN `target_pkgbase` VARCHAR(64))\n'
+    printf 'BEGIN\n'
+    printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
+    printf ' SELECT `binary_packages`.`id`'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' AND `repositories`.`name`="build-list"'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    printf ' WHERE `package_sources`.`pkgbase`=`target_pkgbase`;\n'
+    printf 'REPEAT\n'
+    printf 'INSERT IGNORE INTO `relevant_binary_packages_copy` (`id`)'
+    printf ' SELECT `relevant_binary_packages`.`id` FROM `relevant_binary_packages`;\n'
+    printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
+    printf ' SELECT `install_target_providers`.`package`'
+    printf ' FROM `relevant_binary_packages_copy`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    printf ' AND `repositories`.`name`="build-list"'
+    mysql_join_binary_packages_dependencies
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_building`'
+    mysql_join_dependencies_install_target_providers
+    printf ';\n'
+    printf 'UNTIL ROW_COUNT()=0\n'
+    printf 'END REPEAT;\n'
+    printf 'END\n'
+    printf '//\n'
+    printf 'DELIMITER ;\n'
+
     printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
       'CREATE ROUTINE' 'buildmaster.*' \
       'CREATE TEMPORARY TABLES' 'buildmaster.*' \
