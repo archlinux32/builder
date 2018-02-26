@@ -159,10 +159,18 @@ fi
   fi
   # packages on the build-list or deletion-list should be ignored
   printf 'INSERT IGNORE INTO `ignore_packages` (`pkgname`)'
-  printf ' SELECT DISTINCT `binary_packages`.`pkgname`'
-  printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_repositories
-  printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list");\n'
+  printf ' SELECT DISTINCT `ignore_bin`.`pkgname`'
+  printf ' FROM `binary_packages` AS `ignore_bin`'
+  mysql_join_binary_packages_repositories 'ignore_bin'
+  printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list")'
+  # packages with no not-to-be-deleted and at least on to-be-deleted version should be ignored
+  printf ' OR ('
+  printf '`ignore_bin`.`is_to_be_deleted`'
+  printf ' AND NOT EXISTS ('
+    printf 'SELECT * FROM `binary_packages` AS `other_bin`'
+    printf ' WHERE NOT `other_bin`.`is_to_be_deleted`'
+    printf ' AND `other_bin`.`pkgname`=`ignore_bin`.`pkgname`'
+  printf '));\n'
 } | \
   sponge "${tmp_dir}/ignore-packages"
 
