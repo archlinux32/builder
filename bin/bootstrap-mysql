@@ -139,6 +139,7 @@ if [ ! "$1" = 'slim' ]; then
       ' less_stable MEDIUMINT :repository_stabilities'
   )
 
+  # shellcheck disable=SC2016
   {
     printf '%s\n' \
       '/*!40014 SET UNIQUE_CHECKS=0 */;' \
@@ -151,14 +152,11 @@ if [ ! "$1" = 'slim' ]; then
         while read -r table size; do
           case "${turn}" in
            'drop')
-              # shellcheck disable=SC2016
               printf 'DROP TABLE IF EXISTS `%s`;\n' "${table}"
             ;;
             'create'|'link')
               if [ "${turn}" = 'create' ]; then
-                # shellcheck disable=SC2016
                 printf 'CREATE TABLE `%s` (\n' "${table}"
-                # shellcheck disable=SC2016
                 printf '  `id` %s NOT NULL AUTO_INCREMENT,\n' "${size}"
               fi
               echo "${tables}" | \
@@ -181,16 +179,14 @@ if [ ! "$1" = 'slim' ]; then
                       if [ -z "${rest}" ]; then
                         rest="${type}"
                       fi
-                      # shellcheck disable=SC2016
                       printf '  UNIQUE KEY `%s` (' "${type}"
-                      # shellcheck disable=SC2016,SC2086
+                      # shellcheck disable=SC2086
                       printf '`%s`,' ${rest} | \
                         sed 's|,$||'
                       printf ')'
                     ;;
                     *)
                       if [ "${turn}" = 'create' ]; then
-                        # shellcheck disable=SC2016
                         printf '  `%s` %s' "${column}" "${type}"
                         if ! echo "${rest}" | \
                           grep -qwF 'NULL'; then
@@ -201,7 +197,6 @@ if [ ! "$1" = 'slim' ]; then
                           tr ' ' '\n' | \
                           sed -n 's/^://;T;p' | \
                           while read -r link; do
-                            # shellcheck disable=SC2016
                             printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`);\n' \
                               "${table}" \
                               "${column}" \
@@ -215,7 +210,6 @@ if [ ! "$1" = 'slim' ]; then
                   fi
                 done
               if [ "${turn}" = 'create' ]; then
-                # shellcheck disable=SC2016
                 printf '  PRIMARY KEY (`id`));\n'
               fi
             ;;
@@ -230,26 +224,26 @@ if [ ! "$1" = 'slim' ]; then
       '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;'
     printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
       'CREATE TEMPORARY TABLES' 'buildmaster.*' \
-      'SHOW VIEW' 'buildmaster.*' \
+      'EXECUTE' 'buildmaster.*' \
+      'RELOAD' '*.*' \
       'SELECT' 'buildmaster.*' \
-      'UPDATE' 'buildmaster.*' \
-      'RELOAD' '*.*'
-    printf 'GRANT %s ON %s TO '"'"'http'"'"'@'"'"'localhost'"'"';\n' \
       'SHOW VIEW' 'buildmaster.*' \
-      'SELECT' 'buildmaster.*'
+      'UPDATE' 'buildmaster.*'
+    printf 'GRANT %s ON %s TO '"'"'http'"'"'@'"'"'localhost'"'"';\n' \
+      'SELECT' 'buildmaster.*' \
+      'SHOW VIEW' 'buildmaster.*'
     printf 'FLUSH PRIVILEGES;\n'
   } | \
     mysql -u root -p buildmaster
 fi
 
+# shellcheck disable=SC2016
 {
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `architectures` (`name`) VALUES '
   printf '("%s"),' \
     'any' 'i686' | \
     sed 's|,$||'
   printf ';\n'
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `fail_reasons` (`identifier`,`name`,`severity`) VALUES '
   printf '(from_base64("%s"),"%s",%s),' \
     "$(
@@ -290,7 +284,6 @@ fi
     )" 'unknown' 100 | \
     sed 's|,$||'
   printf ';\n'
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `git_repositories` (`name`,`url`,`directory`,`head`) VALUES'
   {
     for repo in ${repo_names}; do
@@ -328,9 +321,7 @@ fi
     'extra:packages' \
     'multilib:packages' \
     'community:community'; do
-    # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `upstream_repositories` (`name`,`git_repository`) SELECT\n'
-    # shellcheck disable=SC2016
     printf '  from_base64("%s"),`id` FROM `git_repositories` WHERE `name` = from_base64("%s");\n' \
       "$(
         printf '%s' "${repo%:*}" | \
@@ -342,7 +333,6 @@ fi
       )"
   done
 
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `build_slaves` (`name`,`ssh_key`,`operator`,`last_connection`) VALUES'
   {
     sed -n '
@@ -385,7 +375,6 @@ fi
   } | \
     sed 's|,;|;|'
 
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `repository_stabilities` (`name`,`bugtracker_category`) VALUES'
   {
     printf '\n  ("%s",%s),' \
@@ -399,7 +388,6 @@ fi
   } | \
     sed 's|,;|;|'
 
-  # shellcheck disable=SC2016
   {
     printf 'INSERT IGNORE INTO `repository_stability_relations` (`more_stable`,`less_stable`)'
     printf ' SELECT `ms`.`id`,`ls`.`id`'
@@ -435,9 +423,7 @@ fi
     'community-staging:staging:AQ==' \
     'build-list:unbuilt:AA==' \
     'deletion-list:forbidden:AA=='; do
-    # shellcheck disable=SC2016
     printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
-    # shellcheck disable=SC2016
     printf ' from_base64("%s"),`id`,from_base64("%s") FROM `repository_stabilities` WHERE `name`=from_base64("%s");\n' \
       "$(
         printf '%s' "${repo}" | \
@@ -455,7 +441,6 @@ fi
       )"
   done
 
-  # shellcheck disable=SC2016
   printf 'INSERT IGNORE INTO `dependency_types` (`name`,`relevant_for_building`,`relevant_for_binary_packages`) VALUES'
   {
     printf '\n  ("%s",%s,%s),' \
