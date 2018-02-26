@@ -3,7 +3,7 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: read information from database
+# TODO: can this be faster?
 
 # Create a lock file.
 
@@ -54,360 +54,249 @@ fi
 tmp_dir=$(mktemp -d 'tmp.show-dependencies.1.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-sort -u "${work_dir}/build-order" | \
-  grep -v '^\(\S\+\) \1$' | \
-  grep '^\S\+ \S\+$' > \
-  "${tmp_dir}/original-build-order"
-
-sort -k1,1 "${work_dir}/build-list" > \
-  "${tmp_dir}/build-list.sorted-by-package"
-
-{
-  sort -k1,1 "${tmp_dir}/original-build-order" | \
-    join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
-  sort -k2,2 "${tmp_dir}/original-build-order" | \
-    join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/build-list.sorted-by-package"
-} | \
-  sort -u | \
-  sponge "${tmp_dir}/original-build-order"
-
-find "${work_dir}/package-infos" -maxdepth 1 -printf '%f\n' | \
-  sed 's|\(\.[^.]\+\)\{4\}$||' | \
-  sort -u > \
-  "${tmp_dir}/known-packages"
-
-find "${work_dir}/package-infos" -maxdepth 1 -name '*.groups' -printf '%f %p\n' | \
-  while read -r name pf; do
-    xargs -r printf "${name%.*.*.*.*}"' %s\n' < \
-      "${pf}"
-  done > \
-  "${tmp_dir}/known-groups"
-
-find "${work_dir}/package-infos" -maxdepth 1 -name '*.packages' -printf '%f %p\n' | \
-  while read -r name pf; do
-    grep -vxF "${name%.*.*.*.*}" "${pf}" | \
-      xargs -r printf "${name%.*.*.*.*}"' %s\n'
-  done > \
-  "${tmp_dir}/known-split-packages"
-
-find "${work_dir}/package-infos" -maxdepth 1 -name '*.run-depends' -printf '%f %p\n' | \
-  while read -r name pf; do
-    xargs -r printf '%s '"${name%.*.*.*.*}"'\n' < \
-      "${pf}"
-  done > \
-  "${tmp_dir}/known-run-depends"
-
 for target_package in "$@"; do
 
-  output="${webserver_directory}/graphs/${target_package}.png"
+#  output="${webserver_directory}/graphs/${target_package}.png"
+  output="${webserver_directory}/test.png"
 
-  if [ "${target_package}" = 'ALL' ]; then
-
-    # groups and split packages built by jobs on the build list
-    cat "${tmp_dir}/known-groups" "${tmp_dir}/known-split-packages" | \
-      sort -k1,1 | \
-      join -1 1 -2 1 -o 1.2 - "${tmp_dir}/build-list.sorted-by-package" | \
-      sort -u > \
-      "${tmp_dir}/relevant-stuff"
-
-    {
-      # groups and split packages built by jobs on the build list - which are also dependencies of packages on the build-list
-      sort -k1,1 "${tmp_dir}/original-build-order" | \
-        join -1 1 -2 1 -o 2.1 - "${tmp_dir}/relevant-stuff"
-      # build list jobs themself
-      cut -d' ' -f1 < "${work_dir}/build-list"
-    } | \
-      sort -u | \
-      sponge "${tmp_dir}/relevant-stuff"
-
-    {
-      sort -k1,1 "${tmp_dir}/original-build-order" | \
-        join -1 1 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff" | \
-        sort -k2,2 | \
-        join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/relevant-stuff"
-      sed 's/.*/\0 \0/' "${tmp_dir}/relevant-stuff"
-    } > \
-      "${tmp_dir}/build-order"
-
-    rm "${tmp_dir}/relevant-stuff"
-
-    find "${work_dir}/package-states" -name '*.done' -printf '%f\n' | \
-      sed 's|\(\.[^.]\+\)\{4\}$||' | \
-      sort -u | \
-      tee "${tmp_dir}/done-packages" | \
-      xargs -r printf '4 staging-package %s\n' > \
-      "${tmp_dir}/knots"
-
-    {
-      cat \
-        "${tmp_dir}/known-groups" \
-        "${tmp_dir}/known-run-depends" \
-        "${tmp_dir}/known-split-packages"
-      awk '{print $1 " " $1}' < \
-        "${tmp_dir}/known-packages"
-    } | \
-      sort -k1,1 > \
-      "${tmp_dir}/known-connections.sorted.1"
-
-    sort -k2,2 \
-      "${tmp_dir}/known-connections.sorted.1" > \
-      "${tmp_dir}/known-connections.sorted.2"
-
-    {
-      # staging -> something -> build-list
-      join -1 1 -2 1 -o 1.1,1.2 \
-        "${tmp_dir}/known-connections.sorted.1" \
-        "${tmp_dir}/done-packages" | \
-        sort -k2,2 | \
-        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
-        - \
-        "${tmp_dir}/known-connections.sorted.1" | \
-        sort -k4,4 | \
-        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
-        - \
-        "${tmp_dir}/build-list.sorted-by-package" | \
-        sed '
-          s|^\(\S\+ \S\+\) |\1\n|
-        '
-      # staging -> something -> staging
-      join -1 1 -2 1 -o 1.1,1.2 \
-        "${tmp_dir}/known-connections.sorted.1" \
-        "${tmp_dir}/done-packages" | \
-        sort -k2,2 | \
-        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
-        - \
-        "${tmp_dir}/known-connections.sorted.1" | \
-        sort -k4,4 | \
-        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
-        - \
-        "${tmp_dir}/done-packages" | \
-        sed '
-          s|^\(\S\+ \S\+\) |\1\n|
-        '
-      # build-list -> something -> staging
-      join -1 1 -2 1 -o 1.1,1.2 \
-        "${tmp_dir}/known-connections.sorted.1" \
-        "${tmp_dir}/build-list.sorted-by-package" | \
-        sort -k2,2 | \
-        join -1 2 -2 1 -o 1.1,1.2,2.1,2.2 \
-        - \
-        "${tmp_dir}/known-connections.sorted.1" | \
-        sort -k4,4 | \
-        join -1 4 -2 1 -o 1.1,1.2,1.3,1.4 \
-        - \
-        "${tmp_dir}/done-packages" | \
-        sed '
-          s|^\(\S\+ \S\+\) |\1\n|
-        '
-      cat "${tmp_dir}/build-order"
-    } | \
-      sort -u | \
-      sponge "${tmp_dir}/build-order"
-
-    rm \
-      "${tmp_dir}/done-packages" \
-      "${tmp_dir}/known-connections.sorted.1" \
-      "${tmp_dir}/known-connections.sorted.2"
-
-  else
-
-    grep " $(str_to_regex "${target_package}")\$" "${tmp_dir}/original-build-order" | \
-      sort -u > \
-      "${tmp_dir}/build-order"
-    printf '0 target-package %s\n' "${target_package}" > \
-      "${tmp_dir}/knots"
-
-    last_sum=''
-    current_sum=$(sha512sum "${tmp_dir}/build-order")
-    while ! [ "${last_sum}" = "${current_sum}" ]; do
-
-      last_sum="${current_sum}"
-
-      awk '{print $1}' "${tmp_dir}/build-order" | \
-        sort -u > \
-        "${tmp_dir}/new"
-      {
-        cat \
-          "${tmp_dir}/original-build-order" \
-          "${tmp_dir}/known-split-packages"
-        sed '/ base\(-devel\)\?$/d' "${tmp_dir}/known-groups"
-      } | \
-        sort -k2,2 | \
-        join -1 2 -2 1 -o 1.1,1.2 - "${tmp_dir}/new" | \
-        sponge -a "${tmp_dir}/build-order"
-
-      rm "${tmp_dir}/new"
-
-      sort -u "${tmp_dir}/build-order" | \
-        sponge "${tmp_dir}/build-order"
-
-      current_sum=$(sha512sum "${tmp_dir}/build-order")
-
-    done
-
-  fi
-
-#  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
-#    sponge "${tmp_dir}/build-order"
-
-  # shellcheck disable=SC2129
-  tr ' ' '\n' < \
-    "${tmp_dir}/build-order" | \
-    sort -u | \
-    join -j 1 - "${tmp_dir}/build-list.sorted-by-package" | \
-    while read -r pkg rev mod_rev repo; do
-      if [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.broken" ]; then
-        printf '1 broken-build-list-package %s\n' "${pkg}"
-      elif [ -f "${work_dir}/package-states/${pkg}.${rev}.${mod_rev}.${repo}.blocked" ]; then
-        printf '2 blocked-build-list-package %s\n' "${pkg}"
-      else
-        printf '3 build-list-package %s\n' "${pkg}"
-      fi
-    done >> \
-    "${tmp_dir}/knots"
-
+  # shellcheck disable=SC2016
   {
-    sort -u "${work_dir}/deletion-list"
-    tr ' ' '\n' < \
-      "${tmp_dir}/build-order" | \
-      sort -u
+    printf 'CREATE TEMPORARY TABLE `relevant_binary_packages` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+    printf 'CREATE TEMPORARY TABLE `relevant_binary_packages_copy` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+    printf 'CREATE TEMPORARY TABLE `relevant_install_targets` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+
+    if [ "${target_package}" = 'ALL' ]; then
+
+      printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
+      printf ' SELECT DISTINCT `binary_packages`.`id`'
+      printf ' FROM `repositories`'
+      mysql_join_repositories_repository_stabilities
+      printf ' AND `repository_stabilities`.`name` IN ("unbuilt","staging")'
+      mysql_join_repositories_binary_packages
+      printf ';\n'
+
+    else
+
+      printf 'CALL calculate_dependencies_of_package_upto_first_built_one(from_base64("%s"));\n' \
+        "$(
+          printf '%s' "${target_package}" | \
+            base64 -w0
+        )"
+
+    fi
+
+    printf 'INSERT IGNORE INTO `relevant_binary_packages_copy` (`id`)'
+    printf ' SELECT `relevant_binary_packages`.`id` FROM `relevant_binary_packages`'
+    printf ';\n'
+    printf 'INSERT IGNORE INTO `relevant_install_targets` (`id`)'
+    printf ' SELECT DISTINCT `install_target_providers`.`install_target`'
+    printf ' FROM `relevant_binary_packages`'
+    mysql_join_binary_packages_install_target_providers 'relevant_binary_packages'
+    mysql_join_install_target_providers_dependencies
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_building`'
+    printf ' JOIN `relevant_binary_packages_copy` ON `relevant_binary_packages_copy`.`id`=`dependencies`.`dependent`'
+    printf ';\n'
+
+    # we return lines with either:
+    # "knot" $type $identifier $label
+    # or
+    # "edge" $type $from_knot $to_knot
+    printf 'SELECT DISTINCT'
+    printf ' "knot",'
+    printf 'IF(`build_assignments`.`is_%s`,"%s-build-list-pkgbase",' \
+      'blocked' 'broken' \
+      'broken' 'broken'
+    printf '"build-list-pkgbase"'
+    printf ')),'
+    printf 'CONCAT("pkgbase:",`package_sources`.`id`),'
+    printf '`package_sources`.`pkgbase`'
+    printf ' FROM `relevant_binary_packages`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' AND `repository_stabilities`.`name`="unbuilt"'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    printf ';\n'
+
+    printf 'SELECT DISTINCT'
+    printf ' "knot",'
+    printf 'CONCAT("pkgname-",`repository_stabilities`.`name`),'
+    printf 'CONCAT("pkgname:",`binary_packages`.`id`),'
+    printf '`binary_packages`.`pkgname`'
+    printf ' FROM `relevant_binary_packages`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ';\n'
+
+    printf 'SELECT DISTINCT'
+    printf ' "knot","install-target",'
+    printf 'CONCAT("install-target:",`install_targets`.`id`),'
+    printf '`install_targets`.`name`'
+    printf ' FROM `relevant_install_targets`'
+    printf ' JOIN `install_targets` ON `install_targets`.`id`=`relevant_install_targets`.`id`'
+    printf ';\n'
+
+    printf 'SELECT DISTINCT'
+    printf ' "edge","builds"'
+    printf ',CONCAT("%s:",`%s`.`id`)' \
+      'pkgbase' 'package_sources' \
+      'pkgname' 'binary_packages'
+    printf ' FROM `relevant_binary_packages`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' AND `repository_stabilities`.`name`="unbuilt"'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    printf ';\n'
+
+    printf 'SELECT DISTINCT'
+    printf ' "edge","provides"'
+    printf ',CONCAT("%s:",`%s`.`id`)' \
+      'pkgname' 'binary_packages' \
+      'install-target' 'install_targets'
+    printf ' FROM `relevant_binary_packages`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_install_target_providers
+    printf ' JOIN `relevant_install_targets` ON `relevant_install_targets`.`id`=`install_target_providers`.`install_target`'
+    mysql_join_install_target_providers_install_targets
+    printf ';\n'
+
+    printf 'SELECT DISTINCT'
+    printf ' "edge",CONCAT("depends:",`dependency_types`.`name`)'
+    printf ',CONCAT("%s:",`%s`.`id`)' \
+      'install-target' 'install_targets' \
+      'pkgname' 'binary_packages'
+    printf ' FROM `relevant_binary_packages`'
+    printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_dependencies
+    printf ' JOIN `relevant_install_targets` ON `relevant_install_targets`.`id`=`dependencies`.`depending_on`'
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_building`'
+    mysql_join_dependencies_install_targets
+    printf ';\n'
   } | \
-    sort | \
-    uniq -d | \
-    xargs -r printf '5 deletion-list-package %s\n' >> \
+    ${mysql_command} -N --raw --batch | \
+    sed '
+      y/\t/ /
+      /^knot /{
+        s/^\S\+ //
+        w '"${tmp_dir}"'/knots
+        d
+      }
+      /^edge /{
+        s/^\S\+ //
+        w '"${tmp_dir}"'/edges
+        d
+      }
+    ' >&2
+
+  mkdir "${tmp_dir}/find-identical"
+
+  awk '{
+    print $1 >> "'"${tmp_dir}"'/find-identical/characteristics-"$2
+  }' < \
     "${tmp_dir}/knots"
+  awk '{
+    print $1 " X " $3 >> "'"${tmp_dir}"'/find-identical/characteristics-"$2
+    print $1 " " $2 " X" >> "'"${tmp_dir}"'/find-identical/characteristics-"$3
+  }' < \
+    "${tmp_dir}/edges"
 
-  {
-    awk '{print $2}' "${tmp_dir}/known-split-packages" | \
-      sort -u
-    tr ' ' '\n' < \
-      "${tmp_dir}/build-order" | \
-      sort -u
-  } | \
-    sort | \
-    uniq -d | \
-    xargs -r printf '6 split-package %s\n' >> \
-    "${tmp_dir}/knots"
-
-  {
-    cat "${tmp_dir}/known-packages"
-    tr ' ' '\n' < \
-      "${tmp_dir}/build-order" | \
-      sort -u
-  } | \
-    sort | \
-    uniq -d | \
-    xargs -r printf '7 package %s\n' >> \
-    "${tmp_dir}/knots"
-
-  {
-    awk '{print $2}' "${tmp_dir}/known-groups" | \
-      sort -u
-    tr ' ' '\n' < \
-      "${tmp_dir}/build-order" | \
-      sort -u
-  } | \
-    sort | \
-    uniq -d | \
-    xargs -r printf '8 group %s\n' >> \
-    "${tmp_dir}/knots"
-
-  tr ' ' '\n' < \
-    "${tmp_dir}/build-order" | \
-    sort -u | \
-    xargs -r printf '100 unknown %s\n' >> \
-    "${tmp_dir}/knots"
-
-  sort -k3,3 -k1n,1 "${tmp_dir}/knots" | \
-    uniq -f2 | \
-    awk '{print $3 " " $1 " " $2}' | \
-    sort -k2,3 | \
-    sponge "${tmp_dir}/knots"
-
-  mkdir "${tmp_dir}/neighbours"
-  cat "${tmp_dir}/knots" "${tmp_dir}/build-order" | \
-    awk '{
-      print $1 " " $2 > "'"${tmp_dir}/neighbours/"'"$1;
-      print $1 " " $2 > "'"${tmp_dir}/neighbours/"'"$2;
-    }'
-
-  find "${tmp_dir}/neighbours" -maxdepth 1 -type f | \
-    while read -r file; do
+  modifier=$(
+    find "${tmp_dir}/find-identical" -maxdepth 1 \
+      -type f \
+      -name 'characteristics-*' | \
+      while read -r file; do
+        printf '%s ' "${file##*/}"
+        sort -u "${file}" | \
+          sha512sum | \
+          awk '{print $1}'
+      done | \
+      sort -k2,2 | \
+      uniq -Df1 | \
+      sed 's,^characteristics-,,' | \
       sed '
-          s@\(^\| \)'"$(str_to_regex "${file##*/}")"'\( \|$\)@\1<knot>\2@
-          s@\(^\| \)'"$(str_to_regex "${file##*/}")"'\( \|$\)@\1<knot>\2@
-        ' "${file}" | \
-        sort -u | \
-        sponge "${file}"
-    done
+        :a
+          $!N
+          s/^\(\S\+\) \(\S\+\)\n\(\S\+ \)\2$/\1+\3\2/
+          ta
+          P
+          D
+      ' | \
+      cut -d' ' -f1 | \
+      sed '
+        s/^/s,\\(/
+        s/+\([^+[:space:]]\+\)$/\\)\\(\\s\\|$\\),\1\\2,g;/
+        s/+/\\|/g
+      '
+  )
+  rm -rf --one-file-system "${tmp_dir}/find-identical"
 
-  find "${tmp_dir}/neighbours" -maxdepth 1 -type f -exec \
-    sha512sum {} \; | \
-    sed 's|^\(\S\+\)  .*/\([^/]\+\)$|\2 \1|' | \
-    sort -k2,2 | \
-    uniq -f1 -D | \
-    awk '{print $2 " " $1}' > \
-    "${tmp_dir}/sums"
-
-  rm -rf --one-file-system "${tmp_dir}/neighbours"
-
-  sed '
-    :a
-    $!N
-    s|^\(\S\+\) \([^\n]\+\)\n\1 |\1 \2<nl>|
-    ta
-    P
-    D
-  ' "${tmp_dir}/sums" | \
-  join -1 1 -2 1 -o 2.2,1.2 - "${tmp_dir}/sums" | \
-  while read -r original replacement; do
-    sed -i '
-      s@\( \|^\)'"$(str_to_regex "${original}")"'\( \|$\)@\1'"${replacement}"'\2@
-      s@\( \|^\)'"$(str_to_regex "${original}")"'\( \|$\)@\1'"${replacement}"'\2@
-    ' "${tmp_dir}/build-order" "${tmp_dir}/knots"
-  done
-
-  grep -v '^\(\S\+\) \1$' "${tmp_dir}/build-order" | \
-    sort -u | \
-    sponge "${tmp_dir}/build-order"
-  sort -u "${tmp_dir}/knots" | \
+  sed "${modifier}" "${tmp_dir}/knots" | \
+    sort -k2,2 -k1,1 | \
+    sed '
+      :a
+        $!N
+        s/^\(\S\+ \S\+ \)\(\S\+\)\n\1\(\S\+\)$/\1\2<nl>\3/
+        ta
+        P
+        D
+    ' | \
     sponge "${tmp_dir}/knots"
+
+  sed "${modifier}" "${tmp_dir}/edges" | \
+    sort -u | \
+    sponge "${tmp_dir}/edges"
 
   {
     printf '%s\n' \
       'digraph dependencies {' \
       '  fontname=dejavu;'
 
-    cut -d' ' -f1,3 < \
-      "${tmp_dir}/knots" | \
-      while read -r who what; do
-        if [ "${what}" = 'broken-build-list-package' ]; then
-          color='#ff0000'
-        elif [ "${what}" = 'blocked-build-list-package' ]; then
-          color='#d00000'
-        elif [ "${what}" = 'build-list-package' ]; then
-          color='#800000'
-        elif [ "${what}" = 'deletion-list-package' ]; then
-          color='#808080'
-        elif [ "${what}" = 'group' ]; then
-          color='#0000ff'
-        elif [ "${what}" = 'package' ]; then
-          color='#000000'
-        elif [ "${what}" = 'split-package' ]; then
-          color='#8080ff'
-        elif [ "${what}" = 'staging-package' ]; then
-          color='#008000'
-        elif [ "${what}" = 'target-package' ]; then
-          color='#00ff00'
-        else
-          color='#ff80ff'
-        fi
-        printf '  "%s" [fontcolor="%s"];\n' "${who}" "${color}"
-      done
+    # knots: $type $identifier $label
+    # edges: $type $from_knot $to_knot
 
-    sed 's|\\|\\\\|g' "${tmp_dir}/build-order" | \
-      xargs -rn2 printf '  "%s" -> "%s";\n' | \
-      sort -u
+    while read -r type id label; do
+      case "${type}" in
+        'broken-build-list-pkgbase')
+          color='#ff0000'
+        ;;
+        'blocked-build-list-pkgbase')
+          color='#d00000'
+        ;;
+        'build-list-pkgbase')
+          color='#800000'
+        ;;
+        'pkgname-unbuilt')
+          color='#800000'
+        ;;
+        'pkgname-staging')
+          color='#008000'
+        ;;
+        'pkgname-stable'|'pkgname-testing'|'pkgname-standalone')
+          color='#000000'
+        ;;
+        'install-target')
+          color='#000080'
+        ;;
+        *)
+          color='#ff80ff'
+          label="${label} (${type})"
+        ;;
+      esac
+      printf '  "%s" [label="%s", fontcolor="%s"];\n' "${id}" "${label}" "${color}"
+    done < \
+      "${tmp_dir}/knots"
+
+    while read -r type from_knot to_knot; do
+      printf '"%s" -> "%s";\n' \
+        "${from_knot}" "${to_knot}"
+    done < \
+      "${tmp_dir}/edges"
 
     printf '%s\n' \
       '}'
@@ -421,16 +310,12 @@ for target_package in "$@"; do
   ' "${tmp_dir}/input"
 
   line_count=$(wc -l < "${tmp_dir}/input")
-  if [ "${line_count}" -gt 500 ] && [ "${target_package}" != 'ALL' ]; then
-    sed -i '/"base\(-devel\)\?"/d' "${tmp_dir}/input"
-    line_count=$(wc -l < "${tmp_dir}/input")
-    if [ "${line_count}" -gt 700 ]; then
-      rm -f "${output}"
-      >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
-        "${target_package}" \
-        "${line_count}"
-      continue
-    fi
+  if [ "${target_package}" != 'ALL' ] && [ "${line_count}" -gt 1000 ]; then
+    rm -f "${output}"
+    >&2 printf 'Skipping graph for "%s" - would be too big (%d).\n' \
+      "${target_package}" \
+      "${line_count}"
+    continue
   fi
   printf 'small enough (%s): %d\n' \
     "${target_package}" \
