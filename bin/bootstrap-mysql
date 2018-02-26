@@ -222,7 +222,45 @@ if [ ! "$1" = 'slim' ]; then
     printf '%s\n' \
       '/*!40014 SET UNIQUE_CHECKS=1 */;' \
       '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;'
+
+    printf 'DROP PROCEDURE IF EXISTS show_broken_packages_and_dependencies;\n'
+    printf 'DELIMITER //\n'
+    printf 'CREATE PROCEDURE show_broken_packages_and_dependencies()\n'
+    printf 'BEGIN\n'
+    printf 'CREATE TEMPORARY TABLE `%s` (`id` BIGINT, UNIQUE KEY (`id`));\n' \
+      'broken_packages_and_dependencies' 'broken_packages_and_dependencies_old'
+    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
+    printf ' SELECT `build_assignments`.`id`'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_build_assignments
+    printf ' AND `build_assignments`.`is_broken`'
+    mysql_join_binary_packages_repositories
+    printf ' AND `repositories`.`name`="build-list";\n'
+    printf 'REPEAT\n'
+    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`)'
+    printf ' SELECT `broken_packages_and_dependencies`.`id` FROM `broken_packages_and_dependencies`;\n'
+    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
+    printf ' SELECT `new_bp`.`build_assignment`'
+    printf ' FROM `broken_packages_and_dependencies_old`'
+    mysql_join_build_assignments_binary_packages 'broken_packages_and_dependencies_old' 'old_bp'
+    mysql_join_binary_packages_dependencies 'old_bp'
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_building`'
+    mysql_join_dependencies_install_target_providers
+    mysql_join_install_target_providers_binary_packages '' 'new_bp'
+    mysql_join_binary_packages_repositories 'new_bp' 'new_repo'
+    printf ' AND `new_repo`.`name` IN ("build-list","deletion-list");\n'
+    printf 'UNTIL ROW_COUNT()=0\n'
+    printf 'END REPEAT;\n'
+    printf 'SELECT '
+    mysql_query_select_pkgbase_and_revision
+    printf ' JOIN `broken_packages_and_dependencies` ON `broken_packages_and_dependencies`.`id`=`build_assignments`.`id`;\n'
+    printf 'END\n'
+    printf '//\n'
+    printf 'DELIMITER ;\n'
+
     printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
+      'CREATE ROUTINE' 'buildmaster.*' \
       'CREATE TEMPORARY TABLES' 'buildmaster.*' \
       'EXECUTE' 'buildmaster.*' \
       'RELOAD' '*.*' \
