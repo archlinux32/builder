@@ -16,6 +16,9 @@
 
 # TODO: keep database clean in case of abort
 
+# TODO: It seems, updating present build assignments in the database is borken
+# ... they seem to get deleted
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
