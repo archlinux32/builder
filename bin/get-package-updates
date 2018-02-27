@@ -16,7 +16,7 @@
 
 # TODO: keep database clean in case of abort
 
-# TODO: It seems, updating present build assignments in the database is borken
+# TODO: It seems, updating present build assignments in the database is broken
 # ... they seem to get deleted
 
 # shellcheck disable=SC2016
