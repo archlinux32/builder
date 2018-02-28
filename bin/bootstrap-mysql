@@ -304,7 +304,8 @@ if [ ! "$1" = 'slim' ]; then
       'SELECT' 'buildmaster.*' \
       'SHOW VIEW' 'buildmaster.*' \
       'UPDATE' 'buildmaster.*'
-    printf 'GRANT %s ON %s TO '"'"'http'"'"'@'"'"'localhost'"'"';\n' \
+    printf 'GRANT %s ON %s TO '"'"'webserver'"'"'@'"'"'localhost'"'"';\n' \
+      'CREATE TEMPORARY TABLES' 'buildmaster.*' \
       'SELECT' 'buildmaster.*' \
       'SHOW VIEW' 'buildmaster.*'
     printf 'FLUSH PRIVILEGES;\n'
