@@ -34,7 +34,8 @@ if (! $result = $mysql -> query(
   " JOIN `dependencies` ON `dependencies`.`dependent`=`binary_packages`.`id`" .
   " JOIN `install_targets` ON `dependencies`.`depending_on`=`install_targets`.`id`" .
   $ignore_install_targets .
-  " JOIN `install_target_providers` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`"
+  " JOIN `install_target_providers` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`" .
+  " LIMIT 50"
   ))
   die($mysql->error);
 
@@ -46,7 +47,8 @@ if (! $result = $mysql -> query(
   " JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`" .
   $match .
   " JOIN `install_target_providers` ON `install_target_providers`.`package`=`binary_packages`.`id`" .
-  " JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`"
+  " JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`" .
+  " LIMIT 50"
   ))
   die($mysql->error);
 
