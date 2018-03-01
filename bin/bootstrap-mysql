@@ -136,7 +136,12 @@ if [ ! "$1" = 'slim' ]; then
       ' depending_on MEDIUMINT' \
       'repository_stability_relations MEDIUMINT' \
       ' more_stable MEDIUMINT :repository_stabilities' \
-      ' less_stable MEDIUMINT :repository_stabilities'
+      ' less_stable MEDIUMINT :repository_stabilities' \
+      'repository_moves MEDIUMINT' \
+      ' from_repository MEDIUMINT :repositories' \
+      ' to_repository MEDIUMINT :repositories' \
+      ' upstream_package_repository SMALLINT :upstream_repositories' \
+      ' UNIQUE source from_repository upstream_package_repository'
   )
 
   # shellcheck disable=SC2016
@@ -484,6 +489,29 @@ fi
       'staging' 'forbidden' \
       'unbuilt' 'forbidden' \
       'build-support' 'build-support'
+    printf ';\n'
+  } | \
+    sed 's| OR ;|;|'
+
+  {
+    printf 'INSERT IGNORE INTO `repository_moves` (`from_repository`,`to_repository`,`upstream_package_repository`)'
+    printf ' SELECT `f`.`id`,`t`.`id`,`u`.`id`'
+    printf ' FROM'
+    printf ' `repositories` AS `%s` JOIN' \
+      'f' 't'
+    printf ' `upstream_repositories` AS `u`'
+    printf ' WHERE '
+    printf '(`f`.`name`="%s" AND `t`.`name`="%s" AND `u`.`name`="%s") OR ' \
+      'staging' 'testing' 'core' \
+      'staging' 'testing' 'extra' \
+      'staging' 'testing' 'multilib' \
+      'community-staging' 'community-testing' 'community' \
+      'community-staging' 'community-testing' 'multilib' \
+      'testing' 'core' 'core' \
+      'testing' 'extra' 'extra' \
+      'testing' 'extra' 'multilib' \
+      'community-testing' 'community' 'community' \
+      'community-testing' 'community' 'multilib'
     printf ';\n'
   } | \
     sed 's| OR ;|;|'
