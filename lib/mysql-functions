@@ -25,7 +25,28 @@ base64_encode_each() {
 # mysql_run_query
 # wrapper function to query mysql
 mysql_run_query() {
-  ${mysql_command} "$@"
+  {
+    printf '%s %s: ' "$0" "${mysql_command} $*"
+    date
+  } \
+    | tee -a "${work_dir}/mysql.stdin" \
+    | tee -a "${work_dir}/mysql.stdout" \
+    >> "${work_dir}/mysql.stderr"
+  tee -a "${work_dir}/mysql.stdin" \
+    | ${mysql_command} "$@" \
+    2>> "${work_dir}/mysql.stderr" \
+    | tee -a "${work_dir}/mysql.stdout"
+  for s in \
+    "${work_dir}/mysql.stdin" \
+    "${work_dir}/mysql.stdout" \
+    "${work_dir}/mysql.stderr"; do
+    {
+      tail -n 10000 "$s"
+      printf '%s %s done: ' "$0" "${mysql_command} $*"
+      date
+    } \
+      | sponge "$s"
+  done
 }
 
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
