@@ -10,7 +10,7 @@
 if [ $# -eq 0 ]; then
   broken=$(
     printf 'CALL show_broken_packages_and_dependencies;\n' | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         s/\s.*$//
@@ -178,7 +178,7 @@ for target_package in "$@"; do
     mysql_join_dependencies_install_targets
     printf ';\n'
   } | \
-    ${mysql_command} -N --raw --batch | \
+    mysql_run_query -N --raw --batch | \
     sed '
       y/\t/ /
       /^knot /{

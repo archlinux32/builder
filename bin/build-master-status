@@ -557,12 +557,12 @@ if ${web}; then
         "${line}"
     done < \
       "${tmp_dir}/todos" | \
-      ${mysql_command}
+      mysql_run_query
     # insert unfound todos
     # shellcheck disable=SC2016
     {
       printf 'SHOW CREATE TABLE `todos`' | \
-        ${mysql_command} --raw --batch | \
+        mysql_run_query --raw --batch | \
         sed '
           1d
           2s/^\S\+\s\+CREATE TABLE `todos` /CREATE TEMPORARY TABLE `td` /
@@ -611,7 +611,7 @@ if ${web}; then
       printf 'WHERE `todos`.`id`=`todo_links`.`dependent`'
       printf ');\n'
     } | \
-      ${mysql_command}
+      mysql_run_query
     rm -f "${tmp_dir}/todos"
   fi
 

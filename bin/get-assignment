@@ -58,7 +58,7 @@ hand_out_assignment() {
       "$(printf '%s' "$4" | base64 -w0)"
     printf ' LIMIT 1;\n'
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '
       1d
       y/\t/ /
@@ -104,7 +104,7 @@ hand_out_assignment() {
     printf ' `upstream_repositories`.`name` = from_base64("%s");\n' \
       "$(printf '%s' "$4" | base64 -w0)"
   } | \
-    ${mysql_command}
+    mysql_run_query
 
   # lock every loop this package breaks
   find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
@@ -157,7 +157,7 @@ currently_building=$(
     printf ' AND `repositories`.`name`="build-list"'
     printf ' LIMIT 1;\n'
   } | \
-    ${mysql_command} --batch --raw | \
+    mysql_run_query --batch --raw | \
     sed '1d'
 )
 
@@ -214,7 +214,7 @@ next_building=$(
     printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
-    ${mysql_command} --batch --raw | \
+    mysql_run_query --batch --raw | \
     sed '
       1d
       y/\t/ /
@@ -238,7 +238,7 @@ count_pending=$(
     printf ' AND `build_assignments`.`is_blocked` IS NULL'
     printf ';\n'
   } | \
-    ${mysql_command} --batch --raw | \
+    mysql_run_query --batch --raw | \
     sed '1d'
 )
 

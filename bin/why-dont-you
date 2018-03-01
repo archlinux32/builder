@@ -85,7 +85,7 @@ case "${action}" in
       printf ' LEFT JOIN `build_slaves` ON `build_slaves`.`currently_building`=`to_build`.`ba_id`'
       printf ';\n'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         y/\t/ /

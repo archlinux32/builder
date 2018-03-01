@@ -22,6 +22,12 @@ base64_encode_each() {
   done
 }
 
+# mysql_run_query
+# wrapper function to query mysql
+mysql_run_query() {
+  ${mysql_command} "$@"
+}
+
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
 
 # shellcheck disable=SC2086
@@ -69,7 +75,7 @@ mysql_add_package_source() {
     printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
       "${values##* }"
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
@@ -113,7 +119,7 @@ mysql_add_binary_package() {
       s|, )|)|g
       s|, FROM| FROM|g
     ' | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
@@ -162,7 +168,7 @@ mysql_show_binary_package() {
       s|, FROM| FROM|g
       s|AND;|;|g
     ' | \
-    ${mysql_command} --html
+    mysql_run_query --html
 }
 
 # mysql_add_install_target $install_target
@@ -180,7 +186,7 @@ mysql_add_install_target() {
     printf ' VALUES (from_base64("%s"))' \
       "${install_target}"
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_generate_package_metadata $current_repository $package $git_revision $mod_git_revision $repository
@@ -626,7 +632,7 @@ mysql_generate_package_metadata() {
         cat "${temp_dir}/add-install-targets-command"
       fi
     } | \
-      ${mysql_command}
+      mysql_run_query
     printf '.' >&2
 
   )
@@ -662,7 +668,7 @@ mysql_sanity_check() {
       'a' 'b'
     printf ';\n'
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '
       /^CONCAT("/d
       s,^,<font color="#FF0000">,
@@ -693,7 +699,7 @@ mysql_sanity_check() {
       mysql_join_binary_packages_repositories
       printf ' WHERE `repositories`.`is_on_master_mirror`'
     } | \
-      ${mysql_command} --batch | \
+      mysql_run_query --batch | \
       sed '
         1d
         s,\t,/,
@@ -724,7 +730,7 @@ mysql_find_build_assignment_loops() {
       mysql_join_binary_packages_repositories 'packages_dependent' 'repositories_dependent'
       printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         y/\t/ /
@@ -754,7 +760,7 @@ mysql_find_build_assignment_loops() {
         "${new_loops}"
     fi
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_cleanup [dry]
@@ -844,7 +850,7 @@ mysql_cleanup() {
     printf ' SET `currently_building`=NULL'
     printf ' WHERE `repositories`.`name`!="build-list";\n'
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_query_has_pending_dependencies `build_assignment`.`id`
@@ -904,7 +910,7 @@ mysql_repair_binary_packages_without_build_assignment() {
     mysql_join_binary_packages_architectures
     printf ' WHERE `binary_packages`.`build_assignment`<0'
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '1d' | \
     while read -r id pkgname arch; do
       pkgname=$(
@@ -933,7 +939,7 @@ mysql_repair_binary_packages_without_build_assignment() {
           printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
             "$(printf '%s' "${pkgname}" | base64 -w0)"
         } | \
-          ${mysql_command} --raw --batch | \
+          mysql_run_query --raw --batch | \
           sed '1d' | \
           grep -qvxF '0'; then
         pkgbase="${pkgname}"
@@ -960,7 +966,7 @@ mysql_repair_binary_packages_without_build_assignment() {
       printf ' WHERE `binary_packages`.`id`=%s' "${id}"
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' "${pkgbase}"
     done | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_remove_duplicate_binary_packages
@@ -1001,7 +1007,7 @@ mysql_remove_duplicate_build_order() {
     printf ' SET `binary_packages`.`repository`=`ren`.`repo`,'
     printf ' `binary_packages`.`sub_pkgrel`=`ren`.`sub_pkgrel`;\n'
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 
 # mysql_package_name_query

@@ -225,7 +225,7 @@ while read -r package reason; do
     ;;
   esac
   if printf 'SELECT 1 FROM %s %s AND %s LIMIT 1' "${combiner}" "${selector}" "${tester}" | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '1d' | \
     grep -qxF '1'; then
     # shellcheck disable=SC2016
@@ -242,7 +242,7 @@ while read -r package reason; do
       printf ' AND NOT `b`.`is_tested`'
       printf ' AND NOT `repositories`.`name`="deletion-list";\n'
     } | \
-      ${mysql_command}
+      mysql_run_query
     case "${action}" in
       'block')
         printf '%s' "${reason}" > \

@@ -27,7 +27,7 @@ fi
   mysql_join_binary_packages_repositories
   printf ' WHERE `repositories`.`name`="build-list"'
 } | \
-  ${mysql_command} --batch | \
+  mysql_run_query --batch | \
   sed '
     1d
     y/\t/ /
@@ -48,7 +48,7 @@ sort "${work_dir}/build-list" > \
   mysql_join_build_assignments_package_sources
   mysql_join_package_sources_upstream_repositories
 } | \
-  ${mysql_command} --raw --batch | \
+  mysql_run_query --raw --batch | \
   sed '
     1d
     y/\t/ /
@@ -72,7 +72,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.locked' -prin
   printf ' WHERE `repositories`.`name`="deletion-list"'
   printf ' OR `binary_packages`.`is_to_be_deleted`;\n'
 } | \
-  ${mysql_command} --batch | \
+  mysql_run_query --batch | \
   sed '
     1d
     y/\t/ /
@@ -90,7 +90,7 @@ sort "${work_dir}/deletion-list" > \
   mysql_join_build_assignments_build_dependency_loops
   printf ';\n'
 } | \
-  ${mysql_command} --batch | \
+  mysql_run_query --batch | \
   sed '
     1d
     y/\t/ /
@@ -121,7 +121,7 @@ find "${work_dir}/build-list.loops" -regextype grep -mindepth 1 -maxdepth 1 \
   printf ' AND NOT `binary_packages`.`has_issues`'
   printf ' AND `repository_stabilities`.`name`="testing"'
 } | \
-  ${mysql_command} --batch | \
+  mysql_run_query --batch | \
   sed '
     1d
     s/^\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)$/\1-\2:\3-\4.\5-\6.pkg.tar.xz/
@@ -156,7 +156,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   printf ' AND NOT `binary_packages`.`has_issues`'
   printf ' AND `repository_stabilities`.`name`="testing"'
 } | \
-  ${mysql_command} --batch | \
+  mysql_run_query --batch | \
   sed '
     1d
     s/^\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)\s\(\S\+\)$/\1-\2:\3-\4.\5-\6.pkg.tar.xz/
@@ -190,7 +190,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   mysql_join_package_sources_upstream_repositories
   printf ' WHERE `dependency_types`.`relevant_for_building`'
 } | \
-  ${mysql_command} --raw --batch | \
+  mysql_run_query --raw --batch | \
   sed '
     1d
     y/\t/ /
@@ -210,7 +210,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
     mysql_join_package_sources_build_assignments
     mysql_join_build_assignments_binary_packages
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '
       1d
       y/\t/ /

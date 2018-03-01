@@ -129,7 +129,7 @@ delete_package() {
       printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");' \
         "$(printf '%s' "$1" | base64 -w0)"
     } | \
-      ${mysql_command}
+      mysql_run_query
   fi
 }
 
@@ -144,7 +144,7 @@ clean_up() {
       printf ' WHERE `repositories`.`name`="to-be-decided"'
     printf ');\n'
   } | \
-    ${mysql_command}
+    mysql_run_query
 }
 tmp_dir=$(mktemp -d 'tmp.get-package-updates.XXXXXXXXXX' --tmpdir)
 trap 'clean_up' EXIT
@@ -353,7 +353,7 @@ done | \
               base64 -w0
           )"
       } | \
-        ${mysql_command}
+        mysql_run_query
       mysql_generate_package_metadata 'to-be-decided' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       generate_package_metadata "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
@@ -391,7 +391,7 @@ black_listed_new=$(
       printf ' FROM `package_sources`'
       printf ' WHERE `package_sources`.`pkgbase` LIKE "lib32-%%"'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '1d'
   } | \
     sort -u
@@ -443,7 +443,7 @@ while [ -n "${black_listed_new}" ]; do
           printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
         printf ');\n'
       } | \
-        ${mysql_command} --raw --batch | \
+        mysql_run_query --raw --batch | \
         sed '1d' | \
         sort -u
     } | \
@@ -604,7 +604,7 @@ fi
   printf ')'
   printf ' WHERE `from_repo`.`name`="to-be-decided";\n'
 } | \
-  ${mysql_command}
+  mysql_run_query
 
 # update loop list in database (beware, the packages are expected to be in "build-list",
 # not "to-be-decided", so we need to run this after moving the packages from "to-be-decided" to the "build-list".

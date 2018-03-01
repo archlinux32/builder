@@ -501,7 +501,7 @@ remove_old_package_versions() {
       "$(printf '%s' "${repository}" | base64 -w0)"
     printf ';\n'
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '
       /^\S\+\sCONCAT(/d
       y/\t/ /
@@ -680,7 +680,7 @@ remove_old_package_versions() {
           sed 's/ AND$//'
         printf ';\n'
       done | \
-      ${mysql_command}
+      mysql_run_query
 
     sed '
       s| \(\S\+\)$|-\1|

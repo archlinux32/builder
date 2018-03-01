@@ -370,7 +370,7 @@ move_packages() {
     if ${no_action}; then
       sed 's|^|mysql: |'
     else
-      ${mysql_command}
+      mysql_run_query
     fi
 
   ${dummynator} trigger_mirror_refreshs
@@ -457,7 +457,7 @@ errors=$(
       printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
       printf ' WHERE `repository_stabilities`.`name` = "testing"'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         p
@@ -496,7 +496,7 @@ errors=$(
       printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
       printf ' WHERE `repository_stabilities`.`name` = "staging"'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         p

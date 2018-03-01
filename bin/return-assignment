@@ -70,7 +70,7 @@ if [ "$5" = 'ERROR' ]; then
         "$(printf '%s' "$4" | base64 -w0)"
       printf ' AND `repositories`.`name`="build-list"'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
         y/\t/ /
@@ -111,7 +111,7 @@ if [ "$5" = 'ERROR' ]; then
           printf 'SELECT `fail_reasons`.`id`,replace(to_base64(`fail_reasons`.`identifier`),"\\n","")'
           printf ' FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`'
         } | \
-          ${mysql_command} --raw --batch | \
+          mysql_run_query --raw --batch | \
           sed '1d'
       )
       for saved_build_log in ${saved_build_logs}; do
@@ -164,7 +164,7 @@ if [ "$5" = 'ERROR' ]; then
           base64 -w0
       )"
   } | \
-    ${mysql_command}
+    mysql_run_query
 
   # shellcheck disable=SC2154
   sed -i '
@@ -283,7 +283,7 @@ if ! {
     printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
-    ${mysql_command} --raw --batch | \
+    mysql_run_query --raw --batch | \
     sed '1d' | \
     grep -vxF '0'; then
   >&2 echo 'Sorry, the sent package is outdated.'
@@ -441,7 +441,7 @@ package_errors=$(
       printf ' AND `repositories`.`name`="build-list"'
       printf ';\n'
     } | \
-      ${mysql_command} --raw --batch | \
+      mysql_run_query --raw --batch | \
       sed '
         1d
       '
@@ -513,7 +513,7 @@ find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_
     printf ';\n'
   done
 } | \
-  ${mysql_command}
+  mysql_run_query
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
@@ -605,7 +605,7 @@ fi
   printf ');\n'
   printf 'DROP TABLE `loops_to_delete`;\n'
 } | \
-  ${mysql_command}
+  mysql_run_query
 rm -f \
   "${work_dir}/package-states/$1.$2.$3.$4.locked" \
   "${work_dir}/package-states/$1.$2.$3.$4.broken"

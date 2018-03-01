@@ -590,7 +590,7 @@ find "${work_dir}/package-states" -name '*.blocked' -printf '%p %f\n' | \
     printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${repository}" | base64 -w0)"
   done | \
-  ${mysql_command}
+  mysql_run_query
 
 grep '^\('"$(
   # shellcheck disable=SC2086
@@ -665,7 +665,7 @@ if [ -s "${tmp_dir}/new-stable-packages" ]; then
     printf ';\n'
     printf 'DROP TABLE `stable_packages`;\n'
   } | \
-    ${mysql_command}
+    mysql_run_query
 fi
 
 mysql_repair_binary_packages_without_build_assignment
