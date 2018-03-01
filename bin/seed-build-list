@@ -125,9 +125,8 @@ if [ -s "${tmp_dir}/mirrors" ]; then
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
     } | \
-      mysql_run_query --raw --batch | \
+      mysql_run_query -N --raw --batch | \
       sed '
-        1d
         s/^\(.*\)-\([^-]\+-[^-]\+\)-\([^-]\+\)/ours \2 \3 \1/
       '
   } | \
@@ -206,8 +205,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
     printf ' WHERE `ignore_packages`.`pkgname`=`must_haves`.`pkgname`'
   printf ') AND NOT `must_haves`.`pkgname` LIKE "lib32-%%";\n'
 } | \
-  mysql_run_query --raw --batch | \
-  sed '1d' | \
+  mysql_run_query -N --raw --batch | \
   while read -r pkgname; do
     content=$(
       curl -Ss 'https://www.archlinux.org/packages/search/json/?name='"${pkgname}" | \
@@ -294,12 +292,9 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
     printf ' WHERE `ignore_packages`.`pkgname`=`binary_packages`.`pkgname`'
   printf ');\n'
 } | \
-  mysql_run_query --raw --batch | \
+  mysql_run_query -N --raw --batch | \
   sort -u | \
-  sed '
-    y/\t/ /
-    / [0-9a-f]\{40\} [0-9a-f]\{40\} /!d
-  ' | \
+  tr '\t' ' ' | \
   if ${update}; then
     # always block if locked
     exec 9> "${build_list_lock_file}"

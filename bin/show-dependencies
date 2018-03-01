@@ -10,9 +10,8 @@
 if [ $# -eq 0 ]; then
   broken=$(
     printf 'CALL show_broken_packages_and_dependencies;\n' | \
-      mysql_run_query --raw --batch | \
+      mysql_run_query -N --raw --batch | \
       sed '
-        1d
         s/\s.*$//
       ' | \
       sort -u

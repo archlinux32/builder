@@ -26,8 +26,7 @@ bug_list=$(
   printf ' FROM `repository_stabilities`'
   printf ' WHERE NOT `repository_stabilities`.`bugtracker_category` IS NULL'
 } | \
-  mysql_run_query --raw --batch | \
-  sed '1d' | \
+  mysql_run_query -N --raw --batch | \
   while read -r stability_id category; do
     for has_issues in '1:' '0:NOT '; do
       printf 'UPDATE `binary_packages`'
@@ -61,5 +60,5 @@ bug_list=$(
         tr '\n' ','
       printf '"");\n'
     done
-  done | tee /dev/stderr | \
+  done | \
   mysql_run_query

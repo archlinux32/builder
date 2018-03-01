@@ -70,11 +70,8 @@ if [ "$5" = 'ERROR' ]; then
         "$(printf '%s' "$4" | base64 -w0)"
       printf ' AND `repositories`.`name`="build-list"'
     } | \
-      mysql_run_query --raw --batch | \
-      sed '
-        1d
-        y/\t/ /
-      '
+      mysql_run_query -N --raw --batch | \
+      tr '\t' ' '
   )
   if [ -z "${infos}" ]; then
     >&2 echo 'You do not build this package (anymore) - move on.'
@@ -111,8 +108,7 @@ if [ "$5" = 'ERROR' ]; then
           printf 'SELECT `fail_reasons`.`id`,replace(to_base64(`fail_reasons`.`identifier`),"\\n","")'
           printf ' FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`'
         } | \
-          mysql_run_query --raw --batch | \
-          sed '1d'
+          mysql_run_query -N --raw --batch
       )
       for saved_build_log in ${saved_build_logs}; do
         printf '%s' "${fail_reason_identifiers}" | \
@@ -283,9 +279,8 @@ if ! {
     printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
-    mysql_run_query --raw --batch | \
-    sed '1d' | \
-    grep -vxF '0'; then
+    mysql_run_query -N --raw --batch | \
+    grep -qvxF '0'; then
   >&2 echo 'Sorry, the sent package is outdated.'
   exit 2
 fi
@@ -441,10 +436,7 @@ package_errors=$(
       printf ' AND `repositories`.`name`="build-list"'
       printf ';\n'
     } | \
-      mysql_run_query --raw --batch | \
-      sed '
-        1d
-      '
+      mysql_run_query -N --raw --batch
   } | \
     sort -k2 | \
     uniq -u -f1

@@ -58,11 +58,8 @@ hand_out_assignment() {
       "$(printf '%s' "$4" | base64 -w0)"
     printf ' LIMIT 1;\n'
   } | \
-    mysql_run_query --raw --batch | \
-    sed '
-      1d
-      y/\t/ /
-    '
+    mysql_run_query -N --raw --batch | \
+    tr '\t' ' '
 
   {
     # shellcheck disable=SC2154
@@ -157,8 +154,7 @@ currently_building=$(
     printf ' AND `repositories`.`name`="build-list"'
     printf ' LIMIT 1;\n'
   } | \
-    mysql_run_query --batch --raw | \
-    sed '1d'
+    mysql_run_query -N --batch --raw
 )
 
 if [ -n "${currently_building}" ]; then
@@ -214,9 +210,8 @@ next_building=$(
     printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
     printf ' LIMIT 1;\n'
   } | \
-    mysql_run_query --batch --raw | \
+    mysql_run_query -N --batch --raw | \
     sed '
-      1d
       y/\t/ /
       s/^.* \(\S\+\( \S\+\)\{3\}\)$/\1/
     '
@@ -238,8 +233,7 @@ count_pending=$(
     printf ' AND `build_assignments`.`is_blocked` IS NULL'
     printf ';\n'
   } | \
-    mysql_run_query --batch --raw | \
-    sed '1d'
+    mysql_run_query -N --batch --raw
 )
 
 if [ "${count_pending}" -eq 0 ]; then

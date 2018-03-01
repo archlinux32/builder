@@ -457,11 +457,8 @@ errors=$(
       printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
       printf ' WHERE `repository_stabilities`.`name` = "testing"'
     } | \
-      mysql_run_query --raw --batch | \
-      sed '
-        1d
-        p
-      '
+      mysql_run_query -N --raw --batch | \
+      sed 'p'
     # shellcheck disable=SC2086
     printf '%s\n' ${packages_to_force_stabilize} | \
       sort -u
@@ -496,11 +493,8 @@ errors=$(
       printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
       printf ' WHERE `repository_stabilities`.`name` = "staging"'
     } | \
-      mysql_run_query --raw --batch | \
-      sed '
-        1d
-        p
-      '
+      mysql_run_query -N --raw --batch | \
+      sed 'p'
     # shellcheck disable=SC2086
     printf '%s\n' ${packages_to_force_unstage} | \
       sort -u

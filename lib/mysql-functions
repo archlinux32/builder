@@ -668,9 +668,8 @@ mysql_sanity_check() {
       'a' 'b'
     printf ';\n'
   } | \
-    mysql_run_query --raw --batch | \
+    mysql_run_query -N --raw --batch | \
     sed '
-      /^CONCAT("/d
       s,^,<font color="#FF0000">,
       s,$,</font>,
     '
@@ -699,9 +698,8 @@ mysql_sanity_check() {
       mysql_join_binary_packages_repositories
       printf ' WHERE `repositories`.`is_on_master_mirror`'
     } | \
-      mysql_run_query --batch | \
+      mysql_run_query -N --raw --batch | \
       sed '
-        1d
         s,\t,/,
         s,\t,-,
         s,\t,:,
@@ -730,11 +728,8 @@ mysql_find_build_assignment_loops() {
       mysql_join_binary_packages_repositories 'packages_dependent' 'repositories_dependent'
       printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
     } | \
-      mysql_run_query --raw --batch | \
-      sed '
-        1d
-        y/\t/ /
-      ' | \
+      mysql_run_query -N --raw --batch | \
+      tr '\t' ' ' | \
       tsort 2>&1 >/dev/null | \
       sed 's/^tsort:\s*//' | \
       {
@@ -910,8 +905,7 @@ mysql_repair_binary_packages_without_build_assignment() {
     mysql_join_binary_packages_architectures
     printf ' WHERE `binary_packages`.`build_assignment`<0'
   } | \
-    mysql_run_query --raw --batch | \
-    sed '1d' | \
+    mysql_run_query -N --raw --batch | \
     while read -r id pkgname arch; do
       pkgname=$(
         printf '%s' "${pkgname}" | \
@@ -939,8 +933,7 @@ mysql_repair_binary_packages_without_build_assignment() {
           printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
             "$(printf '%s' "${pkgname}" | base64 -w0)"
         } | \
-          mysql_run_query --raw --batch | \
-          sed '1d' | \
+          mysql_run_query -N --raw --batch | \
           grep -qvxF '0'; then
         pkgbase="${pkgname}"
       fi

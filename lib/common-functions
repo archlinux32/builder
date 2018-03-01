@@ -501,11 +501,8 @@ remove_old_package_versions() {
       "$(printf '%s' "${repository}" | base64 -w0)"
     printf ';\n'
   } | \
-    mysql_run_query --raw --batch | \
-    sed '
-      /^\S\+\sCONCAT(/d
-      y/\t/ /
-    ' | \
+    mysql_run_query -N --raw --batch | \
+    tr '\t' ' ' | \
     expand_version 4 | \
     sort -k4V,4 -k3r,3 | \
     shrink_version 4 | \
