@@ -929,6 +929,10 @@ extract_source_directory() {
       "${output}/PKGBUILD"
   fi
 
+  # we do not want to update pkgver, so we just undefine it
+  printf 'unset -f pkgver\n' >> \
+    "${output}/PKGBUILD"
+
   mangle_pkgbuild "${output}/PKGBUILD" "${sub_pkgrel}"
 
   # shellcheck disable=SC2016
