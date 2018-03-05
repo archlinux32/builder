@@ -16,6 +16,10 @@
 #   a) provided by another new or not-replaced package or
 #   b) not required by any not-replaced package.
 
+# TODO: Use the stored function
+# calculate_maximal_moveable_set("staging") and
+# calculate_maximal_moveable_set("testing")
+
 # TODO: separate locks for staging, testing (and stable)
 
 # TODO: handle deletion of parts of a split package
