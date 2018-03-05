@@ -345,14 +345,23 @@ while [ "${count}" -ne 0 ]; do
 
         if echo "${straw}" | \
           grep -qF ':clean_chroot:'; then
-          parameters='-c'
+          outerParameters='-c'
         else
-          parameters=''
+          outerParameters=''
         fi
 
         if echo "${straw}" | \
           grep -qF ':without_check:'; then
-          parameters="${parameters} -- -- --nocheck"
+          innerParameters='--nocheck'
+        else
+          innerParameters=''
+        fi
+
+        if echo "${straw}" | \
+          grep -qF ':with_/dev/fuse:'; then
+          middleParameters='-d /dev/fuse'
+        else
+          middleParameters=''
         fi
 
         find . -maxdepth 1 -type f \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -exec \
@@ -368,7 +377,7 @@ while [ "${count}" -ne 0 ]; do
         # by piping the log, we don't see anything in the terminal,
         # but all ways to duplicate the logs seem pretty elaborate
         # shellcheck disable=SC2024,SC2086
-        if sudo "${build_command}" ${parameters} > \
+        if sudo "${build_command}" ${outerParameters} -- ${middleParameters} -- ${innerParameters} > \
           "$(
             date -u --iso-8601=seconds | \
               cut -d+ -f1
