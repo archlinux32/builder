@@ -10,6 +10,12 @@
 #   b) no done package B (in a not-more stable repository) which is
 #      not being moved run-depends on A
 
+# The new condition will be shorter, cleaner and less error prone:
+# (_Moving_ is without risk. It is _deleting_, that may break stuff.)
+# Every package which is replaced, must have its provided install_targets:
+#   a) provided by another new or not-replaced package or
+#   b) not required by any not-replaced package.
+
 # TODO: separate locks for staging, testing (and stable)
 
 # TODO: handle deletion of parts of a split package
