@@ -1101,6 +1101,8 @@ for link in \
  \
   'repositories:stability:repository_stabilities' \
  \
+  'repository_moves:upstream_package_repository:upstream_repositories' \
+ \
   'upstream_repositories:git_repository:git_repositories'; do
 # A join for these cannot be done, because it's not clear on what to join:
 #  'repository_stability_relations:more_stable:repository_stabilities'
