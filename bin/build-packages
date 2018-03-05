@@ -352,9 +352,9 @@ while [ "${count}" -ne 0 ]; do
 
         if echo "${straw}" | \
           grep -qF ':without_check:'; then
-          innerParameters='--nocheck --holdver'
+          innerParameters='--nocheck'
         else
-          innerParameters='--holdver'
+          innerParameters=''
         fi
 
         if echo "${straw}" | \

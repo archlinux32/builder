@@ -934,6 +934,10 @@ extract_source_directory() {
   # shellcheck disable=SC2016
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
+  # we don't want write permissions on the PKGBUILD - otherwise pkgver()
+  # will change the version! (**HACK**)
+  chmod -w "${output}/PKGBUILD"
+
 }
 
 # find_dependencies_on_build_list $package $git_revision $mod_git_revision $repository
