@@ -225,7 +225,7 @@ while read -r package reason; do
     ;;
   esac
   if printf 'SELECT 1 FROM %s %s AND %s LIMIT 1' "${combiner}" "${selector}" "${tester}" | \
-    mysql_run_query -N --raw --batch | \
+    mysql_run_query | \
     grep -qxF '1'; then
     # shellcheck disable=SC2016
     {

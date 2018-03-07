@@ -125,7 +125,7 @@ if [ -s "${tmp_dir}/mirrors" ]; then
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
     } | \
-      mysql_run_query -N --raw --batch | \
+      mysql_run_query | \
       sed '
         s/^\(.*\)-\([^-]\+-[^-]\+\)-\([^-]\+\)/ours \2 \3 \1/
       '
@@ -205,7 +205,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
     printf ' WHERE `ignore_packages`.`pkgname`=`must_haves`.`pkgname`'
   printf ') AND NOT `must_haves`.`pkgname` LIKE "lib32-%%";\n'
 } | \
-  mysql_run_query -N --raw --batch | \
+  mysql_run_query | \
   while read -r pkgname; do
     content=$(
       curl -Ss 'https://www.archlinux.org/packages/search/json/?name='"${pkgname}" | \
@@ -292,7 +292,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
     printf ' WHERE `ignore_packages`.`pkgname`=`binary_packages`.`pkgname`'
   printf ');\n'
 } | \
-  mysql_run_query -N --raw --batch | \
+  mysql_run_query | \
   sort -u | \
   tr '\t' ' ' | \
   if ${update}; then

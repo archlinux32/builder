@@ -391,7 +391,7 @@ black_listed_new=$(
       printf ' FROM `package_sources`'
       printf ' WHERE `package_sources`.`pkgbase` LIKE "lib32-%%"'
     } | \
-      mysql_run_query -N --raw --batch
+      mysql_run_query
   } | \
     sort -u
 )
@@ -442,7 +442,7 @@ while [ -n "${black_listed_new}" ]; do
           printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
         printf ');\n'
       } | \
-        mysql_run_query -N --raw --batch | \
+        mysql_run_query | \
         sort -u
     } | \
       grep -vxF '' | \

@@ -44,7 +44,7 @@ sed -n '
           "$(printf '%s' "${architecture}" | base64 -w0)"
         printf ' LIMIT 1;\n'
       } | \
-        mysql_run_query -N --raw --batch | \
+        mysql_run_query | \
         tr '\t' ' '
     )
     if [ -z "${id}" ]; then

@@ -562,7 +562,7 @@ if ${web}; then
     # shellcheck disable=SC2016
     {
       printf 'SHOW CREATE TABLE `todos`' | \
-        mysql_run_query -N --raw --batch | \
+        mysql_run_query | \
         sed '
           1s/^\S\+\s\+CREATE TABLE `todos` /CREATE TEMPORARY TABLE `td` /
         '
