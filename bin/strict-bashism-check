@@ -72,14 +72,16 @@ if [ -n "${errors}" ]; then
   exit 1
 fi
 
-errors=$(
-  cd "${tmp_dir}" || \
-    echo 'Cannot cd.'
-  shellcheck -x bin/* conf/* 2>&1
-)
+if which shellcheck >/dev/null 2>&1; then
+  errors=$(
+    cd "${tmp_dir}" || \
+      echo 'Cannot cd.'
+    shellcheck -x bin/* conf/* 2>&1
+  )
 
-if [ -n "${errors}" ]; then
-  >&2 echo 'shellcheck complains about the following:'
-  >&2 echo "${errors}"
-  exit 1
+  if [ -n "${errors}" ]; then
+    >&2 echo 'shellcheck complains about the following:'
+    >&2 echo "${errors}"
+    exit 1
+  fi
 fi
