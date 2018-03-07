@@ -106,7 +106,7 @@ delete_package() {
     "${work_dir}/deletion-list.new"
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
   find "${work_dir}/package-states" -maxdepth 1 -mindepth 1 -regextype grep \
-    -regex '.*/'"$(str_to_regex "${1}")"'\(\.[^.]\+\)\{3\}\.\(blocked\|locked\)' \
+    -regex '.*/'"$(str_to_regex "${1}")"'\(\.[^.]\+\)\{3\}\.\(broken\|blocked\|locked\)' \
     -delete
   # TODO: Once we want to rely on the database for test_exclusion, we
   # need to run the command below unconditionally, but with some
