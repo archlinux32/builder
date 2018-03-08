@@ -26,6 +26,8 @@ base64_encode_each() {
 # wrapper function to query mysql
 mysql_run_query() {
   if [ -s "${work_dir}/build-master-sanity" ]; then
+  # If the build master is insane, the calling command should only check
+  # if the build master is still insane - we do not want to log that.
     ${mysql_command} -N --raw --batch "$@"
   else
     {
