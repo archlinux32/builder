@@ -564,6 +564,33 @@ for ending in 'done' 'tested'; do
   fi
 done
 
+{
+  printf 'CALL calculate_maximal_moveable_set("testing");\n'
+  printf 'SELECT "mv",'
+  mysql_package_name_query
+  printf ',`repositories`.`name`,`new_repo`.`name`'
+  printf ' FROM `moveable_binary_packages`'
+  printf ' JOIN `binary_packages` ON `moveable_binary_packages`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  mysql_join_binary_packages_build_assignments
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
+  mysql_join_upstream_repositories_repository_moves
+  printf ' AND `repositories`.`id`=`repository_moves`.`from_repository`'
+  printf ' JOIN `repositories` AS `new_repo` ON `new_repo`.`id`=`repository_moves`.`to_repository`'
+  printf ';\n'
+  printf 'SELECT "rm",'
+  mysql_package_name_query
+  printf ',`repositories`.`name`'
+  printf ' FROM `replaced_binary_packages`'
+  printf ' JOIN `binary_packages` ON `replaced_binary_packages`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  printf ';\n'
+} | \
+  mysql_run_query -N --raw --batch
+
 # packages which are done
 
 find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
