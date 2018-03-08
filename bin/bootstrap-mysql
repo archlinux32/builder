@@ -312,24 +312,29 @@ if [ ! "$1" = 'slim' ]; then
     printf 'DELIMITER //\n'
     printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
     printf 'BEGIN\n'
-    for table in 'moveable' 'replaced'; do
-      for copy in '' '_copy' '_copy2'; do
-        if [ "${table}" = 'moveable' ] && \
-          [ "${copy}" = '_copy2' ]; then
-          continue
-        fi
-        printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
-          "${table}" "${copy}"
-        printf 'CREATE TEMPORARY TABLE `%s_binary_packages%s` (`id` BIGINT, UNIQUE KEY (`id`));\n' \
-          "${table}" "${copy}"
-      done
+    for copy in '' '_copy' '_copy2'; do
+      printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
+        'moveable' "${copy}" \
+        'replaced' "${copy}"
+      printf 'CREATE TEMPORARY TABLE `replaced_binary_packages%s` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n' \
+        "${copy}"
+      if [ "${copy}" = '_copy2' ]; then
+        continue
+      fi
+      printf 'CREATE TEMPORARY TABLE `moveable_binary_packages%s` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n' \
+        "${copy}"
     done
     # these packages are considered for moving:
-    printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`)'
-    printf ' SELECT `binary_packages`.`id`'
+    printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+    printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
     printf ' FROM `binary_packages`'
     mysql_join_binary_packages_repositories
     mysql_join_repositories_repository_stabilities
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
+    mysql_join_upstream_repositories_repository_moves
+    printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
     # correct stability: "testing"/"staging" - as chosen
     printf ' WHERE `repository_stabilities`.`name` = `from_stability`'
     printf ' AND ('
@@ -342,8 +347,8 @@ if [ ! "$1" = 'slim' ]; then
     printf ';\n'
     # these packages are considered for being replaced:
     # for each moved package
-    printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`)'
-    printf ' SELECT `r_bp`.`id`'
+    printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
+    printf ' SELECT `r_bp`.`id`,`m_bp`.`id`'
     printf ' FROM `moveable_binary_packages`'
     printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
     mysql_join_binary_packages_repositories 'm_bp' 'm_r'
@@ -361,15 +366,15 @@ if [ ! "$1" = 'slim' ]; then
     # list until no further changes are required
     printf 'REPEAT\n'
     for table in 'replaced' 'moveable'; do
-printf 'SELECT count(*) FROM `%s_binary_packages`;\n' "${table}"
+printf 'SELECT NOW(),"count(%s)",count(*) FROM `%s_binary_packages`;\n' "${table}" "${table}"
       for copy in '' '2'; do
         if [ "${table}" = 'moveable' ] && \
           [ "${copy}" = '2' ]; then
           continue
         fi
         printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
-        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s` (`id`)' "${table}" "${copy}"
-        printf ' SELECT `%s_binary_packages`.`id`' "${table}"
+        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+        printf ' SELECT `%s_binary_packages`.*' "${table}"
         printf ' FROM `%s_binary_packages`;\n' "${table}"
       done
     done
@@ -386,7 +391,8 @@ printf 'SELECT count(*) FROM `%s_binary_packages`;\n' "${table}"
     #
     # However, in practice both should not happen.
     #
-    printf 'DELETE `replaced_binary_packages` FROM `replaced_binary_packages`'
+    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
+    printf ' JOIN `moveable_binary_packages` ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
     printf ' JOIN `binary_packages` AS `repl_bp` ON `repl_bp`.`id`=`replaced_binary_packages`.`id`'
     mysql_join_binary_packages_install_target_providers 'repl_bp'
     mysql_join_install_target_providers_dependencies
@@ -399,6 +405,7 @@ printf 'SELECT count(*) FROM `%s_binary_packages`;\n' "${table}"
     # consider only runtime dependencies
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
     mysql_join_dependencies_binary_packages '' 'req_bp'
+    # we need to check wether req_bp's dependency is (un)critical
     mysql_join_binary_packages_repositories 'repl_bp' 'repl_r'
     mysql_join_binary_packages_repositories 'req_bp' 'req_r'
     # dependent package is "less stable" than dependency
@@ -435,23 +442,6 @@ printf 'SELECT count(*) FROM `%s_binary_packages`;\n' "${table}"
       printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
       # b) 2) ^
     printf ');\n'
-    # packages which should not be moved: ones which replace packages no
-    # longer on the replaced-list (e.g un-replaceable packages)
-    printf 'DELETE `moveable_binary_packages` FROM `moveable_binary_packages`'
-    printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
-    mysql_join_binary_packages_build_assignments 'm_bp' 'm_ba'
-    mysql_join_build_assignments_package_sources 'm_ba' 'm_ps'
-    mysql_join_package_sources_upstream_repositories 'm_ps' 'm_ur'
-    mysql_join_upstream_repositories_repository_moves 'm_ur'
-    printf ' AND `repository_moves`.`from_repository`=`m_bp`.`repository`'
-    printf ' JOIN `binary_packages` AS `r_bp`'
-    printf ' ON `repository_moves`.`to_repository`=`r_bp`.`repository`'
-    printf ' AND `r_bp`.`pkgname`=`m_bp`.`pkgname`'
-    printf ' WHERE NOT EXISTS ('
-      printf 'SELECT * FROM `replaced_binary_packages`'
-      printf ' WHERE `replaced_binary_packages`.`id`=`r_bp`.`id`'
-    printf ');\n'
-    # actually, this only checks the count of deletions from the moveable-list, but that should be ok
     printf 'UNTIL ROW_COUNT()=0\n'
     printf 'END REPEAT;\n'
     for table in 'moveable' 'replaced'; do
