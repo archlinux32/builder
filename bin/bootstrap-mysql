@@ -32,6 +32,8 @@ done | \
   sort -k2,2 > \
   "${tmp_dir}/master-mirror-listing"
 
+# TODO: include hash of binary package in mysql database
+
 if [ ! "$1" = 'slim' ]; then
   tables=$(
     printf '%s\n' \
