@@ -416,8 +416,8 @@ printf 'SELECT NOW(),"count(%s)",count(*) FROM `%s_binary_packages`;\n' "${table
     printf ' WHERE NOT EXISTS ('
       # no moved package ...
       printf 'SELECT *'
-      printf ' FROM `moveable_binary_packages`'
-      mysql_join_binary_packages_install_target_providers 'moveable_binary_packages' 'subst_itp'
+      printf ' FROM `moveable_binary_packages_copy`'
+      mysql_join_binary_packages_install_target_providers 'moveable_binary_packages_copy' 'subst_itp'
       # ... provides the same
       printf ' WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
     # b) 1) ^
