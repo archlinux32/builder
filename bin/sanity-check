@@ -400,6 +400,12 @@ while [ $# -gt 0 ]; do
         i_am_insane
       fi
 
+      if find "${work_dir}" -mindepth 1 -maxdepth 1 -name 'tmp.mysql-functions.query.*' | \
+        grep '\S' >> \
+        "${tmp_dir}/messages"; then
+        i_am_insane
+      fi
+
       [ ${silence} -gt 0 ] || \
         echo ' passed.' >> \
         "${tmp_dir}/messages"
