@@ -548,6 +548,9 @@ clean_up_lock_file() {
 
 trap clean_up_lock_file EXIT
 
+# shellcheck disable=SC2119
+mysql_cleanup
+
 # sanity check
 
 for ending in 'done' 'tested'; do
@@ -564,6 +567,7 @@ for ending in 'done' 'tested'; do
   fi
 done
 
+# shellcheck disable=SC2016
 {
   printf 'CALL calculate_maximal_moveable_set("testing");\n'
   printf 'SELECT "mv",'
