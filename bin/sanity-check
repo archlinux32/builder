@@ -395,7 +395,8 @@ while [ $# -gt 0 ]; do
         if [ ${silence} -le 1 ]; then
           printf '\nThere is something wrong with the database:\n'
           cat "${webserver_directory}/mysql-sanity.html"
-        fi
+        fi >> \
+          "${tmp_dir}/messages"
         i_am_insane
       fi
 
