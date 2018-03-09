@@ -1,26 +1,31 @@
 <html>
 <head>
 <?php
-  if (isset($_GET["broken"]))
-    print "<title>List of broken package builds</title>\n";
-  else
-    print "<title>List of scheduled package builds</title>\n";
-?>
-<link rel="stylesheet" type="text/css" href="/static/style.css">
-</head>
-<body>
-<a href="/build-logs/">build logs</a><br>
-<?php
+
+if (isset($_GET["show"]))
+  $to_show=$_GET["show"];
+else
+  $to_show="all";
+
+if ($to_show == "all")
+  $match = "";
+elseif ($to_show == "broken")
+  $match = " AND (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL)";
+elseif ($to_show == "next")
+  $match = "";
+else
+  die();
+
+print "<title>List of " . $to_show . " package builds</title>\n";
+print "<link rel=\"stylesheet\" type=\"text/css\" href=\"/static/style.css\">\n";
+print "</head>\n";
+print "<body>\n";
+print "<a href=\"/build-logs/\">build logs</a><br>\n";
 
 $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
 if ($mysql->connect_error) {
   die("Connection failed: " . $mysql->connect_error);
 }
-
-if (isset($_GET["broken"]))
-  $match_broken = "AND (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL)";
-else
-  $match_broken = "";
 
 $result = $mysql -> query(
   "SELECT DISTINCT " .
@@ -55,13 +60,18 @@ $result = $mysql -> query(
   "JOIN `git_repositories` ON `upstream_repositories`.`git_repository`=`git_repositories`.`id` " .
   "JOIN `binary_packages` ON `binary_packages`.`build_assignment` = `build_assignments`.`id` " .
   "JOIN `repositories` ON `binary_packages`.`repository` = `repositories`.`id` " .
-  "WHERE `repositories`.`name`=\"build-list\"" . $match_broken
+  "WHERE `repositories`.`name`=\"build-list\"" . $match
 );
 if ($result -> num_rows > 0) {
 
   $count = 0;
 
   while($row = $result->fetch_assoc()) {
+
+    if (($to_show == "next") &&
+      ($row["loops"]==0) &&
+      ($row["dependencies_pending"]==1))
+      continue;
 
     $fail_result = $mysql -> query(
       "SELECT " .
