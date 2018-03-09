@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# check for packages that need to be built, and build a list in the proper build order
+# check for packages that need to be built
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
