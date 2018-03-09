@@ -219,7 +219,7 @@ for source_stability in 'testing' 'staging'; do
         sed '
           s/-[^-]\+ \S\+ \S\+$//
         ' | \
-        xargs -r repo-copy \
+        xargs -r "${base_dir}/bin/repo-copy" \
           "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" \
           "${tmp_dir}/dbs/${to_repo}/${to_repo}.db.tar.gz"
       grep " $(str_to_regex "${from_repo}") $(str_to_regex "${to_repo}")\$" "${tmp_dir}/mv" | \
