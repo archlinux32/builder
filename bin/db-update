@@ -202,19 +202,12 @@ for source_stability in 'testing' 'staging'; do
     "${tmp_dir}/rm"
 
   # delete and add moved packages
-  mkdir "${tmp_dir}/transit"
   while read -r pkgname from_repo to_repo; do
-    ${master_mirror_rsync_command} \
-      "${master_mirror_rsync_directory}/i686/${from_repo}/${pkgname}" \
-      "${master_mirror_rsync_directory}/i686/${from_repo}/${pkgname}.sig" \
-      "${tmp_dir}/transit/"
-    cd "${tmp_dir}/dbs/${from_repo}"
-    repo-remove -q "${from_repo}.db.tar.gz" "${pkgname%-*-*-*}"
-    cd "${tmp_dir}/dbs/${to_repo}"
-    repo-add -q "${to_repo}.db.tar.gz" "${tmp_dir}/transit/${pkgname}"
-    rm \
-      "${tmp_dir}/transit/${pkgname}" \
-      "${tmp_dir}/transit/${pkgname}.sig"
+    repo-copy \
+      "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" \
+      "${tmp_dir}/dbs/${to_repo}/${to_repo}.db.tar.gz" \
+      "${pkgname%-*}"
+    repo-remove -q "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" "${pkgname%-*-*-*}"
   done < \
     "${tmp_dir}/mv"
 
