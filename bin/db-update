@@ -90,9 +90,6 @@ if ! flock -s ${block_flag} 8; then
   exit 0
 fi
 
-# shellcheck disable=SC2119
-mysql_cleanup
-
 for source_stability in 'testing' 'staging'; do
   find "${tmp_dir}" -mindepth 1 -delete
 
