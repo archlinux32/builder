@@ -248,6 +248,8 @@ for source_stability in 'testing' 'staging'; do
   done < \
     "${tmp_dir}/repositories"
 
+  trigger_mirror_refreshs
+
   # shellcheck disable=SC2016
   {
     printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, UNIQUE KEY (`id`));\n'
