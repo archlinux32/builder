@@ -1,6 +1,11 @@
 <html>
 <head>
-<title>List of scheduled package builds</title>
+<?php
+  if (isset($_GET["all"]))
+    print "<title>List of scheduled package builds</title>\n";
+  else
+    print "<title>List of broken package builds</title>\n";
+?>
 <link rel="stylesheet" type="text/css" href="/static/style.css">
 </head>
 <body>
@@ -11,6 +16,11 @@ $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
 if ($mysql->connect_error) {
   die("Connection failed: " . $mysql->connect_error);
 }
+
+if (isset($_GET["all"]))
+  $match_broken = "";
+else
+  $match_broken = "AND (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL)";
 
 $result = $mysql -> query(
   "SELECT DISTINCT " .
@@ -45,7 +55,7 @@ $result = $mysql -> query(
   "JOIN `git_repositories` ON `upstream_repositories`.`git_repository`=`git_repositories`.`id` " .
   "JOIN `binary_packages` ON `binary_packages`.`build_assignment` = `build_assignments`.`id` " .
   "JOIN `repositories` ON `binary_packages`.`repository` = `repositories`.`id` " .
-  "WHERE `repositories`.`name`=\"build-list\""
+  "WHERE `repositories`.`name`=\"build-list\"" . $match_broken
 );
 if ($result -> num_rows > 0) {
 
@@ -55,12 +65,39 @@ if ($result -> num_rows > 0) {
 
     $fail_result = $mysql -> query(
       "SELECT " .
-      "`failed_builds`.`id` " .
+      "`fail_reasons`.`name`, " .
+      "`failed_builds`.`log_file` " .
       "FROM `failed_builds` " .
-      "WHERE `failed_builds`.`build_assignment`=".$row["id"]
+      "JOIN `fail_reasons` ON `failed_builds`.`reason`=`fail_reasons`.`id` " .
+      "WHERE `failed_builds`.`build_assignment`=".$row["id"]." " .
+      "ORDER BY `failed_builds`.`date`"
     );
 
+    unset($reasons);
     $rows[$count]["trials"] = $fail_result -> num_rows;
+    if ($rows[$count]["trials"] > 0) {
+      while($fail_row = $fail_result->fetch_assoc()) {
+        $reasons[$fail_row["name"]] = $fail_row["log_file"];
+      }
+    }
+    if (isset($reasons)) {
+      $to_print="";
+      foreach ($reasons as $reason => $last_log) {
+        if (file_exists("/srv/http/build-logs/error/".$last_log)) {
+          $to_print= $to_print .
+            ", <a href=\"/build-logs/error/" .
+            $last_log .
+            "\">" .
+            $reason .
+            "</a>";
+        } else {
+          $to_print= $to_print . ", " . $reason;
+        }
+      }
+      $rows[$count]["fail_reasons"]=substr($to_print,2);
+    } else {
+      $rows[$count]["fail_reasons"]="&nbsp;";
+    }
 
     $rows[$count]["loops"] = $row["loops"];
     $rows[$count]["pkgbase"] = $row["pkgbase"];
@@ -81,7 +118,10 @@ if ($result -> num_rows > 0) {
         $rows[$count]["git_revision"] =
           $rows[$count]["git_revision"] . "x86_64";
       $rows[$count]["git_revision"] =
-        $rows[$count]["git_revision"] . "/\">" .
+        $rows[$count]["git_revision"] . "?id=" .
+        $row["git_revision"];
+      $rows[$count]["git_revision"] =
+        $rows[$count]["git_revision"] . "\">" .
         $row["git_revision"] . "</a>";
     } else
       $rows[$count]["git_revision"] = $row["git_revision"];
@@ -133,6 +173,7 @@ if ($result -> num_rows > 0) {
   print "<th>package repository</th>";
   print "<th>compilations</th>";
   print "<th>loops</th>";
+  print "<th>build error</th>";
   print "<th>blocked</th>";
   print "</tr>\n";
 
@@ -140,12 +181,13 @@ if ($result -> num_rows > 0) {
 
     print "<tr>";
 
-    print "<td><a href=\"/graphs/".$row["pkgbase"].".png\">".$row["pkgbase_print"]."</a></td>";
+    print "<td><a href=\"/scripts/dependencies.php?b=".$row["pkgbase"]."&r=build-list\">".$row["pkgbase_print"]."</a></td>";
     print "<td><p style=\"font-size:8px\">".$row["git_revision"]."</p></td>";
     print "<td><p style=\"font-size:8px\">".$row["mod_git_revision"]."</p></td>";
     print "<td>".$row["package_repository"]."</td>";
     print "<td>".$row["trials"]."</td>";
     print "<td>".$row["loops"]."</td>";
+    print "<td>".$row["fail_reasons"]."</td>";
     print "<td>".$row["is_blocked"]."</td>";
 
     print "</tr>\n";
