@@ -9,6 +9,8 @@ $match = "";
 
 if (isset($_GET["a"]))
   $match .= " AND `architectures`.`name`=from_base64(\"" . base64_encode($_GET["a"]) . "\")";
+if (isset($_GET["b"]))
+  $match .= " AND `package_sources`.`pkgbase`=from_base64(\"" . base64_encode($_GET["b"]) . "\")";
 if (isset($_GET["p"]))
   $match .= " AND `binary_packages`.`pkgname`=from_base64(\"" . base64_encode($_GET["p"]) . "\")";
 if (isset($_GET["r"]))
@@ -30,6 +32,8 @@ if (! $result = $mysql -> query(
   " FROM `binary_packages`" .
   " JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`" .
   " JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`" .
+  " JOIN `build_assignments` ON `binary_packages`.`build_assignment`= `build_assignments`.`id`" .
+  " JOIN `package_sources` ON `build_assignments`.`package_source`= `package_sources`.`id`" .
   $match .
   " JOIN `dependencies` ON `dependencies`.`dependent`=`binary_packages`.`id`" .
   " JOIN `install_targets` ON `dependencies`.`depending_on`=`install_targets`.`id`" .
@@ -45,6 +49,8 @@ if (! $result = $mysql -> query(
   " FROM `binary_packages`" .
   " JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`" .
   " JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`" .
+  " JOIN `build_assignments` ON `binary_packages`.`build_assignment`= `build_assignments`.`id`" .
+  " JOIN `package_sources` ON `build_assignments`.`package_source`= `package_sources`.`id`" .
   $match .
   " JOIN `install_target_providers` ON `install_target_providers`.`package`=`binary_packages`.`id`" .
   " JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`" .
