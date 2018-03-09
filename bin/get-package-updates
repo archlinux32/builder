@@ -16,9 +16,6 @@
 
 # TODO: keep database clean in case of abort
 
-# TODO: It seems, updating present build assignments in the database is broken
-# ... they seem to get deleted
-
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
@@ -136,22 +133,6 @@ delete_package() {
   fi
 }
 
-# create tmp_dir and trap
-clean_up() {
-  rm -rf --one-file-system "${tmp_dir}"
-  # shellcheck disable=SC2016
-  {
-    printf 'DELETE FROM `binary_packages`'
-    printf ' WHERE `binary_packages`.`repository`=('
-      printf 'SELECT `repositories`.`id` FROM `repositories`'
-      printf ' WHERE `repositories`.`name`="to-be-decided"'
-    printf ');\n'
-  } | \
-    mysql_run_query
-}
-tmp_dir=$(mktemp -d 'tmp.get-package-updates.XXXXXXXXXX' --tmpdir)
-trap 'clean_up' EXIT
-
 # Update git repositories (official packages, community packages and the repository of package customizations).
 
 for repo in ${repo_names}; do
@@ -201,6 +182,8 @@ if ! flock -s ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - sanity-check running.'
   exit
 fi
+
+trap mysql_cleanup EXIT
 
 # shellcheck disable=SC2119
 mysql_cleanup
