@@ -152,7 +152,7 @@ for source_stability in 'testing' 'staging'; do
     done
 
   if [ ! -s "${tmp_dir}/repositories" ]; then
-    >&2 echo 'Nothing to move from %s.' "${source_stability}"
+    >&2 printf 'Nothing to move from %s.' "${source_stability}"
     continue
   fi
 
