@@ -9,10 +9,6 @@
 
 # TODO: separate locks for staging, testing (and stable)
 
-# TODO: sub_pkgrel=0 may or may not be omitted for the actual package :-/
-
-# TODO: keep .testing, .tested, .done in sync
-
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
@@ -274,4 +270,25 @@ for source_stability in 'testing' 'staging'; do
     printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`;\n'
   } | \
     mysql_run_query
+
+  # TODO: this may delete too much, but these files will be obsolete soon anyway ...
+  find "${work_dir}/package-states/" \
+    \( \
+      -name '*.done' -o \
+      -name '*.testing' -o \
+      -name '*.tested' \
+    \) \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/rm")" '{}' \; \
+    -delete
+  find "${work_dir}/package-states/" \
+    -name '*.tested' \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
+    -delete
+  find "${work_dir}/package-states/" \
+    -name '*.done' \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
+    -prinft '%p\n' | \
+    while read -r sf; do
+      mv "${sf}" "${sf%.done}.testing"
+    done
 done
