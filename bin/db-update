@@ -156,6 +156,12 @@ for source_stability in 'testing' 'staging'; do
     continue
   fi
 
+  touch \
+    "${tmp_dir}/mv" \
+    "${tmp_dir}/mv.id" \
+    "${tmp_dir}/rm" \
+    "${tmp_dir}/rm.id"
+
   # shellcheck disable=SC2086
   for s in "${tmp_dir}/"*; do
     sort -u "${s}" | \
