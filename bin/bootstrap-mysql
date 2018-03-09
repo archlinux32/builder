@@ -310,6 +310,8 @@ if [ ! "$1" = 'slim' ]; then
     # Every package which is replaced, must have its provided install_targets:
     #   a) provided by another moved or not-replaced package or
     #   b) not required by any not-replaced package.
+# TODO: additionally, every package being moved needs to have all dependencies
+# installable in the target repository !
     printf 'DROP PROCEDURE IF EXISTS calculate_maximal_moveable_set;\n'
     printf 'DELIMITER //\n'
     printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
