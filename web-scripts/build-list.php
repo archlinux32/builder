@@ -1,10 +1,10 @@
 <html>
 <head>
 <?php
-  if (isset($_GET["all"]))
-    print "<title>List of scheduled package builds</title>\n";
-  else
+  if (isset($_GET["broken"]))
     print "<title>List of broken package builds</title>\n";
+  else
+    print "<title>List of scheduled package builds</title>\n";
 ?>
 <link rel="stylesheet" type="text/css" href="/static/style.css">
 </head>
@@ -17,10 +17,10 @@ if ($mysql->connect_error) {
   die("Connection failed: " . $mysql->connect_error);
 }
 
-if (isset($_GET["all"]))
-  $match_broken = "";
-else
+if (isset($_GET["broken"]))
   $match_broken = "AND (`build_assignments`.`is_broken` OR `build_assignments`.`is_blocked` IS NOT NULL)";
+else
+  $match_broken = "";
 
 $result = $mysql -> query(
   "SELECT DISTINCT " .
