@@ -264,7 +264,7 @@ for source_stability in 'testing' 'staging'; do
   {
     printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, UNIQUE KEY (`id`));\n'
     printf 'CREATE TEMPORARY TABLE `moved_binary_packages` (`id` BIGINT, `new_repository` MEDIUMINT, UNIQUE KEY (`id`));\n'
-    printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `%s`;\n' \
+    printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `%s` COLUMNS TERMINATED BY " ";\n' \
       "${tmp_dir}/mv.id" 'moved_binary_packages' \
       "${tmp_dir}/rm.id" 'replaced_binary_packages'
     printf 'DELETE `binary_packages` FROM `binary_packages`'
