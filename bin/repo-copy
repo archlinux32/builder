@@ -11,7 +11,7 @@
 
 usage() {
   >&2 echo 'usage:'
-  >&2 echo ' db-copy from-repo.db.tar.gz to-repo.db.tar.gz package1 package2 ...'
+  >&2 echo ' repo-copy from-repo.db.tar.gz to-repo.db.tar.gz package1 package2 ...'
   >&2 echo
   >&2 echo 'Note, that the packages must be given with version, e.g. "linux-4.15.7-1.0".'
   exit 2
