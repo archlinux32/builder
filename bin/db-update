@@ -287,7 +287,7 @@ for source_stability in 'testing' 'staging'; do
   find "${work_dir}/package-states/" \
     -name '*.done' \
     -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
-    -prinft '%p\n' | \
+    -printf '%p\n' | \
     while read -r sf; do
       mv "${sf}" "${sf%.done}.testing"
     done
