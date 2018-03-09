@@ -314,20 +314,29 @@ if [ ! "$1" = 'slim' ]; then
     printf 'DELIMITER //\n'
     printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
     printf 'BEGIN\n'
-    for table in 'moveable' 'replaced'; do
-      for copy in '' '_copy'; do
-        printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
-          "${table}" "${copy}"
-        printf 'CREATE TEMPORARY TABLE `%s_binary_packages%s` (`id` BIGINT, UNIQUE KEY (`id`));\n' \
-          "${table}" "${copy}"
-      done
+    for copy in '' '_copy' '_copy2'; do
+      printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
+        'moveable' "${copy}" \
+        'replaced' "${copy}"
+      printf 'CREATE TEMPORARY TABLE `replaced_binary_packages%s` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n' \
+        "${copy}"
+      if [ "${copy}" = '_copy2' ]; then
+        continue
+      fi
+      printf 'CREATE TEMPORARY TABLE `moveable_binary_packages%s` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n' \
+        "${copy}"
     done
     # these packages are considered for moving:
-    printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`)'
-    printf ' SELECT `binary_packages`.`id`'
+    printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+    printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
     printf ' FROM `binary_packages`'
     mysql_join_binary_packages_repositories
     mysql_join_repositories_repository_stabilities
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
+    mysql_join_upstream_repositories_repository_moves
+    printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
     # correct stability: "testing"/"staging" - as chosen
     printf ' WHERE `repository_stabilities`.`name` = `from_stability`'
     printf ' AND ('
@@ -340,8 +349,8 @@ if [ ! "$1" = 'slim' ]; then
     printf ';\n'
     # these packages are considered for being replaced:
     # for each moved package
-    printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`)'
-    printf ' SELECT `r_bp`.`id`'
+    printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
+    printf ' SELECT `r_bp`.`id`,`m_bp`.`id`'
     printf ' FROM `moveable_binary_packages`'
     printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
     mysql_join_binary_packages_repositories 'm_bp' 'm_r'
@@ -358,66 +367,93 @@ if [ ! "$1" = 'slim' ]; then
     # now we delete all unreplaceable and unmoveable packages from the respective
     # list until no further changes are required
     printf 'REPEAT\n'
-    for s in 'replaced' 'moveable'; do
-      printf 'DELETE FROM `%s_binary_packages_copy`;\n' "$s"
-      printf 'INSERT IGNORE INTO `%s_binary_packages_copy` (`id`)' "$s"
-      printf ' SELECT `%s_binary_packages`.`id`' "$s"
-      printf ' FROM `%s_binary_packages`;\n' "$s"
+    for table in 'replaced' 'moveable'; do
+      for copy in '' '2'; do
+        if [ "${table}" = 'moveable' ] && \
+          [ "${copy}" = '2' ]; then
+          continue
+        fi
+        printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
+        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+        printf ' SELECT `%s_binary_packages`.*' "${table}"
+        printf ' FROM `%s_binary_packages`;\n' "${table}"
+      done
     done
-    # packages which should not be replaced:
-    printf 'DELETE `replaced_binary_packages` FROM `replaced_binary_packages`'
-    printf ' JOIN `binary_packages` AS `d_bp`'
-    mysql_join_binary_packages_dependencies 'd_bp'
-    mysql_join_binary_packages_repositories 'd_bp' 'd_r'
-    # consider only dependencies which can be met at all
-    printf ' AND EXISTS ('
-      printf 'SELECT * FROM `install_target_providers`'
-      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+    # packages which should not be replaced: ones providing something that is:
+    # a) still needed by a not-replaced package x "less stable" than the target repository and
+    # b) not provided by:
+    #   1) a moved package or
+    #   2) any current, not-replaced package in a repository more stable than x's repository
+    #
+    # Note, that this is not 100% clean from an academic point of view:
+    # It might require _downgrading_ of a package to keep fulfilling a dependency
+    # and it might require to do so _without_ any chance for the user to notice,
+    # because there may be more "dependencies" in the database than in the package files.
+    #
+    # However, in practice both should not happen.
+    #
+    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
+    printf ' JOIN `moveable_binary_packages` ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
+    printf ' JOIN `binary_packages` AS `repl_bp` ON `repl_bp`.`id`=`replaced_binary_packages`.`id`'
+    mysql_join_binary_packages_install_target_providers 'repl_bp'
+    mysql_join_install_target_providers_dependencies
+    printf ' AND NOT EXISTS ('
+      # dependencies of replaced packages don't matter
+      printf 'SELECT * FROM `replaced_binary_packages_copy`'
+      printf ' WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`'
     printf ')'
     mysql_join_dependencies_dependency_types
-    # only consider runtime dependencies
+    # consider only runtime dependencies
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
-    # not provided by a not-replaced, not-less-stable package
-    printf ' AND NOT EXISTS ('
-      printf 'SELECT * FROM `install_target_providers`'
-      mysql_join_install_target_providers_binary_packages '' 'itp_bp'
-      mysql_join_binary_packages_repositories 'itp_bp' 'itp_r'
-      printf ' JOIN `repository_stability_relations` ON `itp_r`.`stability`=`repository_stability_relations`.`more_stable`'
-      printf ' WHERE `d_r`.`stability`=`repository_stability_relations`.`less_stable`'
-      printf ' AND `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-      printf ' AND NOT EXISTS ('
-        printf 'SELECT * FROM `replaced_binary_packages_copy`'
-        printf ' WHERE `replaced_binary_packages_copy`.`id`=`itp_bp`.`id`'
-      printf ')'
-    printf ')'
-    # not provided by a moved package
-    printf ' AND NOT EXISTS ('
-      printf 'SELECT * FROM `moveable_binary_packages`'
-      mysql_join_binary_packages_install_target_providers 'moveable_binary_packages'
-      printf ' WHERE `moveable_binary_packages`.`id`=`install_target_providers`.`package`'
-    printf ');\n'
-    # remove packages from the moveable-list which replace packages no longer on the replaced-list (e.g un-replaceable packages)
-    printf 'DELETE `moveable_binary_packages` FROM `moveable_binary_packages`'
-    printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
-    mysql_join_binary_packages_repositories 'm_bp' 'm_r'
-    mysql_join_binary_packages_build_assignments 'm_bp' 'm_ba'
-    mysql_join_build_assignments_package_sources 'm_ba' 'm_ps'
-    mysql_join_package_sources_upstream_repositories 'm_ps' 'm_ur'
-    mysql_join_upstream_repositories_repository_moves 'm_ur'
-    printf ' AND `repository_moves`.`from_repository`=`m_r`.`id`'
-    printf ' JOIN `repositories` AS `r_r` ON `repository_moves`.`to_repository`=`r_r`.`id`'
-    mysql_join_repositories_binary_packages 'r_r' 'r_bp'
-    printf ' AND `r_bp`.`pkgname`=`m_bp`.`pkgname`'
+    mysql_join_dependencies_binary_packages '' 'req_bp'
+    # we need to check wether req_bp's dependency is (un)critical
+    mysql_join_binary_packages_repositories 'repl_bp' 'repl_r'
+    mysql_join_binary_packages_repositories 'req_bp' 'req_r'
+    # dependent package is "less stable" than dependency
+    printf ' JOIN `repository_stability_relations` AS `repl_rr`'
+    printf ' ON `repl_rr`.`more_stable`=`repl_r`.`stability`'
+    printf ' AND `repl_rr`.`less_stable`=`req_r`.`stability`'
+    # a) ^
     printf ' WHERE NOT EXISTS ('
-      printf 'SELECT * FROM `replaced_binary_packages`'
-      printf ' WHERE `replaced_binary_packages`.`id`=`r_bp`.`id`'
+      # no moved package ...
+      printf 'SELECT *'
+      printf ' FROM `moveable_binary_packages_copy`'
+      mysql_join_binary_packages_install_target_providers 'moveable_binary_packages_copy' 'subst_itp'
+      # ... provides the same
+      printf ' WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
+    # b) 1) ^
+    printf ') AND NOT EXISTS ('
+      # no current package ...
+      printf 'SELECT *'
+      printf ' FROM `binary_packages` AS `subst_bp`'
+      mysql_join_binary_packages_install_target_providers 'subst_bp' 'subst_itp'
+      # ... in a repository ...
+      mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+      # ... more stable ...
+      printf ' JOIN `repository_stability_relations` AS `subst_rr`'
+      printf ' ON `subst_rr`.`more_stable`=`subst_r`.`stability`'
+      # ... than x's repository ...
+      printf ' WHERE `subst_rr`.`less_stable`=`repl_r`.`stability`'
+      printf ' AND NOT EXISTS ('
+      # ... and which is not replaced ...
+        printf 'SELECT * FROM `replaced_binary_packages_copy2`'
+        printf ' WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`'
+      printf ')'
+      # ... and provides the same
+      printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
+      # b) 2) ^
     printf ');\n'
-    # actually, this only checks the count of deletions from the moveable-list, but that should be ok
     printf 'UNTIL ROW_COUNT()=0\n'
     printf 'END REPEAT;\n'
     for table in 'moveable' 'replaced'; do
-      printf 'DROP TEMPORARY TABLE `%s_binary_packages_copy`;\n' \
-        "${table}"
+      for copy in '' '2'; do
+        if [ "${table}" = 'moveable' ] && \
+          [ "${copy}" = '2' ]; then
+          continue
+        fi
+        printf 'DROP TEMPORARY TABLE `%s_binary_packages_copy%s`;\n' \
+          "${table}" "${copy}"
+      done
     done
     printf 'END\n'
     printf '//\n'
@@ -429,6 +465,7 @@ if [ ! "$1" = 'slim' ]; then
       'EXECUTE' 'buildmaster.*' \
       'RELOAD' '*.*' \
       'SELECT' 'buildmaster.*' \
+      'SELECT' 'mysql.proc' \
       'SHOW VIEW' 'buildmaster.*' \
       'UPDATE' 'buildmaster.*'
     printf 'GRANT %s ON %s TO '"'"'webserver'"'"'@'"'"'localhost'"'"';\n' \

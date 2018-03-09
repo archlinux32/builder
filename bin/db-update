@@ -4,29 +4,10 @@
 # additionally tested packages from testing to the respective stable
 # repository (if possible [1])
 
-# 1] Condition for moving a package A from staging (testing) to
-#    testing (stable) is that:
-#   a) nothing on the build-list run-depends on A and
-#   b) no done package B (in a not-more stable repository) which is
-#      not being moved run-depends on A
-
-# The new condition will be shorter, cleaner and less error prone:
-# (_Moving_ is without risk. It is _deleting_, that may break stuff.)
-# Every package which is replaced, must have its provided install_targets:
-#   a) provided by another new or not-replaced package or
-#   b) not required by any not-replaced package.
-
-# TODO: Use the stored function
-# calculate_maximal_moveable_set("staging") and
-# calculate_maximal_moveable_set("testing")
+# The condition [1] is explained in the stored function
+# calculate_maximal_moveable_set which is created in bin/bootsrap-mysql
 
 # TODO: separate locks for staging, testing (and stable)
-
-# TODO: handle deletion of parts of a split package
-
-# TODO: handle dependencies of parts of a split package separately
-
-# TODO: read information from database
 
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
@@ -36,367 +17,21 @@
 usage() {
   >&2 echo ''
   >&2 echo 'db-update [options] [packages]:'
-  >&2 echo ' move possible packages from staging to testing.'
   >&2 echo ' move tested packages from testing to stable.'
+  >&2 echo ' move possible packages from staging to testing.'
   >&2 echo ''
   >&2 echo 'possible options:'
   >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be moved.'
-  >&2 echo '  -s|--stabilize $package:'
-  >&2 echo '                    Assume, package $package can be stabilized.'
-  >&2 echo '  -u|--unstage $package:'
-  >&2 echo '                    Assume, package $package can be unstaged.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
-# move_packages file with one "$package $from_repository $to_repository" per line
-# the existence of a directory $tmp_dir is assumed
-
-move_packages() {
-
-  if [ -z "${tmp_dir}" ] || [ ! -d "${tmp_dir}" ]; then
-    >&2 echo 'move_packages: No tmp_dir provided.'
-    exit 2
-  fi
-
-  local package
-  local from_repo
-  local to_repo
-  local from_ending
-  local rm_ending
-  local to_ending
-  local repo
-  local part
-  local dummynator
-  local file
-
-  if [ -e "${tmp_dir:?}/tmp" ]; then
-    rm -rf --one-file-system "${tmp_dir:?}/tmp"
-  fi
-  mkdir "${tmp_dir}/tmp"
-
-  touch "${tmp_dir}/tmp/repos"
-  touch "${tmp_dir}/tmp/packages"
-  touch "${tmp_dir}/tmp/master-mirror-listing"
-  mkdir "${tmp_dir}/tmp/transit"
-
-  if ${no_action}; then
-    dummynator='echo'
-  else
-    dummynator=''
-  fi
-
-  ls_master_mirror 'i686' | \
-    while read -r repo; do
-      ls_master_mirror "i686/${repo}" | \
-        sed "s|^|i686/${repo}/|" >> \
-        "${tmp_dir}/tmp/master-mirror-listing"
-    done
-
-  while read -r package from_repo to_repo; do
-    if [ -z "${package}" ]; then
-      continue
-    fi
-
-    if ${no_action}; then
-      printf \
-        'move "%s" from "%s" to "%s"\n' \
-        "${package}" \
-        "${from_repo}" \
-        "${to_repo}"
-    fi
-
-    echo "${package}" >> \
-      "${tmp_dir}/tmp/packages"
-
-    if echo "${from_repo}" | \
-      grep -q 'staging$' && \
-      echo "${to_repo}" | \
-        grep -q 'testing$'; then
-      from_ending='done'
-      rm_ending='test\(ing\|ed\)'
-      to_ending='testing'
-    elif echo "${from_repo}" | \
-      grep -q 'testing$' && \
-      ! echo "${to_repo}" | \
-        grep -q 'testing$\|staging$'; then
-      from_ending='tested'
-      rm_ending=''
-      to_ending=''
-    else
-      >&2 printf 'move_packages: Cannot move package "%s" from "%s" to "%s".\n' "${package}" "${from_repo}" "${to_repo}"
-      exit 2
-    fi
-
-    echo "${from_repo}" > \
-      "${tmp_dir}/tmp/${package}.from_repo"
-    echo "${to_repo}" > \
-      "${tmp_dir}/tmp/${package}.to_repo"
-    echo "${from_ending}" > \
-      "${tmp_dir}/tmp/${package}.from_ending"
-    echo "${rm_ending}" > \
-      "${tmp_dir}/tmp/${package}.rm_ending"
-    echo "${to_ending}" > \
-      "${tmp_dir}/tmp/${package}.to_ending"
-
-    if [ ! -f "${work_dir}/package-states/${package}.${from_ending}" ]; then
-      >&2 printf 'move_packages: Cannot find package state file "%s"\n' "${package}.${from_ending}"
-      exit 2
-    fi
-
-    cp \
-      "${work_dir}/package-states/${package}.${from_ending}" \
-      "${tmp_dir}/tmp/${package}.parts"
-
-    sed \
-      's|\(-[^-]\+\)\{3\}\.pkg\.tar\.xz$||' \
-      "${tmp_dir}/tmp/${package}.parts" > \
-      "${tmp_dir}/tmp/${package}.parts_names"
-
-    sed \
-      'p;s|$|.sig|' \
-      "${tmp_dir}/tmp/${package}.parts" > \
-      "${tmp_dir}/tmp/${package}.parts_and_signatures"
-
-    while read -r part; do
-      if ! grep -qxF "i686/${from_repo}/${part}" "${tmp_dir}/tmp/master-mirror-listing"; then
-        >&2 printf \
-          'move_packages: Cannot find file "%s", part of package "%s".\n' \
-          "i686/${from_repo}/${part}" \
-          "${package}"
-        exit 2
-      fi
-    done < \
-      "${tmp_dir}/tmp/${package}.parts_and_signatures"
-
-    mkdir -p "${tmp_dir}/tmp/${from_repo}"
-    mkdir -p "${tmp_dir}/tmp/${to_repo}"
-
-    repos=$(
-      # shellcheck disable=SC2046
-      printf '%s\n' "${from_repo}" "${to_repo}" $(cat "${tmp_dir}/tmp/repos") | \
-        sort -u
-    )
-    echo "${repos}" > \
-      "${tmp_dir}/tmp/repos"
-
-  done < \
-    "$1"
-
-  if ${no_action}; then
-    find "${tmp_dir}/tmp" -type f | \
-      while read -r file; do
-        if [ "${file%.pkg.tar.xz}.pkg.tar.xz" = "${file}" ] ||
-          [ "${file%.pkg.tar.xz.sig}.pkg.tar.xz.sig" = "${file}" ]; then
-          echo "'${file}'"
-        else
-          echo "${file}:"
-          sed 's|^|<<|;s|$|>>|' "${file}"
-        fi
-        echo
-      done
-  fi
-
-  # receive the *.db.tar.gz's and *.files.tar.gz's
-
-  while read -r repo; do
-
-    ${master_mirror_rsync_command} \
-      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
-      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
-      "${tmp_dir}/tmp/${repo}/"
-
-    # add and remove the packages locally
-
-    if grep -qxF "${repo}" "${tmp_dir}/tmp/"*".from_repo"; then
-
-      # shellcheck disable=SC2046
-      repo-remove -q \
-        "${tmp_dir}/tmp/${repo}/${repo}.db.tar.gz" \
-        $(
-          grep -lxF "${repo}" "${tmp_dir}/tmp/"*".from_repo" | \
-            sed '
-              s|\.from_repo$|.parts_names|
-            ' | \
-            xargs -rn1 cat
-        )
-    fi
-
-    if grep -qxF "${repo}" "${tmp_dir}/tmp/"*".to_repo"; then
-      grep -lxF "${repo}" "${tmp_dir}/tmp/"*".to_repo" | \
-        sed '
-          s|\.to_repo$||
-        ' | \
-        while read -r package; do
-          while read -r part; do
-            ${master_mirror_rsync_command} \
-              "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}" \
-              "${master_mirror_rsync_directory}/i686/$(cat "${package}.from_repo")/${part}.sig" \
-              "${tmp_dir}/tmp/transit/"
-            repo-add -q \
-              "${tmp_dir}/tmp/${repo}/${repo}.db.tar.gz" \
-              "${tmp_dir}/tmp/transit/${part}"
-            rm \
-              "${tmp_dir}/tmp/transit/${part}" \
-              "${tmp_dir}/tmp/transit/${part}.sig"
-          done < \
-            "${package}.parts"
-        done
-    fi
-
-  done < "${tmp_dir}/tmp/repos"
-
-  if ${no_action}; then
-    find "${tmp_dir}/tmp" -type f
-  fi
-
-  # move the packages remotely via sftp
-
-  {
-    while read -r package; do
-
-      if [ -z "${package}" ]; then
-        continue
-      fi
-
-      while read -r part; do
-        if [ -z "${part}" ]; then
-          continue
-        fi
-        printf \
-          'rename "%s" "%s"\n' \
-          "i686/$(cat "${tmp_dir}/tmp/${package}.from_repo")/${part}" \
-          "i686/$(cat "${tmp_dir}/tmp/${package}.to_repo")/${part}"
-      done < \
-        "${tmp_dir}/tmp/${package}.parts_and_signatures"
-
-    done < \
-      "${tmp_dir}/tmp/packages"
-    echo 'quit'
-  } | \
-    if ${no_action}; then
-      sed 's|^|sftp: |'
-    else
-      ${master_mirror_sftp_command}
-    fi
-
-  # and push our local *.db.tar.gz via rsync
-
-  while read -r repo; do
-
-    # shellcheck disable=SC2086
-    ${dummynator} ${master_mirror_rsync_command} \
-      "${tmp_dir}/tmp/${repo}/${repo}.db."* \
-      "${tmp_dir}/tmp/${repo}/${repo}.files."* \
-      "${master_mirror_rsync_directory}/i686/${repo}/"
-
-  done < \
-    "${tmp_dir}/tmp/repos"
-
-  while read -r package; do
-
-    # then we can safely remove old versions
-
-    while read -r part; do
-      ${dummynator} remove_old_package_versions 'i686' "$(cat "${tmp_dir}/tmp/${package}.to_repo")" "${part}"
-    done < \
-      "${tmp_dir}/tmp/${package}.parts"
-
-    # and update the state files
-
-    from_ending=$(
-      cat "${tmp_dir}/tmp/${package}.from_ending"
-    )
-    rm_ending=$(
-      cat "${tmp_dir}/tmp/${package}.rm_ending"
-    )
-    to_ending=$(
-      cat "${tmp_dir}/tmp/${package}.to_ending"
-    )
-
-    if [ -z "${to_ending}" ]; then
-      ${dummynator} rm \
-        "${work_dir}/package-states/${package}.${from_ending}"
-    else
-      # remove old state files of $package with ending $rm_ending
-      find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-        -regex '.*/'"$(str_to_regex "${package%.*.*.*}")"'\(\.[^.]\+\)\{3\}\.'"${rm_ending}" \
-        -execdir ${dummynator} rm {} \;
-      ${dummynator} mv \
-        "${work_dir}/package-states/${package}.${from_ending}" \
-        "${work_dir}/package-states/${package}.${to_ending}"
-    fi
-
-  done < \
-    "${tmp_dir}/tmp/packages"
-
-  # shellcheck disable=SC2016
-  while read -r package; do
-    while read -r part; do
-      printf 'UPDATE `binary_packages`'
-      mysql_join_binary_packages_repositories '' 'from_repo'
-      mysql_join_binary_packages_architectures
-      printf ' SET `binary_packages`.`repository`=('
-        printf 'SELECT `to_repo`.`id`'
-        printf ' FROM `repositories` as `to_repo`'
-        printf ' WHERE `to_repo`.`name`=from_base64("%s")' \
-          "$(
-            base64_encode_each < \
-              "${tmp_dir}/tmp/${package}.to_repo"
-          )"
-        printf ')'
-      printf ' WHERE'
-      printf ' `from_repo`.`name`=from_base64("%s")' \
-        "$(
-          base64_encode_each < \
-            "${tmp_dir}/tmp/${package}.from_repo"
-        )"
-      printf '%s\n' "${part}" | \
-        sed '
-          s/\.pkg\.tar\.xz$//
-          s/-\([^-.]\+\)\(-[^-]\+\)$/-\1.0\2/
-          s/-\([^-:]\+\)\(\(-[^-]\+\)\{2\}\)$/-0:\1\2/
-          s/^\(.\+\)-\([^-:]\+\):\([^-:]\+\)-\([^-.]\+\)\.\([^-.]\+\)-\([^-]\+\)$/\1\n\2\n\3\n\4\n\5\n\6/
-        ' | \
-        base64_encode_each | \
-        tr '\n' ' ' | \
-        sed '
-          s,\(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) \(\S\+\) $,'"$(
-            printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
-              'pkgname' '\1' \
-              'epoch' '\2' \
-              'pkgver' '\3' \
-              'pkgrel' '\4' \
-              'sub_pkgrel' '\5'
-            printf ' AND `architectures`.`name`=from_base64("\\6")'
-          )"',
-        '
-      printf ';\n'
-    done < \
-      "${tmp_dir}/tmp/${package}.parts"
-  done < \
-    "${tmp_dir}/tmp/packages" | \
-    if ${no_action}; then
-      sed 's|^|mysql: |'
-    else
-      mysql_run_query
-    fi
-
-  ${dummynator} trigger_mirror_refreshs
-
-  rm -rf --one-file-system "${tmp_dir:?}/tmp"
-
-}
-
 eval set -- "$(
-  getopt -o bf:hns:u: \
+  getopt -o bhn \
     --long block \
-    --long from: \
     --long help \
     --long no-action \
-    --long stabilize: \
-    --long unstage: \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -415,14 +50,6 @@ do
     ;;
     -n|--no-action)
       no_action=true
-    ;;
-    -s|--stabilze)
-      shift
-      packages_to_force_stabilize="${packages_to_force_stabilize} $1"
-    ;;
-    -u|--unstage)
-      shift
-      packages_to_force_unstage="${packages_to_force_unstage} $1"
     ;;
     --)
       shift
@@ -446,280 +73,228 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
+# Create tmp_dir, lock and trap.
+
 tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-errors=$(
-  {
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT DISTINCT CONCAT('
-      printf '`package_sources`.`%s`,".",' \
-        'pkgbase' 'git_revision' 'mod_git_revision'
-      printf '`upstream_repositories`.`name`)'
-      printf ' FROM `binary_packages`'
-      mysql_join_binary_packages_repositories
-      mysql_join_binary_packages_build_assignments
-      mysql_join_build_assignments_package_sources
-      mysql_join_package_sources_upstream_repositories
-      # consider all packages less stable than "testing"
-      printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
-      printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
-      printf ' WHERE `repository_stabilities`.`name` = "testing"'
-    } | \
-      mysql_run_query | \
-      sed 'p'
-    # shellcheck disable=SC2086
-    printf '%s\n' ${packages_to_force_stabilize} | \
-      sort -u
-  } | \
-    grep -vxF '' | \
-    sort | \
-    uniq -u
-)
-if [ -n "${errors}" ]; then
-  # shellcheck disable=SC2086
-  >&2 printf 'Package "%s" is not in testing, staging or on the build list!\n' ${errors}
-  # shellcheck disable=SC2016
-  >&2 printf 'Did you really give it in the form "$pkgbase.$git_rev.$mod_git_rev.$repository"?\n'
-  exit 2
-fi
-
-errors=$(
-  {
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT DISTINCT CONCAT('
-      printf '`package_sources`.`%s`,".",' \
-        'pkgbase' 'git_revision' 'mod_git_revision'
-      printf '`upstream_repositories`.`name`)'
-      printf ' FROM `binary_packages`'
-      mysql_join_binary_packages_repositories
-      mysql_join_binary_packages_build_assignments
-      mysql_join_build_assignments_package_sources
-      mysql_join_package_sources_upstream_repositories
-      # consider all packages less stable than "staging"
-      printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
-      printf ' JOIN `repository_stabilities` ON `repository_stability_relations`.`more_stable`=`repository_stabilities`.`id`'
-      printf ' WHERE `repository_stabilities`.`name` = "staging"'
-    } | \
-      mysql_run_query | \
-      sed 'p'
-    # shellcheck disable=SC2086
-    printf '%s\n' ${packages_to_force_unstage} | \
-      sort -u
-  } | \
-    grep -vxF '' | \
-    sort | \
-    uniq -u
-)
-if [ -n "${errors}" ]; then
-  # shellcheck disable=SC2086
-  >&2 printf 'Package "%s" is not in staging or on the build list!\n' ${errors}
-  # shellcheck disable=SC2016
-  >&2 printf 'Did you really give it in the form "$pkgbase.$git_rev.$mod_git_rev.$repository"?\n'
-  exit 2
-fi
-
-# Create a lock file and a trap.
-
-exec 9> "${build_list_lock_file}"
+exec 9> "${package_database_lock_file}"
 if ! flock ${block_flag} 9; then
-  >&2 echo 'come back (shortly) later - I cannot lock build list.'
-  exit 0
-fi
-
-exec 8> "${package_database_lock_file}"
-if ! flock ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - I cannot lock package database.'
   exit 0
 fi
 
-exec 7> "${sanity_check_lock_file}"
-if ! flock -s ${block_flag} 7; then
+exec 8> "${sanity_check_lock_file}"
+if ! flock -s ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - sanity-check currently running.'
   exit 0
 fi
 
-clean_up_lock_file() {
-  rm -f "${package_database_lock_file}" "${build_list_lock_file}"
-  rm -rf --one-file-system "${tmp_dir}"
-}
+# shellcheck disable=SC2119
+mysql_cleanup
 
-trap clean_up_lock_file EXIT
+for source_stability in 'testing' 'staging'; do
+  find "${tmp_dir}" -mindepth 1 -delete
 
-# sanity check
+  # shellcheck disable=SC2016
+  {
+    printf 'CALL calculate_maximal_moveable_set("%s");\n' \
+      "${source_stability}"
 
-for ending in 'done' 'tested'; do
-  errors=$(
-    find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
-      sed 's|\(\.[^.]\+\)\{4\}$||' | \
-      sort | \
-      uniq -d
-  )
-  if [ -n "${errors}" ]; then
-    >&2 echo 'Removing duplicates not yet implemented:'
-    >&2 echo "${errors}"
-    exit 42
+    printf 'CREATE TEMPORARY TABLE `rps` (`id` MEDIUMINT, UNIQUE INDEX (`id`));\n'
+    printf 'INSERT IGNORE INTO `rps` (`id`)'
+    printf ' SELECT `moveable_binary_packages`.`to_repository`'
+    printf ' FROM `moveable_binary_packages`;\n'
+    printf 'INSERT IGNORE INTO `rps` (`id`)'
+    printf ' SELECT `binary_packages`.`repository`'
+    printf ' FROM `moveable_binary_packages`'
+    printf ' JOIN `binary_packages` ON `moveable_binary_packages`.`id`=`binary_packages`.`id`;\n'
+    printf 'INSERT IGNORE INTO `rps` (`id`)'
+    printf ' SELECT `binary_packages`.`repository`'
+    printf ' FROM `replaced_binary_packages`'
+    printf ' JOIN `binary_packages` ON `replaced_binary_packages`.`id`=`binary_packages`.`id`;\n'
+
+    printf 'SELECT "repositories",`repositories`.`name`'
+    printf ' FROM `repositories`'
+    printf ' JOIN `rps` ON `rps`.`id`=`repositories`.`id`;\n'
+
+    printf 'SELECT "mv.id",`moveable_binary_packages`.`id`,`moveable_binary_packages`.`to_repository`'
+    printf ' FROM `moveable_binary_packages`;\n'
+
+    printf 'SELECT "mv",'
+    mysql_package_name_query
+    printf ',`repositories`.`name`,`new_repo`.`name`'
+    printf ' FROM `moveable_binary_packages`'
+    printf ' JOIN `binary_packages` ON `moveable_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_architectures
+    printf ' JOIN `repositories` AS `new_repo` ON `new_repo`.`id`=`moveable_binary_packages`.`to_repository`'
+    printf ';\n'
+
+    printf 'SELECT "rm.id",`replaced_binary_packages`.`id`'
+    printf ' FROM `replaced_binary_packages`;\n'
+
+    printf 'SELECT "rm",'
+    mysql_package_name_query
+    printf ',`repositories`.`name`'
+    printf ' FROM `replaced_binary_packages`'
+    printf ' JOIN `binary_packages` ON `replaced_binary_packages`.`id`=`binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_architectures
+    printf ';\n'
+  } | \
+    mysql_run_query | \
+    tr '\t' ' ' | \
+    grep '^\(repositories\|\(rm\|mv\)\(\.id\)\?\) ' | \
+    while read -r what content; do
+      printf '%s\n' "${content}" >> \
+        "${tmp_dir}/${what}"
+    done
+
+  if [ ! -s "${tmp_dir}/repositories" ]; then
+    >&2 printf 'Nothing to move from %s.\n' "${source_stability}"
+    continue
   fi
-done
 
-# packages which are done
+  touch \
+    "${tmp_dir}/mv" \
+    "${tmp_dir}/mv.id" \
+    "${tmp_dir}/rm" \
+    "${tmp_dir}/rm.id"
 
-find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
-  sed '
-    s|\.done$||
-  ' | \
-  sort -u > \
-  "${tmp_dir}/done-packages"
-
-# packages still on the build-list
-
-grep -vxF 'break_loops' "${work_dir}/build-list" | \
-  tr ' ' '.' | \
-  sort -u > \
-  "${tmp_dir}/build-list-packages"
-
-find "${work_dir}/package-infos" -name '*.groups' \
-  -exec grep -qxF 'base' {} \; \
-  -printf '%f\n' | \
-  sed '
-    s|\.groups$||
-  ' | \
-  sort -u > \
-  "${tmp_dir}/base-packages"
-
-{
   # shellcheck disable=SC2086
-  printf '%s\n' ${packages_to_force_unstage}
-  print_list_of_archaic_packages 'build-list'
-} > \
-  "${tmp_dir}/force-unstage-packages"
-
->&2 printf 'calculate what packages should be unstaged ...'
-find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-unstage-packages" > \
-  "${tmp_dir}/unstage-packages"
->&2 printf ' ok.\n'
-
-# no base packages on the build list anymore?
-if [ -z "$(
-    join -j 1 \
-      "${tmp_dir}/base-packages" \
-      "${tmp_dir}/build-list-packages"
-  )" ]; then
-
-  >&2 echo 'db-update unstage: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
-  for s in "${tmp_dir}/all-builds" "${tmp_dir}/all-depends"; do
-    sed '/ base$/d' "${s}" > \
-      "${s}.no-base"
+  for s in "${tmp_dir}/"*; do
+    sort -u "${s}" | \
+      sponge "${s}"
   done
 
-  >&2 printf 'calculate what packages should be unstaged ...'
-  find_biggest_subset_of_packages "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-unstage-packages" > \
-    "${tmp_dir}/unstage-packages"
-  >&2 printf ' ok.\n'
+  # receive the repository databases from the master mirror
+  mkdir "${tmp_dir}/dbs"
+  while read -r repo; do
+    mkdir "${tmp_dir}/dbs/${repo}"
+    # shellcheck disable=SC2086
+    ${master_mirror_rsync_command} \
+      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
+      "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
+      "${tmp_dir}/dbs/${repo}/"
+    tar -Oxzf "${tmp_dir}/dbs/${repo}/${repo}.db.tar.gz" --wildcards '*/desc' | \
+      sed -n '
+        /^%FILENAME%$/{
+          N
+          s/^\S\+\n\(\S\+-[^-.]\+\)\(-[^-]\+\)/\1.0\2 \1\2/
+          T
+          p
+        }
+      '
+  done < \
+    "${tmp_dir}/repositories" | \
+    while read -r old new; do
+      for file in 'rm' 'mv'; do
+        sed -i '
+          s/\(\s\|^\)'"$(str_to_regex "${old}")"'\(\s\|$\)/\1'"${new}"'\2/
+        ' "${tmp_dir}/${file}"
+      done
+    done
 
-fi
+  # remove to-be-deleted packages
+  # shellcheck disable=SC2094
+  cut -d' ' -f2 < \
+    "${tmp_dir}/rm" | \
+    sort -u | \
+    while read -r repo; do
+      grep " $(str_to_regex "${repo}")\$" "${tmp_dir}/rm" | \
+        sed '
+          s/\(-[^-]\+\)\{3\} \S\+$//
+        ' | \
+        xargs -r repo-remove -q "${tmp_dir}/dbs/${repo}/${repo}.db.tar.gz"
+    done
 
-{
-  # shellcheck disable=SC2086
-  printf '%s\n' ${packages_to_force_stabilize}
-  print_list_of_archaic_packages 'build-list' 'staging' 'testing'
-} > \
-  "${tmp_dir}/force-stabilize-packages"
+  # copy and delete moved packages
+  # shellcheck disable=SC2094
+  cut -d' ' -f2,3 < \
+    "${tmp_dir}/mv" | \
+    sort -u | \
+    while read -r from_repo to_repo; do
+      grep " $(str_to_regex "${from_repo}") $(str_to_regex "${to_repo}")\$" "${tmp_dir}/mv" | \
+        sed '
+          s/-[^-]\+ \S\+ \S\+$//
+        ' | \
+        xargs -r repo-copy \
+          "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" \
+          "${tmp_dir}/dbs/${to_repo}/${to_repo}.db.tar.gz"
+      grep " $(str_to_regex "${from_repo}") $(str_to_regex "${to_repo}")\$" "${tmp_dir}/mv" | \
+        sed '
+          s/\(-[^-]\+\)\{3\} \S\+ \S\+$//
+        ' | \
+        xargs -r repo-remove -q \
+          "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz"
+    done
 
-# calculate what packages should be stabilized
+  # move the packages remotely via sftp
+  {
+    sed '
+      s,^\(\S\+\) \(\S\+\)$,rm "i686/\2/\1"\nrm "i686/\2/\1.sig",
+    ' "${tmp_dir}/rm"
+    sed '
+      s,^\(\S\+\) \(\S\+\) \(\S\+\)$,rename "i686/\2/\1" "i686/\3/\1"\nrename "i686/\2/\1.sig" "i686/\3/\1.sig",
+    ' "${tmp_dir}/mv"
+    echo 'quit'
+  } | \
+    if ${no_action}; then
+      sed 's|^|sftp: |'
+    else
+      ${master_mirror_sftp_command}
+    fi
 
-{
-  cat "${tmp_dir}/done-packages" "${tmp_dir}/build-list-packages"
-  find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.testing' -printf '%f\n' | \
-    sed 's|\.testing$||'
-} | \
-  sort -u > \
-  "${tmp_dir}/keep-packages"
-
-find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.tested' -printf '%f\n' | \
-    sed 's|\.tested$||' > \
-  "${tmp_dir}/stabilize-packages"
-
-# no base packages on the build list or in staging anymore?
-if [ -z "$(
-    cat \
-      "${tmp_dir}/build-list-packages" \
-      "${tmp_dir}/done-packages" | \
-      sort -u | \
-      join -j 1 \
-        "${tmp_dir}/base-packages" \
-        -
-  )" ]; then
-
-  >&2 echo 'db-update stabilize: we pretend, the group "base" does not exist, so we only fetch "direct" dependencies on base-packages'
-  >&2 printf 'calculate what packages should be stabilized ...'
-  find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds.no-base" "${tmp_dir}/all-depends.no-base" "${tmp_dir}/force-stabilize-packages" | \
-    sponge "${tmp_dir}/stabilize-packages"
-  >&2 printf ' ok.\n'
-
-else
-
-  >&2 printf 'calculate what packages should be stabilized ...'
-  find_biggest_subset_of_packages "${tmp_dir}/stabilize-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/all-builds" "${tmp_dir}/all-depends" "${tmp_dir}/force-stabilize-packages" | \
-    sponge "${tmp_dir}/stabilize-packages"
-  >&2 printf ' ok.\n'
-
-fi
-
-# unlock build list
-
-rm -f "${build_list_lock_file}"
-flock -u 9
-
-clean_up_lock_file() {
-  rm -rf --one-file-system "${tmp_dir}"
-  rm -f "${package_database_lock_file}"
-}
-
-# testing -> stable
-
-while read -r package; do
-  if [ -z "${package}" ]; then
+  if ${no_action}; then
     continue
   fi
-  printf '%s %s %s\n' \
-    "${package}" \
-    "$(official_or_community "${package}" 'testing')" \
-    "$(repository_of_package "${package}")"
-done < \
-  "${tmp_dir}/stabilize-packages" | \
-  sponge "${tmp_dir}/stabilize-packages"
 
-# staging -> testing
+  # and push our local *.db.tar.gz via rsync
+  while read -r repo; do
+    # shellcheck disable=SC2086
+    ${master_mirror_rsync_command} \
+      "${tmp_dir}/dbs/${repo}/${repo}.db."* \
+      "${tmp_dir}/dbs/${repo}/${repo}.files."* \
+      "${master_mirror_rsync_directory}/i686/${repo}/"
+  done < \
+    "${tmp_dir}/repositories"
 
-while read -r package; do
-  if [ -z "${package}" ]; then
-    continue
-  fi
-  printf '%s %s %s\n' \
-    "${package}" \
-    "$(official_or_community "${package}" 'staging')" \
-    "$(official_or_community "${package}" 'testing')"
-done < \
-  "${tmp_dir}/unstage-packages" | \
-  sponge "${tmp_dir}/unstage-packages"
+  trigger_mirror_refreshs
 
-if [ -s "${tmp_dir}/stabilize-packages" ]; then
-  >&2 printf 'move packages from *testing/ to the stable repos ...'
-  move_packages "${tmp_dir}/stabilize-packages"
-  >&2 printf ' ok.\n'
-else
-  >&2 printf 'Nothing to move from *testing to the stable repos.\n'
-fi
+  # shellcheck disable=SC2016
+  {
+    printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+    printf 'CREATE TEMPORARY TABLE `moved_binary_packages` (`id` BIGINT, `new_repository` MEDIUMINT, UNIQUE KEY (`id`));\n'
+    printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `%s` COLUMNS TERMINATED BY " ";\n' \
+      "${tmp_dir}/mv.id" 'moved_binary_packages' \
+      "${tmp_dir}/rm.id" 'replaced_binary_packages'
+    printf 'DELETE `binary_packages` FROM `binary_packages`'
+    printf ' JOIN `replaced_binary_packages` ON `binary_packages`.`id`=`replaced_binary_packages`.`id`;\n'
+    printf 'UPDATE `binary_packages`'
+    printf ' JOIN `moved_binary_packages` ON `binary_packages`.`id`=`moved_binary_packages`.`id`'
+    printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`;\n'
+  } | \
+    mysql_run_query
 
-if [ -s "${tmp_dir}/unstage-packages" ]; then
-  >&2 printf 'move packages from *staging to *testing ...'
-  move_packages "${tmp_dir}/unstage-packages"
-  >&2 printf ' ok.\n'
-else
-  >&2 printf 'Nothing to move from *staging to *testing.\n'
-fi
-
-clean_up_lock_file
+  # TODO: this may delete too much, but these files will be obsolete soon anyway ...
+  find "${work_dir}/package-states/" \
+    \( \
+      -name '*.done' -o \
+      -name '*.testing' -o \
+      -name '*.tested' \
+    \) \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/rm")" '{}' \; \
+    -delete
+  find "${work_dir}/package-states/" \
+    -name '*.tested' \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
+    -delete
+  find "${work_dir}/package-states/" \
+    -name '*.done' \
+    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
+    -printf '%p\n' | \
+    while read -r sf; do
+      mv "${sf}" "${sf%.done}.testing"
+    done
+done
