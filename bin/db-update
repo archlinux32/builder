@@ -195,21 +195,38 @@ for source_stability in 'testing' 'staging'; do
     done
 
   # remove to-be-deleted packages
-  while read -r pkgname repo; do
-    cd "${tmp_dir}/dbs/${repo}"
-    repo-remove -q "${repo}.db.tar.gz" "${pkgname%-*-*-*}"
-  done < \
-    "${tmp_dir}/rm"
+  # shellcheck disable=SC2094
+  cut -d' ' -f2 < \
+    "${tmp_dir}/rm" | \
+    sort -u | \
+    while read -r repo; do
+      grep " $(str_to_regex "${repo}")\$" "${tmp_dir}/rm" | \
+        sed '
+          s/\(-[^-]\+\)\{3\} \S\+$//
+        ' | \
+        xargs -r repo-remove -q "${tmp_dir}/dbs/${repo}/${repo}.db.tar.gz"
+    done
 
-  # delete and add moved packages
-  while read -r pkgname from_repo to_repo; do
-    repo-copy \
-      "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" \
-      "${tmp_dir}/dbs/${to_repo}/${to_repo}.db.tar.gz" \
-      "${pkgname%-*}"
-    repo-remove -q "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" "${pkgname%-*-*-*}"
-  done < \
-    "${tmp_dir}/mv"
+  # copy and delete moved packages
+  # shellcheck disable=SC2094
+  cut -d' ' -f2,3 < \
+    "${tmp_dir}/mv" | \
+    sort -u | \
+    while read -r from_repo to_repo; do
+      grep " $(str_to_regex "${from_repo}") $(str_to_regex "${to_repo}")\$" "${tmp_dir}/mv" | \
+        sed '
+          s/-[^-]\+ \S\+ \S\+$//
+        ' | \
+        xargs -r repo-copy \
+          "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz" \
+          "${tmp_dir}/dbs/${to_repo}/${to_repo}.db.tar.gz"
+      grep " $(str_to_regex "${from_repo}") $(str_to_regex "${to_repo}")\$" "${tmp_dir}/mv" | \
+        sed '
+          s/\(-[^-]\+\)\{3\} \S\+ \S\+$//
+        ' | \
+        xargs -r repo-remove -q \
+          "${tmp_dir}/dbs/${from_repo}/${from_repo}.db.tar.gz"
+    done
 
   # move the packages remotely via sftp
   {
