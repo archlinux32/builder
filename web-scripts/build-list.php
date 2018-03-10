@@ -20,6 +20,7 @@ print "<title>List of " . $to_show . " package builds</title>\n";
 print "<link rel=\"stylesheet\" type=\"text/css\" href=\"/static/style.css\">\n";
 print "</head>\n";
 print "<body>\n";
+print "<a href=\"main page\">/</a>\n";
 print "<a href=\"/build-logs/\">build logs</a><br>\n";
 
 $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
