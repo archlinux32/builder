@@ -26,6 +26,8 @@ $colors["unbuilt"]="#ff0000";
 $colors["forbidden"]="#808080";
 $colors["virtual"]="#800080";
 
+$limit=200;
+
 if (! $result = $mysql -> query(
   "CREATE TEMPORARY TABLE `cons` (" .
     "`dep` BIGINT, " .
@@ -39,15 +41,18 @@ if (! $result = $mysql -> query(
   " SELECT `dependencies`.`id`,`install_target_providers`.`id`".
   " FROM `binary_packages`" .
   " JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`" .
+  " JOIN `repository_stabilities` ON `repositories`.`stability`=`repository_stabilities`.`id`" .
   " JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`" .
   " JOIN `build_assignments` ON `binary_packages`.`build_assignment`= `build_assignments`.`id`" .
   " JOIN `package_sources` ON `build_assignments`.`package_source`= `package_sources`.`id`" .
   $match .
   " JOIN `dependencies` ON `dependencies`.`dependent`=`binary_packages`.`id`" .
+  " JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id`" .
   " JOIN `install_targets` ON `dependencies`.`depending_on`=`install_targets`.`id`" .
   $ignore_install_targets .
   " JOIN `install_target_providers` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`" .
-  " LIMIT 50"
+  " WHERE (`dependency_types`.`relevant_for_binary_packages` OR `repository_stabilities`.`name`=\"unbuilt\")" .
+  " LIMIT " . $limit
   ))
   die($mysql->error);
 
@@ -62,7 +67,12 @@ if (! $result = $mysql -> query(
   $match .
   " JOIN `install_target_providers` ON `install_target_providers`.`package`=`binary_packages`.`id`" .
   " JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on`" .
-  " LIMIT 50"
+  " JOIN `binary_packages` AS `d_bp` ON `dependencies`.`dependent`=`d_bp`.`id`" .
+  " JOIN `repositories` AS `d_r` ON `d_bp`.`repository`=`d_r`.`id`" .
+  " JOIN `repository_stabilities` AS `d_rs` ON `d_r`.`stability`=`d_rs`.`id`" .
+  " JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id`" .
+  " WHERE (`dependency_types`.`relevant_for_binary_packages` OR `d_rs`.`name`=\"unbuilt\")" .
+  " LIMIT " . $limit
   ))
   die($mysql->error);
 
