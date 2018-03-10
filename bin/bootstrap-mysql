@@ -307,15 +307,20 @@ if [ ! "$1" = 'slim' ]; then
     # stores results in `moveable_binary_packages` and `replaced_binary_packages`
     # Give a maximal list of packages to be moved, while implementing the
     # condition from db-update:
+
     # Every package which is replaced, must have its provided install_targets:
     #   a) provided by another moved or not-replaced package or
     #   b) not required by any not-replaced package.
-# TODO: additionally, every package being moved needs to have all dependencies
-# installable in the target repository !
+
+    # Every package being moved needs to have all dependencies
+    # installable in the target repository.
+
     printf 'DROP PROCEDURE IF EXISTS calculate_maximal_moveable_set;\n'
     printf 'DELIMITER //\n'
     printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
     printf 'BEGIN\n'
+    # variables to store count of changed rows
+    printf 'DECLARE row_count_saved INT DEFAULT 0;\n'
     for copy in '' '_copy' '_copy2'; do
       printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
         'moveable' "${copy}" \
@@ -369,6 +374,7 @@ if [ ! "$1" = 'slim' ]; then
     # now we delete all unreplaceable and unmoveable packages from the respective
     # list until no further changes are required
     printf 'REPEAT\n'
+    # create copies of our temporary tables *yuck*
     for table in 'replaced' 'moveable'; do
       for copy in '' '2'; do
         if [ "${table}" = 'moveable' ] && \
@@ -381,6 +387,50 @@ if [ ! "$1" = 'slim' ]; then
         printf ' FROM `%s_binary_packages`;\n' "${table}"
       done
     done
+    # a package is not moveable if its dependencies are not provided ...
+    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages`'
+    printf ' FROM `replaced_binary_packages`'
+    printf ' RIGHT JOIN `moveable_binary_packages`'
+    printf ' ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`'
+    printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_dependencies
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+    # ... by a not-deleted, "more stable" package already in place or ...
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `install_target_providers`'
+      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+      printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`less_stable`'
+      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+      printf ' AND `repositories`.`stability`=`repository_stability_relations`.`more_stable`'
+      printf ' AND NOT EXISTS ('
+        printf 'SELECT * FROM `replaced_binary_packages_copy`'
+        printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
+      printf ')'
+    # ... by a moved package
+    printf ') AND NOT EXISTS ('
+      printf 'SELECT * FROM `install_target_providers`'
+      printf ' JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`'
+      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+    printf ');\n'
+    printf 'SET @row_count_saved = ROW_COUNT();\n'
+
+    # refresh copies of our temporary tables *yuck*
+    for table in 'replaced' 'moveable'; do
+      for copy in '' '2'; do
+        if [ "${table}" = 'moveable' ] && \
+          [ "${copy}" = '2' ]; then
+          continue
+        fi
+        printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
+        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+        printf ' SELECT `%s_binary_packages`.*' "${table}"
+        printf ' FROM `%s_binary_packages`;\n' "${table}"
+      done
+    done
+
     # packages which should not be replaced: ones providing something that is:
     # a) still needed by a not-replaced package x "less stable" than the target repository and
     # b) not provided by:
@@ -445,7 +495,7 @@ if [ ! "$1" = 'slim' ]; then
       printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
       # b) 2) ^
     printf ');\n'
-    printf 'UNTIL ROW_COUNT()=0\n'
+    printf 'UNTIL row_count_saved=0 AND ROW_COUNT()=0\n'
     printf 'END REPEAT;\n'
     for table in 'moveable' 'replaced'; do
       for copy in '' '2'; do
