@@ -18,6 +18,14 @@ if (isset($_GET["r"]))
 
 $ignore_install_targets = " AND NOT `install_targets`.`name` IN (\"base\",\"base-devel\")";
 
+$colors["stable"]="#000000";
+$colors["testing"]="#008000";
+$colors["staging"]="#00ff00";
+$colors["standalone"]="#000000";
+$colors["unbuilt"]="#ff0000";
+$colors["forbidden"]="#808080";
+$colors["virtual"]="#800080";
+
 if (! $result = $mysql -> query(
   "CREATE TEMPORARY TABLE `cons` (" .
     "`dep` BIGINT, " .
@@ -94,7 +102,7 @@ if (! $result = $mysql -> query(
 
 if ($result -> num_rows > 0)
   while ($row = $result->fetch_assoc())
-    $knots .= "\"i" . $row["id"] . "\" [label = \"" . $row["name"] . "\", fontcolor=\"#000080\"];\n";
+    $knots .= "\"i" . $row["id"] . "\" [label = \"" . $row["name"] . "\", fontcolor = \"#000080\"];\n";
 
 $pkgfile_query =
   "CONCAT(".
@@ -108,32 +116,40 @@ $pkgfile_query =
   ") AS `filename`";
 
 if (! $result = $mysql -> query(
-  "SELECT DISTINCT `binary_packages`.`id`," . $pkgfile_query .
+  "SELECT DISTINCT " .
+  "`binary_packages`.`id`," .
+  "`repository_stabilities`.`name` AS `stability`," .
+  $pkgfile_query .
   " FROM `cons`" .
   " JOIN `dependencies` ON `cons`.`dep`=`dependencies`.`id`" .
   " JOIN `binary_packages` ON `dependencies`.`dependent`=`binary_packages`.`id`" .
   " JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`" .
-  " JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`"
+  " JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`" .
+  " JOIN `repository_stabilities` ON `repository_stabilities`.`id`=`repositories`.`stability`"
   ))
   die($mysql->error);
 
 if ($result -> num_rows > 0)
   while ($row = $result->fetch_assoc())
-    $knots .= "\"p" . $row["id"] . "\" [label = \"" . $row["filename"] . "\"];\n";
+    $knots .= "\"p" . $row["id"] . "\" [label = \"" . $row["filename"] . "\", fontcolor = \"" . $colors[$row["stability"]] . "\"];\n";
 
 if (! $result = $mysql -> query(
-  "SELECT DISTINCT `binary_packages`.`id`," . $pkgfile_query .
+  "SELECT DISTINCT " .
+  "`binary_packages`.`id`," .
+  "`repository_stabilities`.`name` AS `stability`," .
+  $pkgfile_query .
   " FROM `cons`" .
   " JOIN `install_target_providers` ON `cons`.`itp`=`install_target_providers`.`id`" .
   " JOIN `binary_packages` ON `install_target_providers`.`package`=`binary_packages`.`id`" .
   " JOIN `architectures` ON `architectures`.`id`=`binary_packages`.`architecture`" .
-  " JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`"
+  " JOIN `repositories` ON `repositories`.`id`=`binary_packages`.`repository`" .
+  " JOIN `repository_stabilities` ON `repository_stabilities`.`id`=`repositories`.`stability`"
   ))
   die($mysql->error);
 
 if ($result -> num_rows > 0)
   while ($row = $result->fetch_assoc())
-    $knots .= "\"p" . $row["id"] . "\" [label = \"" . $row["filename"] . "\"];\n";
+    $knots .= "\"p" . $row["id"] . "\" [label = \"" . $row["filename"] . "\", fontcolor = \"" . $colors[$row["stability"]] . "\"];\n";
 
 $knots = str_replace("\$","\\\$",$knots);
 $edges = str_replace("\$","\\\$",$edges);
