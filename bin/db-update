@@ -9,6 +9,9 @@
 
 # TODO: separate locks for staging, testing (and stable)
 
+# TODO: we should delete more packages than just the ones in repositories
+# where we move to (think of [extra] -> [community])
+
 # shellcheck disable=SC2039
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
