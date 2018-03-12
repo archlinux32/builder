@@ -452,6 +452,7 @@ while [ "${count}" -ne 0 ]; do
                 awk '{print $2}' | \
                 sort -u > \
                 "${pkgfile}.so.needs"
+              find "${package_content_dir:?}/${pkgfile##*/}" -xdev -exec chmod 777 {} \;
               rm -rf --one-file-system "${package_content_dir:?}/${pkgfile##*/}"
             done
           >&2 printf 'running namcap ...'
