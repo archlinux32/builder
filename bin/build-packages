@@ -264,7 +264,11 @@ while [ "${count}" -ne 0 ]; do
         -mindepth 1 \
         -maxdepth 1 \
         -name 'tmp.build-packages.??????' \
-        -exec rm -rf --one-file-system {} \;
+        -printf '%p\n' | \
+        while read -r old_tmp_dir; do
+          find "${old_tmp_dir}" -xdev -exec chmod 777 {} \;
+          rm -rf --one-file-system "${old_tmp_dir}"
+        done
       tmp_dir=$(mktemp -d "${work_dir}/tmp.build-packages.XXXXXX")
       trap bail_out EXIT
 
