@@ -99,7 +99,16 @@ fi
 # delete_package package
 # mark $package for deletion
 delete_package() {
-  echo "$1" >> \
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
+    printf ' FROM `package_sources`'
+    mysql_join_package_sources_build_assignments
+    mysql_join_build_assignments_binary_packages
+    printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
+      "$(printf '%s' "$1" | base64 -w0)"
+  } | \
+    mysql_run_query >> \
     "${work_dir}/deletion-list.new"
   sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
   find "${work_dir}/package-states" -maxdepth 1 -mindepth 1 -regextype grep \
