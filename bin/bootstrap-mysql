@@ -689,17 +689,20 @@ fi
       'stable' 'stable' \
       'stable' 'testing' \
       'stable' 'staging' \
+      'stable' 'standalone' \
       'stable' 'unbuilt' \
       'stable' 'forbidden' \
       'testing' 'testing' \
       'testing' 'staging' \
+      'testing' 'standalone' \
       'testing' 'unbuilt' \
       'testing' 'forbidden' \
       'staging' 'staging' \
+      'staging' 'standalone' \
       'staging' 'unbuilt' \
       'staging' 'forbidden' \
       'unbuilt' 'forbidden' \
-      'build-support' 'build-support'
+      'standalone' 'standalone'
     printf ';\n'
   } | \
     sed 's| OR ;|;|'
