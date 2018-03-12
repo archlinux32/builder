@@ -129,6 +129,14 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
   mysql_join_binary_packages_repositories
   printf ';\n'
 
+  printf ' SELECT "package-file",`repositories`.`name`,'
+  mysql_package_name_query
+  printf ' FROM `to_deletes`'
+  printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  printf ';\n'
+
   printf ' SELECT "package-id",`to_deletes`.`id`'
   printf ' FROM `to_deletes`'
   printf ';\n'
@@ -144,6 +152,15 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
     /^package /{
       s/^\S\+ //
       w '"${tmp_dir}"'/packages
+      d
+    }
+    /^package-file /{
+      s/^\S\+ //
+      s, ,/,
+      s/$/.pkg.tar.xz/
+      w '"${tmp_dir}"'/package-files
+      s/$/.sig/
+      w '"${tmp_dir}"'/package-files
       d
     }
     /^package-id /{
@@ -196,22 +213,21 @@ done < \
   printf 'CREATE TEMPORARY TABLE `to_deletes` (`id` BIGINT, UNIQUE KEY (`id`));\n'
   printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `to_deletes`;\n' \
     "${tmp_dir}/package-ids"
-  printf 'DELETE `binary_packages` FROM `binary_packages` '
+
+  printf 'UPDATE `binary_packages` '
   printf ' JOIN `to_deletes` ON `to_deletes`.`id`=`binary_packages`.`id`'
   mysql_join_binary_packages_repositories
   mysql_join_binary_packages_architectures
-  printf ';\n'
+  printf ' SET `repository`=('
+    printf 'SELECT `repositories`.`id`'
+    printf ' FROM `repositories`'
+    printf ' WHERE `repositories`.`name`="deletion-list"'
+  printf ');\n'
 } | \
   mysql_run_query
 
-tr ' ' '/' < \
-  "${tmp_dir}/packages" | \
-  sed '
-    p
-    s/$/.sig/
-  ' | \
-  sed '
-    s,^,rm "i686/,
-    s,$,",
-  ' | \
+sed '
+  s,^,rm "i686/,
+  s,$,",
+' "${tmp_dir}/package-files" | \
   ${master_mirror_sftp_command}
