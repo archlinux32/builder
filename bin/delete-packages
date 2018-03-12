@@ -13,7 +13,7 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: finish this
+# TODO: delete other to-be-deleted packages if asked to do so
 
 # shellcheck disable=SC2016
 usage() {
