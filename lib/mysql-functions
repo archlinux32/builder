@@ -142,50 +142,6 @@ mysql_add_package_source() {
     mysql_run_query
 }
 
-# mysql_add_binary_package $pkgbase $git_revision $mod_git_revision $upstream_package_repository $pkgname $sub_pkgrel $architecture $repository
-
-# shellcheck disable=SC2031,SC2086,SC2154
-mysql_add_binary_package() {
-  local names='pkgbase git_revision mod_git_revision upstream_package_repository pkgname sub_pkgrel architecture repository'
-  local name
-  for name in ${names}; do
-    eval 'local '"${name}"
-    eval "${name}"'=$(
-      printf "%s" "$1" |
-        base64 -w0
-    )'
-    shift
-  done
-
-  {
-    printf 'INSERT IGNORE INTO binary_packages'
-    printf ' ('
-    printf '`%s`, ' 'sub_pkgrel' 'pkgname' 'package_source' 'repository' 'architecture' 'has_issues' 'is_tested' 'is_to_be_deleted'
-    printf ') SELECT'
-    printf ' from_base64("%s"), ' "${sub_pkgrel}" "${pkgname}"
-    printf ' `%s`.`id`,' 'package_sources' 'repositories' 'architectures'
-    printf ' 0, 0, 0'
-    printf ' FROM'
-    printf ' `%s` JOIN' 'package_sources' 'repositories' 'architectures'
-    printf ' `upstream_repositories` ON `package_sources`.`upstream_package_repository` = `upstream_repositories`.`id`'
-    printf ' WHERE'
-    printf ' `%s`.`name` = from_base64("%s") AND' \
-      'repositories' "${repository}" \
-      'architectures' "${architecture}"
-    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
-      'pkgbase' "${pkgbase}" \
-      'git_revision' "${git_revision}" \
-      'mod_git_revision' "${mod_git_revision}"
-    printf ' `upstream_repositories`.`name` = from_base64("%s")' \
-      "${upstream_package_repository}"
-  } | \
-    sed '
-      s|, )|)|g
-      s|, FROM| FROM|g
-    ' | \
-    mysql_run_query
-}
-
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
 
 # shellcheck disable=SC2031,SC2086,SC2154
@@ -233,24 +189,6 @@ mysql_show_binary_package() {
       s|AND;|;|g
     ' | \
     mysql_run_query --html --column-names
-}
-
-# mysql_add_install_target $install_target
-
-# shellcheck disable=2086
-mysql_add_install_target() {
-  local install_target
-  install_target=$(
-    printf "%s" "$1" | \
-      base64 -w0
-  )
-
-  {
-    printf 'INSERT IGNORE INTO `install_targets` (`name`)'
-    printf ' VALUES (from_base64("%s"))' \
-      "${install_target}"
-  } | \
-    mysql_run_query
 }
 
 # mysql_generate_package_metadata $current_repository $package $git_revision $mod_git_revision $repository
