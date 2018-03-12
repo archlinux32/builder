@@ -277,24 +277,59 @@ for source_stability in 'testing' 'staging'; do
   } | \
     mysql_run_query
 
-  # TODO: this may delete too much, but these files will be obsolete soon anyway ...
+  sed_apply_rm=$(
+    while read -r pkg _ _; do
+      printf '/^%s$/d\n' "$(str_to_regex "${pkg}")"
+    done < \
+      "${tmp_dir}/rm"
+  )
+
+  sed_apply_remove_part_of_mv=$(
+    while read -r pkg _ _; do
+      printf '/^%s$/d\n' "$(str_to_regex "${pkg}")"
+    done < \
+      "${tmp_dir}/mv"
+  )
+
+  sed_apply_move_part_of_mv=$(
+    while read -r pkg _ _; do
+      printf '/^%s$/{\n' "$(str_to_regex "${pkg}")"
+      printf 'w %%s\n'
+      printf 'd\n'
+      printf '}\n'
+    done < \
+      "${tmp_dir}/mv"
+  )
+
   find "${work_dir}/package-states/" \
     \( \
       -name '*.done' -o \
       -name '*.testing' -o \
       -name '*.tested' \
     \) \
-    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/rm")" '{}' \; \
-    -delete
+    -exec sed -i "${sed_apply_rm}" '{}' \;
   find "${work_dir}/package-states/" \
     -name '*.tested' \
-    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
-    -delete
+    -exec sed -i "${sed_apply_remove_part_of_mv}" '{}' \;
   find "${work_dir}/package-states/" \
     -name '*.done' \
     -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
     -printf '%p\n' | \
     while read -r sf; do
-      mv "${sf}" "${sf%.done}.testing"
+      sed -i "$(
+        printf '%s\n' "${sed_apply_move_part_of_mv}" | \
+          sed '
+            s,%s,'"${sf%.done}.testing"',g
+          '
+      )" "${sf}"
     done
+  find "${work_dir}/package-states/" \
+    \( \
+      -name '*.done' -o \
+      -name '*.testing' -o \
+      -name '*.tested' \
+    \) \
+    -type f \
+    -not -exec test -s '{}' \; \
+    -delete
 done
