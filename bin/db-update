@@ -133,6 +133,12 @@ for source_stability in 'testing' 'staging'; do
       mysql_join_repositories_repository_stabilities 'subst_r' 'subst_rs'
       printf ' AND `subst_rs`.`name`="%s"' \
         "${source_stability}"
+      # TODO: we may relax this condition, if we a) got rid of state files
+      # or b) improved keeping them in sync (*.testing -> /dev/null is not
+      # implemented, only .tested -> /dev/null)
+      if [ ! "${source_stability}" = 'staging' ]; then
+        printf ' AND `subst_bp`.`is_tested`'
+      fi
       mysql_join_binary_packages_dependencies
       mysql_join_dependencies_dependency_types
       printf ' AND `dependency_types`.`relevant_for_binary_packages`'
@@ -152,6 +158,15 @@ for source_stability in 'testing' 'staging'; do
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_repositories
       printf ' AND `repositories`.`is_on_master_mirror`'
+      mysql_join_repositories_repository_stabilities
+      printf ' AND `repository_stabilities`.`name`="%s"' \
+        "${source_stability}"
+      # TODO: we may relax this condition, if we a) got rid of state files
+      # or b) improved keeping them in sync (*.testing -> /dev/null is not
+      # implemented, only .tested -> /dev/null)
+      if [ ! "${source_stability}" = 'staging' ]; then
+        printf ' AND `binary_packages`.`is_tested`'
+      fi
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
