@@ -24,23 +24,32 @@ usage() {
   >&2 echo ' move possible packages from staging to testing.'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
-  >&2 echo '  -h|--help:        Show this help and exit.'
-  >&2 echo '  -n|--no-action:   Only print what would be moved.'
+  >&2 echo '  -b|--block:'
+  >&2 echo '    If necessary, wait for lock blocking.'
+  >&2 echo '  -h|--help:'
+  >&2 echo '    Show this help and exit.'
+  >&2 echo '  -n|--no-action:'
+  >&2 echo '    Only print what would be moved.'
+  >&2 echo '  -p|--progressive:'
+  >&2 echo '    Move forward any package which replaces no package whose'
+  >&2 echo '    dependencies are all available somewhere.'
+  >&2 echo '    Note, that this _may_ move _less_ packages.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bhn \
+  getopt -o bhnp \
     --long block \
     --long help \
     --long no-action \
+    --long progressive \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 block_flag='-n'
 no_action=false
+progressive=false
 
 while true
 do
@@ -53,6 +62,9 @@ do
     ;;
     -n|--no-action)
       no_action=true
+    ;;
+    -p|--progressive)
+      progressive=true
     ;;
     --)
       shift
@@ -98,8 +110,62 @@ for source_stability in 'testing' 'staging'; do
 
   # shellcheck disable=SC2016
   {
-    printf 'CALL calculate_maximal_moveable_set("%s");\n' \
-      "${source_stability}"
+    if ${progressive}; then
+      printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages`;\n' \
+        'moveable' 'replaced'
+      printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n'
+      printf 'CREATE TEMPORARY TABLE `moveable_binary_packages` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n'
+
+      printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
+      printf ' SELECT `binary_packages`.`id`,`subst_bp`.`id`'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_repositories
+      printf ' AND `repositories`.`is_on_master_mirror`'
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      mysql_join_upstream_repositories_repository_moves
+      printf ' AND `repository_moves`.`to_repository`=`binary_packages`.`repository`'
+      printf ' JOIN `binary_packages` AS `subst_bp`'
+      printf ' ON `binary_packages`.`pkgname`=`subst_bp`.`pkgname`'
+      printf ' AND `repository_moves`.`from_repository`=`subst_bp`.`repository`'
+      mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+      mysql_join_repositories_repository_stabilities 'subst_r' 'subst_rs'
+      printf ' AND `subst_rs`.`name`="%s"' \
+        "${source_stability}"
+      mysql_join_binary_packages_dependencies
+      mysql_join_dependencies_dependency_types
+      printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+      printf ' WHERE NOT EXISTS ('
+        printf 'SELECT * FROM `install_target_providers`'
+        printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+      printf ');\n'
+
+      printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+      printf ' SELECT `replaced_binary_packages`.`replaced_by`,`binary_packages`.`repository`'
+      printf ' FROM `replaced_binary_packages`'
+      printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`replaced_binary_packages`.`id`'
+      printf ';\n'
+
+      printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+      printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_repositories
+      printf ' AND `repositories`.`is_on_master_mirror`'
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      mysql_join_upstream_repositories_repository_moves
+      printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+      printf ' WHERE NOT EXISTS ('
+        printf 'SELECT * FROM `binary_packages` AS `repl_bp`'
+        printf ' WHERE `repl_bp`.`pkgname`=`binary_packages`.`pkgname`'
+        printf ' AND `repl_bp`.`repository`=`repository_moves`.`to_repository`'
+      printf ');\n'
+    else
+      printf 'CALL calculate_maximal_moveable_set("%s");\n' \
+        "${source_stability}"
+    fi
 
     printf 'CREATE TEMPORARY TABLE `rps` (`id` MEDIUMINT, UNIQUE INDEX (`id`));\n'
     printf 'INSERT IGNORE INTO `rps` (`id`)'
@@ -143,7 +209,7 @@ for source_stability in 'testing' 'staging'; do
     mysql_join_binary_packages_architectures
     printf ';\n'
   } | \
-    mysql_run_query | \
+    mysql buildmaster -N --raw --batch | \
     tr '\t' ' ' | \
     grep '^\(repositories\|\(rm\|mv\)\(\.id\)\?\) ' | \
     while read -r what content; do
