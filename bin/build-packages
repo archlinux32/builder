@@ -260,7 +260,7 @@ while [ "${count}" -ne 0 ]; do
         recursively_umount_and_rm "${tmp_dir}"
         exit "${err}"
       }
-      find . \
+      find "${work_dir}" \
         -mindepth 1 \
         -maxdepth 1 \
         -name 'tmp.build-packages.??????' \
