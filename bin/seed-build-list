@@ -14,6 +14,9 @@ usage() {
   >&2 echo '    - a list of packages which need to be rebuilt'
   >&2 echo ''
   >&2 echo 'possible options:'
+  >&2 echo '  -a|--auto:'
+  >&2 echo '    Automatically reschedule packages which have run-time'
+  >&2 echo '    dependencies that are not available anywhere.'
   >&2 echo '  -h|--help:'
   >&2 echo '    Show this help and exit.'
   >&2 echo '  -i|--ignore $package:'
@@ -32,7 +35,8 @@ tmp_dir=$(mktemp -d 'tmp.seed-build-list.XXXXXXXXXX' --tmpdir)
 trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 
 eval set -- "$(
-  getopt -o hi:m:np: \
+  getopt -o ahi:m:np: \
+    --long auto \
     --long help \
     --long ignore: \
     --long mirror: \
@@ -46,11 +50,15 @@ touch "${tmp_dir}/mirrors"
 touch "${tmp_dir}/package-regexes"
 touch "${tmp_dir}/ignore-packages"
 
+auto=false
 update=true
 
 while true
 do
   case "$1" in
+    -a|--auto)
+      auto=true
+    ;;
     -h|--help)
       usage 0
     ;;
@@ -89,7 +97,8 @@ if [ $# -ne 0 ]; then
 fi
 
 if [ ! -s "${tmp_dir}/mirrors" ] && \
-  [ ! -s "${tmp_dir}/package-regexes" ]; then
+  [ ! -s "${tmp_dir}/package-regexes" ] && \
+  ! ${auto}; then
   # nothing to do
   exit 0
 fi
@@ -249,6 +258,34 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
 # shellcheck disable=SC2016
 {
   cat "${tmp_dir}/must-haves" "${tmp_dir}/ignore-packages" "${tmp_dir}/pkgbases"
+  if ${auto}; then
+    printf 'CREATE TEMPORARY TABLE `bin_ids` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+    printf 'INSERT IGNORE INTO `bin_ids`'
+    printf ' SELECT `binary_packages`.`id` FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' AND `repositories`.`is_on_master_mirror`'
+    printf ' AND `repositories`.`name`!="build-support"'
+    mysql_join_binary_packages_dependencies
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+    # nothing "less stable" has the same name
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `binary_packages` AS `subst_bp`'
+      mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+      printf ' AND `subst_r`.`name`!="build-support"'
+      printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`subst_r`.`stability`'
+      printf ' WHERE `repository_stability_relations`.`more_stable`=`repositories`.`stability`'
+      printf ' AND `subst_bp`.`id`!=`binary_packages`.`id`'
+      printf ' AND `subst_bp`.`pkgname`=`binary_packages`.`pkgname`'
+    printf ') AND NOT EXISTS ('
+      printf 'SELECT * FROM `install_target_providers`'
+      mysql_join_install_target_providers_binary_packages '' 'subst_bp'
+      mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+      printf ' AND `subst_r`.`name` NOT IN ("build-support","deletion-list","to-be-decided")'
+      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+    printf ')'
+    printf ';\n'
+  fi
   printf 'SELECT '
   printf '`pkgbases`.`pkgbase`,'
   printf '`git_repositories`.`head`,'
@@ -283,6 +320,13 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
         s/$/") OR /
       ' | \
       tr -d '\n'
+  fi
+  if ${auto}; then
+    printf 'EXISTS ('
+      printf 'SELECT * FROM `bin_ids`'
+      printf ' WHERE `bin_ids`.`id`=`binary_packages`.`id`'
+    printf ')'
+    printf ' OR '
   fi
   printf 'EXISTS ('
     printf 'SELECT * FROM `must_haves`'
