@@ -535,6 +535,15 @@ mysql_generate_package_metadata() {
               s|^| (from_base64("|
               s|$|")),|
             '
+          printf ' (CONCAT(from_base64("%s"),"-",from_base64("%s"),":",from_base64("%s"),"-",from_base64("%s"))),\n' \
+            "${pkgname}" \
+            "${epoch}" \
+            "${pkgver}" \
+            "${pkgrel}"
+          printf ' (CONCAT(from_base64("%s"),"-",from_base64("%s"),":",from_base64("%s"))),\n' \
+            "${pkgname}" \
+            "${epoch}" \
+            "${pkgver}"
           printf ' (from_base64("%s"));\n' \
             "${pkgname}"
 
@@ -546,6 +555,14 @@ mysql_generate_package_metadata() {
               s|^| (from_base64("|
               s|$|")),|
             '
+          if printf '%s' "${pkgname}" | \
+            base64 -d | \
+            grep -q -- '-doc$'; then
+            printf ' (CONCAT(from_base64("%s"),"-",from_base64("%s"),":",from_base64("%s"))),\n' \
+              "$(printf '%s' "${pkgname}" | base64 -d | sed 's/-doc$//' | base64 -w0)" \
+              "${epoch}" \
+              "${pkgver}"
+          fi
           printf ' ("base");\n'
 
           echo "${checkdepends}" | \
