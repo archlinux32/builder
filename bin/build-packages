@@ -446,7 +446,8 @@ while [ "${count}" -ne 0 ]; do
             while read -r pkgfile; do
               mkdir "${package_content_dir}/${pkgfile##*/}"
               tar -C "${package_content_dir}/${pkgfile##*/}" -xJf "${pkgfile}" 2>/dev/null
-              find "${package_content_dir}/${pkgfile##*/}" -type f \
+              find "${package_content_dir}/${pkgfile##*/}" \
+                -name 'opt' -prune , \
                 -exec objdump -x '{}' \; 2>/dev/null | \
                 grep -w 'NEEDED' | \
                 awk '{print $2}' | \
