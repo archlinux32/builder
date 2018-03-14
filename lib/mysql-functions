@@ -34,7 +34,7 @@ mysql_run_query() {
     # we save the query in a file and delete that file if the query succeeded
     query_file=$(mktemp "${work_dir}/tmp.mysql-functions.query.$(date +'%Y-%m-%dT%T').XXXXXX")
     cat > "${query_file}"
-    for i in {1..10}; do
+    for _ in {1..10}; do
       {
         printf '%s %s: ' "$0" "${mysql_command} -N --raw --batch $*"
         date
