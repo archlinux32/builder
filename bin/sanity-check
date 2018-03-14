@@ -400,6 +400,9 @@ while [ $# -gt 0 ]; do
         i_am_insane
       fi
 
+      # hopefully, this gets rid of false positives :-)
+      sleep 1
+
       if find "${work_dir}" -mindepth 1 -maxdepth 1 -name 'tmp.mysql-functions.query.*' | \
         grep '\S' >> \
         "${tmp_dir}/messages"; then
