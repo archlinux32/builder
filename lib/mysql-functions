@@ -395,6 +395,7 @@ mysql_generate_package_metadata() {
         pkgrel=$(
           grep '^pkgrel = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
+            sed 's/\.[0-9]\+$//' | \
             base64_encode_each
         )
         epoch=$(
