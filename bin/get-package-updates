@@ -318,7 +318,7 @@ done | \
       # new or modified PKGBUILD
       sed -i "/^$(str_to_regex "${package}") /d" "${work_dir}/build-list.new"
       find "${work_dir}/package-states" -regextype grep \
-        -regex ".*/$(str_to_regex "${package}")\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+\.\(blocked\|broken\)" \
+        -regex '.*/'"$(str_to_regex "${package}")"'\(\.[0-9a-f]\{40\}\)\{2\}\.[^.]\+\.\(blocked\|broken\)' \
         -delete
       # shellcheck disable=SC2154
       echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
