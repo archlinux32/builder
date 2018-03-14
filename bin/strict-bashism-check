@@ -49,14 +49,27 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 git archive "${tree}" | \
   tar -C "${tmp_dir}" -x
 
+if ! cd "${tmp_dir}"; then
+  echo 'Cannot cd.'
+  exit 1
+fi
+
 errors=$(
-  cd "${tmp_dir}" || \
-    echo 'Cannot cd.'
   find bin conf lib -type f -not -executable -not -name '.gitignore'
 )
 
 if [ -n "${errors}" ]; then
-  >&2 echo 'Non-executable files found in bin/ or conf/:'
+  >&2 echo 'Non-executable files found in bin/, conf/ or lib/:'
+  >&2 echo "${errors}"
+  exit 1
+fi
+
+errors=$(
+  grep -r '\(\s\|^\)mysql buildmaster\($\|\s\)' bin lib conf
+)
+
+if [ -n "${errors}" ]; then
+  >&2 echo 'Style error: call "mysql_run_query" instead of "mysql buildmaster":'
   >&2 echo "${errors}"
   exit 1
 fi
@@ -74,8 +87,6 @@ fi
 
 if which shellcheck >/dev/null 2>&1; then
   errors=$(
-    cd "${tmp_dir}" || \
-      echo 'Cannot cd.'
     shellcheck -x bin/* conf/* 2>&1
   )
 
