@@ -526,7 +526,7 @@ if [ ! "$1" = 'slim' ]; then
       'SHOW VIEW' 'buildmaster.*'
     printf 'FLUSH PRIVILEGES;\n'
   } | \
-    mysql -u root -p buildmaster
+    mysql_run_query -u root -p
 fi
 
 # shellcheck disable=SC2016
@@ -770,7 +770,7 @@ fi
   } | \
     sed 's|,;|;|'
 } | \
-  mysql buildmaster
+  mysql_run_query
 
 find "${work_dir}/package-states" \
   -maxdepth 1 \
