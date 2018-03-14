@@ -224,7 +224,7 @@ for source_stability in 'testing' 'staging'; do
     mysql_join_binary_packages_architectures
     printf ';\n'
   } | \
-    mysql buildmaster -N --raw --batch | \
+    mysql_run_query | \
     tr '\t' ' ' | \
     grep '^\(repositories\|\(rm\|mv\)\(\.id\)\?\) ' | \
     while read -r what content; do
