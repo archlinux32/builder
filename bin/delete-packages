@@ -157,7 +157,6 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
     /^package-file /{
       s/^\S\+ //
       s, ,/,
-      s/$/.pkg.tar.xz/
       w '"${tmp_dir}"'/package-files
       s/$/.sig/
       w '"${tmp_dir}"'/package-files
@@ -175,19 +174,6 @@ if [ ! -s "${tmp_dir}/packages" ]; then
   exit
 fi
 
-if ${no_action}; then
-  printf 'I would delete the following packages:\n'
-  sed '
-    y, ,/,
-    s/^/  /
-  ' "${tmp_dir}/packages"
-  printf 'From these repositories:\n'
-  sed '
-    s/^/  /
-  ' "${tmp_dir}/repositories"
-  exit
-fi
-
 mkdir "${tmp_dir}/repos"
 
 while read -r repo; do
@@ -195,18 +181,49 @@ while read -r repo; do
     "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db.tar.gz" \
     "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files.tar.gz" \
     "${tmp_dir}/repos/"
+
+  tar -Oxzf "${tmp_dir}/repos/${repo}.db.tar.gz" --wildcards '*/desc' | \
+    sed -n '
+      /^%FILENAME%$/{
+        N
+        s/^\S\+\n\(\S\+-[^-.]\+\)\(-[^-]\+\)/\1.0\2 \1\2/
+        T
+        p
+      }
+    ' | \
+    while read -r old new; do
+      printf 's,/%s\\(\\.sig\\)\\?$,/%s\\1,\n' \
+        "$(str_to_regex "${old}")" \
+        "$(str_to_regex "${new}")"
+    done >> \
+    "${tmp_dir}/sub_pkgrel-removal.sed"
+
   # shellcheck disable=SC2046
   repo-remove "${tmp_dir}/repos/${repo}.db.tar.gz" \
     $(
       grep "^$(str_to_regex "${repo}") " "${tmp_dir}/packages" | \
         cut -d' ' -f2
     )
-  ${master_mirror_rsync_command} \
-    "${tmp_dir}/repos/${repo}.db.tar.gz" \
-    "${tmp_dir}/repos/${repo}.files.tar.gz" \
-    "${master_mirror_rsync_directory}/i686/${repo}/"
+  if ! ${no_action}; then
+    ${master_mirror_rsync_command} \
+      "${tmp_dir}/repos/${repo}.db.tar.gz" \
+      "${tmp_dir}/repos/${repo}.files.tar.gz" \
+      "${master_mirror_rsync_directory}/i686/${repo}/"
+  fi
 done < \
   "${tmp_dir}/repositories"
+
+if [ -s "${tmp_dir}/sub_pkgrel-removal.sed" ]; then
+  sed -i -f "${tmp_dir}/sub_pkgrel-removal.sed" "${tmp_dir}/package-files"
+fi
+
+if ${no_action}; then
+  printf 'Now, I would remove the packages from the database and delete the following files from the master mirror:\n'
+  sed '
+    s,^,  ,
+  ' "${tmp_dir}/package-files"
+  exit
+fi
 
 # shellcheck disable=SC2016
 {
