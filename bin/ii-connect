@@ -39,7 +39,6 @@ fi
 if [ "$1" = 'watch' ]; then
   while pgrep -x 'ii' > /dev/null; do
     find "${irc_dir}" \
-      -regextype sed \
       -type f \
       -name 'out' \
       -printf '%p\n' | \
