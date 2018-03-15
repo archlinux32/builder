@@ -393,7 +393,7 @@ if [ ! "$1" = 'slim' ]; then
     printf ' RIGHT JOIN `moveable_binary_packages`'
     printf ' ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`'
     printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
-    mysql_join_binary_packages_repositories
+    printf ' JOIN `target_repositories` ON `moveable_binary_packages`.`to_repository`=`repositories`.`id`'
     mysql_join_binary_packages_dependencies
     mysql_join_dependencies_dependency_types
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
@@ -404,7 +404,7 @@ if [ ! "$1" = 'slim' ]; then
       mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
       printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`less_stable`'
       printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-      printf ' AND `repositories`.`stability`=`repository_stability_relations`.`more_stable`'
+      printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`more_stable`'
       printf ' AND NOT EXISTS ('
         printf 'SELECT * FROM `replaced_binary_packages_copy`'
         printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
