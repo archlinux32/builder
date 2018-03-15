@@ -101,7 +101,7 @@ input_file="$1"
 if ${report}; then
   if ! [ -w "${input_file}" ]; then
     >&2 printf \
-      'Cannot open file "%s" for writing.' \
+      'Cannot open file "%s" for writing.\n' \
       "${input_file}"
     exit 2
   fi
@@ -117,7 +117,7 @@ fi
 
 if ! [ -r "${input_file}" ]; then
   >&2 printf \
-    'Cannot open file "%s" for reading.' \
+    'Cannot open file "%s" for reading.\n' \
     "${input_file}"
   exit 2
 fi
