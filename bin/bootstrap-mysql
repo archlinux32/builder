@@ -308,12 +308,17 @@ if [ ! "$1" = 'slim' ]; then
     # Give a maximal list of packages to be moved, while implementing the
     # condition from db-update:
 
-    # Every package which is replaced, must have its provided install_targets:
+    # Every package which is replaced[1], must have its provided install_targets:
     #   a) provided by another moved or not-replaced package or
     #   b) not required by any not-replaced package.
 
     # Every package being moved needs to have all dependencies
     # installable in the target repository.
+
+    # TODO: [1] A "replaced" package may also be in a different repository
+    # e.g. if a-2 is moved from [staging] to [testing] and there is only
+    # a-1 in [core], then this will be "replaced" by a-2 on a system
+    # running on [testing] repositories.
 
     printf 'DROP PROCEDURE IF EXISTS calculate_maximal_moveable_set;\n'
     printf 'DELIMITER //\n'
@@ -402,9 +407,9 @@ if [ ! "$1" = 'slim' ]; then
       printf 'SELECT * FROM `install_target_providers`'
       mysql_join_install_target_providers_binary_packages '' 'prov_bp'
       mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
-      printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`less_stable`'
+      printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`'
       printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-      printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`more_stable`'
+      printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable`'
       printf ' AND NOT EXISTS ('
         printf 'SELECT * FROM `replaced_binary_packages_copy`'
         printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
