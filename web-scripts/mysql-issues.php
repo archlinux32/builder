@@ -7,6 +7,11 @@
 <a href="/">Start page</a><br>
 <?php
 
+  if (isset($_GET["ignore-haskell"]))
+    $ignore = " AND `install_targets`.`name` NOT LIKE \"libHS%\"";
+  else
+    $ignore = "";
+
   $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
   if ($mysql->connect_error) {
     die("Connection failed: " . $mysql->connect_error);
@@ -34,7 +39,9 @@
     " WHERE NOT EXISTS (" .
       "SELECT * FROM `install_target_providers`" .
       " WHERE `install_target_providers`.`install_target` = `dependencies`.`depending_on`" .
-    ") ORDER BY `is_to_be_deleted`, `binary_packages`.`pkgname`"
+    ")" .
+    $ignore .
+    " ORDER BY `is_to_be_deleted`, `binary_packages`.`pkgname`"
   ))
     die($mysql -> error);
 
@@ -83,7 +90,9 @@
       " JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`" .
       " WHERE `install_target_providers`.`install_target` = `dependencies`.`depending_on`" .
       " AND `repositories`.`stability`=`repository_stability_relations`.`less_stable`" .
-    ") ORDER BY `is_to_be_deleted`, `binary_packages`.`pkgname`"
+    ")" .
+    $ignore .
+    " ORDER BY `is_to_be_deleted`, `binary_packages`.`pkgname`"
   ))
     die($mysql -> error);
 
