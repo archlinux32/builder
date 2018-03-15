@@ -26,6 +26,8 @@ usage() {
   >&2 echo 'possible options:'
   >&2 echo '  -b|--block:'
   >&2 echo '    If necessary, wait for lock blocking.'
+  >&2 echo '  -f|--force $package-id:'
+  >&2 echo '    Force movement of Package with given id and move nothing else.'
   >&2 echo '  -h|--help:'
   >&2 echo '    Show this help and exit.'
   >&2 echo '  -n|--no-action:'
@@ -38,8 +40,9 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o bhnp \
+  getopt -o bf:hnp \
     --long block \
+    --long force \
     --long help \
     --long no-action \
     --long progressive \
@@ -50,12 +53,21 @@ eval set -- "$(
 block_flag='-n'
 no_action=false
 progressive=false
+force_ids=''
 
 while true
 do
   case "$1" in
     -b|--block)
       block_flag=''
+    ;;
+    -f|--force)
+      shift
+      force_ids=$(
+        printf '%s' "$1" | \
+          base64 -w0
+        printf '\n%s' "${force_ids}"
+      )
     ;;
     -h|--help)
       usage 0
@@ -83,15 +95,18 @@ if [ $# -ne 0 ]; then
   usage
 fi
 
+if ${progressive} && \
+  [ -n "${force_ids}" ]; then
+  >&2 echo 'db-update: conflicting arguments'
+  usage
+fi
+
 if [ -s "${work_dir}/build-master-sanity" ]; then
   >&2 echo 'Build master is not sane.'
   exit
 fi
 
 # Create tmp_dir, lock and trap.
-
-tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 exec 9> "${package_database_lock_file}"
 if ! flock ${block_flag} 9; then
@@ -105,12 +120,47 @@ if ! flock -s ${block_flag} 8; then
   exit 0
 fi
 
+tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
 for source_stability in 'testing' 'staging'; do
   find "${tmp_dir}" -mindepth 1 -delete
 
   # shellcheck disable=SC2016
   {
-    if ${progressive}; then
+    if [ -n "${force_ids}" ]; then
+      printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages`;\n' \
+        'moveable' 'replaced'
+      printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n'
+      printf 'CREATE TEMPORARY TABLE `moveable_binary_packages` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n'
+      printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+      printf ' VALUES'
+      # shellcheck disable=SC2086
+      printf '(from_base64("%s"),NULL),' \
+        ${force_ids} | \
+        sed 's/,$/;\n/'
+      printf 'DELETE `moveable_binary_packages` FROM `moveable_binary_packages`'
+      printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
+      mysql_join_binary_packages_repositories
+      mysql_join_repositories_repository_stabilities
+      printf ' WHERE `repository_stabilities`.`name`!="%s";\n' \
+        "${source_stability}"
+      printf 'UPDATE `moveable_binary_packages`'
+      printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      mysql_join_upstream_repositories_repository_moves
+      printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+      printf ' SET `moveable_binary_packages`.`to_repository`=`repository_moves`.`to_repository`;\n'
+      printf 'DELETE FROM `moveable_binary_packages` WHERE `moveable_binary_packages`.`to_repository` IS NULL;\n'
+      printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
+      printf ' SELECT `binary_packages`.`id`,`moveable_binary_packages`.`id`'
+      printf ' FROM `moveable_binary_packages`'
+      printf ' JOIN `binary_packages` AS `subst_bp` ON `moveable_binary_packages`.`id`=`subst_bp`.`id`'
+      printf ' JOIN `binary_packages` ON `binary_packages`.`pkgname`=`subst_bp`.`pkgname`'
+      printf ' AND `binary_packages`.`repository`=`moveable_binary_packages`.`to_repository`;\n'
+    elif ${progressive}; then
       printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages`;\n' \
         'moveable' 'replaced'
       printf 'CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n'
