@@ -445,7 +445,7 @@ while [ "${count}" -ne 0 ]; do
             -name '*.pkg.tar.xz' | \
             while read -r pkgfile; do
               if printf '%s\n' "${pkgfile}" | \
-                grep -vq '-any\.pkg\.tar\.xz$'; then
+                grep -vq -- '-any\.pkg\.tar\.xz$'; then
                 # we do not check "any" packages for linked libraries
                 # (why do they have them in the first place?)
                 mkdir "${package_content_dir}/${pkgfile##*/}"
