@@ -455,7 +455,7 @@ find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_
 # shellcheck disable=SC2016
 {
   for lib_link in 'pl:provides' 'nl:needs'; do
-    printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(64));\n' \
+    printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(128));\n' \
       "${lib_link%:*}"
     find . -maxdepth 1 -name '*.pkg.tar.xz.so.'"${lib_link#*:}"'.gz' -execdir zgrep -HF '' '{}' \; | \
       sed -n '
