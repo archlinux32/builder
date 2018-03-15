@@ -128,6 +128,12 @@ if ! flock -s -n 9; then
   exit
 fi
 
+exec 8> "${package_database_lock_file}"
+if ! flock -n 8; then
+  >&2 echo 'Cannot get package-database lock.'
+  exit
+fi
+
 while read -r package reason; do
   case "${action}" in
     'faulty'|'tested')
