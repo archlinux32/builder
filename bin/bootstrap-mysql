@@ -393,7 +393,7 @@ if [ ! "$1" = 'slim' ]; then
     printf ' RIGHT JOIN `moveable_binary_packages`'
     printf ' ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`'
     printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
-    printf ' JOIN `target_repositories` ON `moveable_binary_packages`.`to_repository`=`repositories`.`id`'
+    printf ' JOIN `repositories` AS `target_repositories` ON `moveable_binary_packages`.`to_repository`=`target_repositories`.`id`'
     mysql_join_binary_packages_dependencies
     mysql_join_dependencies_dependency_types
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
