@@ -455,7 +455,10 @@ while [ "${count}" -ne 0 ]; do
                   -exec objdump -x '{}' \; 2>/dev/null | \
                   grep -w 'NEEDED' | \
                   awk '{print $2}' | \
-                  grep -v '\.c32$'
+                  sed '
+                    /\.c32$/d
+                    s,^.*/,,
+                  '
                 find "${package_content_dir:?}/${pkgfile##*/}" -xdev -exec chmod 777 '{}' \;
                 rm -rf --one-file-system "${package_content_dir:?}/${pkgfile##*/}"
               fi | \
