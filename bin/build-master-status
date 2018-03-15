@@ -64,63 +64,93 @@ tmp_dir=$(mktemp -d 'tmp.build-master-status.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 stable=$(
-  ls_master_mirror 'i686' | \
-    grep -v 'testing$\|staging$\|-unstable$' | \
-    while read -r dir; do
-      ls_master_mirror "i686/${dir}"
-    done | \
-    grep -c '\.pkg\.tar\.xz$'
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="stable";\n'
+  } | \
+    mysql_run_query
 )
 tasks=$(
-  grep -c '^\S\+ \S\+ \S\+ \S\+$' \
-    "${work_dir}/build-list"
-) || true
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list";\n'
+  } | \
+    mysql_run_query
+)
 pending_packages=$(
-  grep '^\S\+ \S\+ \S\+ \S\+$' "${work_dir}/build-list" | \
-    tr ' ' '.' | \
-    while read -r package; do
-      generate_package_metadata "${package}" 2>&1 > /dev/null
-      cat "${work_dir}/package-infos/${package}.packages"
-    done |
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list";\n'
+  } | \
+    mysql_run_query
 )
 next_tasks=$(
+  # shellcheck disable=SC2016
   {
-    cat "${work_dir}/build-list"
-    find "${work_dir}/package-states" -maxdepth 1 \
-      \( -name '*.broken' -o -name '*.blocked' \) \
-      -printf '%f\n' | \
-      sed '
-        s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
-        p
-      '
+    printf 'SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND NOT EXISTS ('
+      printf 'SELECT * FROM `dependencies`'
+      mysql_join_dependencies_dependency_types
+      printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+      mysql_join_dependencies_install_target_providers
+      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+      printf ' WHERE `prov_r`.`name`="build-list"'
+      printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
+    printf ')'
+    printf ';\n'
   } | \
-    sort | \
-    uniq -u | \
-    while read -r package git_revision mod_git_revision repository; do
-      if [ -z "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
-        echo "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-      fi
-    done | \
-    wc -l
+    mysql_run_query
 )
 staging=$(
-  find "${work_dir}/package-states" -name '*.done' \
-    -exec cat '{}' \; | \
-    sort -u | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="staging";\n'
+  } | \
+    mysql_run_query
 )
 testing=$(
-  find "${work_dir}/package-states" -name '*.testing' \
-    -exec cat '{}' \; | \
-    sort -u | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND NOT `binary_packages`.`is_tested`;\n'
+  } | \
+    mysql_run_query
 )
 tested=$(
-  find "${work_dir}/package-states" -name '*.tested' \
-    -exec cat '{}' \; | \
-    sort -u | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND `binary_packages`.`is_tested`;\n'
+  } | \
+    mysql_run_query
 )
 {
   find "${work_dir}/package-states/" -maxdepth 1 -name '*.broken' -printf '%f\n' | \
@@ -145,28 +175,56 @@ tested=$(
   sort -u > \
   "${tmp_dir}/broken-packages-names"
 broken=$(
-  wc -l < \
-    "${tmp_dir}/broken-packages-names"
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_broken`;\n'
+  } | \
+    mysql_run_query
 )
 blocked=$(
-  find "${work_dir}/package-states/" -maxdepth 1 -name '*.blocked' | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_blocked` IS NOT NULL;\n'
+  } | \
+    mysql_run_query
 )
 locked=$(
-  find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_slaves`.`currently_building`) FROM'
+    printf ' `build_slaves`'
+    mysql_join_build_slaves_build_assignments
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list";\n'
+  } | \
+    mysql_run_query
 )
 loops=$(
-  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_dependency_loops`.`loop`) FROM'
+    printf ' `build_dependency_loops`'
+  } | \
+    mysql_run_query
 )
 looped_packages=$(
-  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' \
-    -exec cat '{}' \; | \
-    sort -u | \
-    wc -l
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT COUNT(DISTINCT `build_dependency_loops`.`build_assignment`) FROM'
+    printf ' `build_dependency_loops`'
+  } | \
+    mysql_run_query
 )
 
 {
