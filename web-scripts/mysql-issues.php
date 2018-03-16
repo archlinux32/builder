@@ -45,6 +45,8 @@
   ))
     die($mysql -> error);
 
+  print "Found " . ($result -> num_rows) . " serious issues.<br>\n";
+
   if ($result -> num_rows > 0) {
 
     while ($row = $result->fetch_assoc()) {
@@ -52,8 +54,8 @@
         print "<font color=\"#00ff00\">(marked as to-be-deleted) ";
       else
         print "<font color=\"#ff0000\">";
-      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package.<br>\n";
-      print "</font>";
+      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package.<br>";
+      print "</font>\n";
     }
 
   }
@@ -96,14 +98,16 @@
   ))
     die($mysql -> error);
 
+  print "Found " . ($result -> num_rows) . " stability issues.<br>\n";
+
   if ($result -> num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
       if ($row["is_to_be_deleted"]==1)
         print "<font color=\"#00ff00\">(marked as to-be-deleted) ";
       else
         print "<font color=\"#800000\">";
-      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package installable from enabled " . $row["stability"] . " repositories.<br>\n";
-      print "</font>";
+      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package installable from enabled " . $row["stability"] . " repositories.<br>";
+      print "</font>\n";
     }
 
   }
