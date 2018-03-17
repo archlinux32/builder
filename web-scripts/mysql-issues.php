@@ -27,7 +27,8 @@
     "`binary_packages`.`sub_pkgrel`,\"-\"," .
     "`architectures`.`name`) AS `pkgfile`," .
     "`install_targets`.`name` AS `install_target`," .
-    "IF(`binary_packages`.`is_to_be_deleted`,1,0) AS `is_to_be_deleted`" .
+    "IF(`binary_packages`.`is_to_be_deleted`,1,0) AS `is_to_be_deleted`," .
+    "`subst_r`.`name` AS `subst_repository`" .
     " FROM `binary_packages`" .
     " JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`" .
     " AND `repositories`.`is_on_master_mirror`" .
@@ -36,6 +37,13 @@
     " AND `dependency_types`.`relevant_for_binary_packages`" .
     " JOIN `install_targets` ON `dependencies`.`depending_on`=`install_targets`.`id`" .
     " JOIN `architectures` ON `binary_packages`.`architecture`=`architectures`.`id`" .
+    " LEFT JOIN (`binary_packages` AS `subst_bp`" .
+    " JOIN `repositories` AS `subst_r` ON `subst_bp`.`repository`=`subst_r`.`id`" .
+    " JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`subst_r`.`id`" .
+    ")" .
+    " ON `subst_bp`.`pkgname`=`binary_packages`.`pkgname`" .
+    " AND `subst_bp`.`id`!=`binary_packages`.`id`" .
+    " AND `repository_stability_relations`.`more_stable`=`repositories`.`id`" .
     " WHERE NOT EXISTS (" .
       "SELECT * FROM `install_target_providers`" .
       " WHERE `install_target_providers`.`install_target` = `dependencies`.`depending_on`" .
@@ -54,7 +62,10 @@
         print "<font color=\"#00ff00\">(marked as to-be-deleted) ";
       else
         print "<font color=\"#ff0000\">";
-      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package.<br>";
+      print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package";
+      if (isset($row["subst_repository"]))
+        print " - but can be replaced by the one in " . $row["subst_repository"];
+      print ".<br>";
       print "</font>\n";
     }
 
