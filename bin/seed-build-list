@@ -297,6 +297,13 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   printf ' FROM `pkgbases`'
   printf ' JOIN `upstream_repositories` ON `upstream_repositories`.`name`=`pkgbases`.`repository`'
   mysql_join_upstream_repositories_git_repositories
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT * FROM `ignore_packages`'
+    printf ' JOIN `binary_packages` AS `i_bp` ON `ignore_packages`.`pkgname`=`i_bp`.`pkgname`'
+    mysql_join_binary_packages_build_assignments 'i_bp' 'i_ba'
+    mysql_join_build_assignments_package_sources 'i_ba' 'i_ps'
+    printf ' WHERE `i_ps`.`pkgbase`=`pkgbases`.`pkgbase`'
+  printf ');\n'
   printf ';\n'
   printf 'SELECT '
   printf '`package_sources`.`pkgbase`,'
