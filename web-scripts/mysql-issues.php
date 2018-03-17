@@ -28,7 +28,8 @@
     "`architectures`.`name`) AS `pkgfile`," .
     "`install_targets`.`name` AS `install_target`," .
     "IF(`binary_packages`.`is_to_be_deleted`,1,0) AS `is_to_be_deleted`," .
-    "`subst_r`.`name` AS `subst_repository`" .
+    "`subst_r`.`name` AS `subst_repository`," .
+    "`subst_buildlist_bp`.`id` AS `subst_buildlist`" .
     " FROM `binary_packages`" .
     " JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id`" .
     " AND `repositories`.`is_on_master_mirror`" .
@@ -44,6 +45,11 @@
     " ON `subst_bp`.`pkgname`=`binary_packages`.`pkgname`" .
     " AND `subst_bp`.`id`!=`binary_packages`.`id`" .
     " AND `repository_stability_relations`.`more_stable`=`repositories`.`id`" .
+    " LEFT JOIN (`binary_packages` AS `subst_buildlist_bp`" .
+    " JOIN `repositories` AS `subst_buildlist_r`" .
+    " ON `subst_buildlist_bp`.`repository`=`subst_buildlist_r`.`id`" .
+    " AND `subst_buildlist_r`.`name`=\"build-list\"".
+    ") ON `subst_buildlist_bp`.`pkgname`=`binary_packages`.`pkgname`" .
     " WHERE NOT EXISTS (" .
       "SELECT * FROM `install_target_providers`" .
       " WHERE `install_target_providers`.`install_target` = `dependencies`.`depending_on`" .
@@ -65,6 +71,8 @@
       print $row["pkgfile"] . " depends on " . $row["install_target"] . " which is not provided by any package";
       if (isset($row["subst_repository"]))
         print " - but can be replaced by the one in " . $row["subst_repository"];
+      elseif (isset($row["subst_buildlist"]))
+        print " - but is already rescheduled";
       print ".<br>";
       print "</font>\n";
     }
