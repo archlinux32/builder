@@ -4,8 +4,6 @@
 
 # shellcheck disable=SC2039
 
-# TODO: include link depenendencies in run-depends metadata
-
 # TODO: have full information (currently in files) in database
 
 # TODO: remove state files / metadata files
