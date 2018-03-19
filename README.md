@@ -5,6 +5,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 ## requirements
 * `moreutils`
 ### build master only
+* `base-devel`
 * `bc`
 * `git`
 * `ii`
