@@ -5,11 +5,12 @@ This includes scripts to be run on the build master as well as scripts to be run
 ## requirements
 * `moreutils`
 ### build master only
-* some ssh-server
+* `bc`
 * `git`
+* `ii`
 * some mysql-server
 * `screen`
-* `bc`
+* some ssh-server
 ### build slave only
 * some ssh-client
 * `wget`
