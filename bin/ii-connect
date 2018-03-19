@@ -19,12 +19,12 @@ if tail -n1 "${irc_dir}/nickserv/out" 2> /dev/null | \
     sponge "${irc_dir}/nickserv/in"
 fi
 
-# join #archlinux-ports if not yet done
+# join #archlinux32 if not yet done
 if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
   tail -n1 | \
-  grep -q ' #archlinux-ports '; then
+  grep -q ' #archlinux32 '; then
   {
-    echo '/j #archlinux-ports'
+    echo '/j #archlinux32'
     echo '/WHO buildmaster'
   } | \
     sponge "${irc_dir}/in"

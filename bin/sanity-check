@@ -22,7 +22,7 @@ usage() {
 i_am_insane() {
   if [ ! -s "${work_dir}/build-master-sanity" ]; then
     printf '\001ACTION goes insane.\001\n' | \
-      sponge "${irc_dir}/#archlinux-ports/in"
+      sponge "${irc_dir}/#archlinux32/in"
   fi
   echo 'build master is insane' > \
     "${work_dir}/build-master-sanity"
@@ -432,5 +432,5 @@ done
 if [ -f "${work_dir}/build-master-sanity" ]; then
   rm "${work_dir}/build-master-sanity"
   printf '\001ACTION resumes sanity.\001\n' | \
-    sponge "${irc_dir}/#archlinux-ports/in"
+    sponge "${irc_dir}/#archlinux32/in"
 fi

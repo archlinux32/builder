@@ -249,7 +249,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
 if [ -s "${webserver_directory}/mysql-sanity.html" ] && \
   [ ! -s "${work_dir}/build-master-sanity" ]; then
   printf 'girls: my database is dirty again ...\n' | \
-    sponge "${irc_dir}/#archlinux-ports/in"
+    sponge "${irc_dir}/#archlinux32/in"
   echo 'build master is insane' > \
     "${work_dir}/build-master-sanity"
 fi

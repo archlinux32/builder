@@ -222,7 +222,7 @@ if [ "$5" = 'ERROR' ]; then
       fi
     )
 
-    if [ -p "${irc_dir}/#archlinux-ports/in" ]; then
+    if [ -p "${irc_dir}/#archlinux32/in" ]; then
       {
         printf '%s is broken (says %s).' \
           "$1" \
@@ -235,7 +235,7 @@ if [ "$5" = 'ERROR' ]; then
         fi
         printf '\n'
       } | \
-        sponge "${irc_dir}/#archlinux-ports/in"
+        sponge "${irc_dir}/#archlinux32/in"
     fi
   fi
 

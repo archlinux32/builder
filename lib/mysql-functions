@@ -83,7 +83,7 @@ mysql_run_query() {
       if [ ! -s "${work_dir}/build-master-sanity" ]; then
         printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
           "${query_file##*/}" \
-          | sponge "${irc_dir}/#archlinux-ports/in"
+          | sponge "${irc_dir}/#archlinux32/in"
       fi
       echo 'A mysql query failed.' > \
         "${work_dir}/build-master-sanity"

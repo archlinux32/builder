@@ -480,7 +480,7 @@ if [ "${deletion_list_count}" -gt 1000 ]; then
       done
     } | \
       tee "${work_dir}/told-irc-about-too-many-deletion-list-packages" | \
-      sponge "${irc_dir}/#archlinux-ports/in"
+      sponge "${irc_dir}/#archlinux32/in"
   fi
   exit 3
 fi
