@@ -55,8 +55,6 @@ fi
 tmp_dir=$(mktemp -d 'tmp.build-master-status.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-"${base_dir}/bin/calculate-dependent-packages"
-
 {
   printf '%s\n' \
     '<html>' \
