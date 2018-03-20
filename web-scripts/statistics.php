@@ -51,7 +51,7 @@ $width = 1600;
 $height = 600;
 $border = 5;
 $legend_line_length = 10;
-$legend_height = 3 * ImageFontHeight(5) + $legend_line_length;
+$legend_height = 4 * ImageFontHeight(5) + $legend_line_length;
 
 $im = @ImageCreate ($width + $legend_line_length + $max_len * ImageFontWidth(5), $height + $legend_height)
       or die ("Cannot create new gd-image-stream");
@@ -118,13 +118,13 @@ function print_graph($data, $color) {
 
 ImageRectangle($im, $legend_line_length, 0, $width-1+$legend_line_length, $height-1, $foreground_color);
 
-ImageString($im, 5, $legend_line_length, $height + $legend_line_length + 2*ImageFontHeight(5), "( ".trim(shell_exec("uptime | sed 's|^.*\\s\\(load\\)|\\1|'"))." )", $foreground_color);
+ImageString($im, 5, $legend_line_length, $height + 2*$legend_line_length + 2*ImageFontHeight(5), "( ".trim(shell_exec("uptime | sed 's|^.*\\s\\(load\\)|\\1|'"))." )", $foreground_color);
 
 $xpos = $legend_line_length;
 foreach ($print_columns as $column) {
   print_graph($values[$column], $colors[$column]);
-  ImageString($im, 5, $xpos, $height + $legend_line_length + ImageFontHeight(5), $column, $colors[$column]);
-  $xpos += (strlen($column) + 1.75) * ImageFontWidth(5);
+  ImageString($im, 5, $xpos, $height + $legend_line_length + ImageFontHeight(5), substr($column,0,-strlen("_count")), $colors[$column]);
+  $xpos += (strlen($column) - strlen("_count") + 1.75) * ImageFontWidth(5);
 }
 
 ImageString($im, 5, $legend_line_length, $height + $legend_line_length, date('Y-m-d H:i', $t_min), $foreground_color);
