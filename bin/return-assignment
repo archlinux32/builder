@@ -222,21 +222,19 @@ if [ "$5" = 'ERROR' ]; then
       fi
     )
 
-    if [ -p "${irc_dir}/#archlinux32/in" ]; then
-      {
-        printf '%s is broken (says %s).' \
-          "$1" \
-          "${slave}"
-        if [ -n "${rescheduled_packages}" ]; then
-          printf -- ' - I rescheduled:'
-          # shellcheck disable=SC2086
-          printf ' %s,' ${rescheduled_packages} | \
-            sed 's/,$/./'
-        fi
-        printf '\n'
-      } | \
-        sponge "${irc_dir}/#archlinux32/in"
-    fi
+    {
+      printf '%s is broken (says %s).' \
+        "$1" \
+        "${slave}"
+      if [ -n "${rescheduled_packages}" ]; then
+        printf -- ' - I rescheduled:'
+        # shellcheck disable=SC2086
+        printf ' %s,' ${rescheduled_packages} | \
+          sed 's/,$/./'
+      fi
+      printf '\n'
+    } | \
+      irc_say
   fi
 
   exit 0
