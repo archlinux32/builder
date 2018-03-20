@@ -36,7 +36,7 @@ sort "${work_dir}/build-list" > \
 
 # shellcheck disable=SC2016
 {
-  printf 'SELECT '
+  printf 'SELECT DISTINCT '
   printf '`package_sources`.`%s`,' \
     'pkgbase' 'git_revision' 'mod_git_revision'
   printf '`upstream_repositories`.`name`'
@@ -248,7 +248,7 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
 
 if [ -s "${webserver_directory}/mysql-sanity.html" ] && \
   [ ! -s "${work_dir}/build-master-sanity" ]; then
-  printf 'oh girls, my database is dirty again ...\n' | \
+  printf 'girls, my database is dirty again ...\n' | \
     irc_say
   echo 'build master is insane' > \
     "${work_dir}/build-master-sanity"
