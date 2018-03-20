@@ -143,7 +143,22 @@ if [ ! "$1" = 'slim' ]; then
       ' from_repository MEDIUMINT :repositories' \
       ' to_repository MEDIUMINT :repositories' \
       ' upstream_package_repository SMALLINT :upstream_repositories' \
-      ' UNIQUE source from_repository upstream_package_repository'
+      ' UNIQUE source from_repository upstream_package_repository' \
+      'statistics BIGINT' \
+      ' date DATETIME' \
+      ' stable_packages_count MEDIUMINT' \
+      ' pending_tasks_count MEDIUMINT' \
+      ' pending_packages_count MEDIUMINT' \
+      ' staging_packages_count MEDIUMINT' \
+      ' testing_packages_count MEDIUMINT' \
+      ' tested_packages_count MEDIUMINT' \
+      ' broken_tasks_count MEDIUMINT' \
+      ' dependency_loops_count MEDIUMINT' \
+      ' dependency_looped_tasks_count MEDIUMINT' \
+      ' locked_tasks_count MEDIUMINT' \
+      ' blocked_tasks_count MEDIUMINT' \
+      ' next_tasks_count MEDIUMINT' \
+      ' UNIQUE date'
   )
 
   # shellcheck disable=SC2016
