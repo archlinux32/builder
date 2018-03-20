@@ -942,35 +942,6 @@ extract_source_directory() {
 
 }
 
-# find_dependencies_on_build_list $package $git_revision $mod_git_revision $repository
-# return a list of packages on the build list which are (run- / build- / check-time)
-# dependencies of the given package
-
-find_dependencies_on_build_list() {
-
-  local package="$1"
-  local git_revision="$2"
-  local mod_git_revision="$3"
-  local repository="$4"
-
-  generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-
-  {
-    cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
-    awk '{print $1 "." $2 "." $3 "." $4}' < \
-      "${work_dir}/build-list" | \
-      sed '
-        s|^|'"${work_dir}"'/package-infos/|
-        s|$|\.builds|
-      ' | \
-      xargs -r cat | \
-      sort -u
-  } | \
-    sort | \
-    uniq -d
-
-}
-
 # download_sources_by_hash $package $repository $git_revision $git_mod_revision
 # try to download all sources by their hash into the current directory
 # returns 0 if any source was downloaded and 1 otherwise
@@ -1267,86 +1238,6 @@ smoothen_namcap_log() {
     ' | \
     sort | \
     sponge "${file}"
-}
-
-# print_list_of_archaic_packages $source1 $source2 ...
-# print a list of packages which have not been touched for a while,
-# but which are still in the pipeline, e.g. in $source1, $source2 or ...
-
-print_list_of_archaic_packages() {
-  for source in "$@"; do
-    case "${source}" in
-      'testing')
-        # packages remaining longer than $max_package_age_testing days in testing will be marked tested if no bug for them exists on FS32
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_testing}" \
-          -exec head -n1 {} \; | \
-          "${base_dir}/bin/modify-package-state" -n --tested /dev/stdin
-        # packages remaining longer than $max_package_age_broken_testing days in testing (w/o being tested!) will be considered outdated
-        # and no longer block other packages from being moved
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_broken_testing}" -printf '%f\n' | \
-          sed '
-            s|\.testing$||
-          '
-      ;;
-      'build-list')
-        while read -r pkg rev mod_rev repo; do
-          git_repo=$(
-            find_repository_with_commit "${rev}"
-          )
-          eval repo_path='"${repo_paths__'"${git_repo}"'}"'
-          commit_date=$(
-            git -C "${repo_path}" show -s --format=%ct "${rev}"
-          )
-          mod_commit_date=$(
-            git -C "${repo_paths__archlinux32}" show -s --format=%ct "${mod_rev}"
-          )
-          if [ "${mod_commit_date}" -gt "${commit_date}" ]; then
-            commit_date="${mod_commit_date}"
-          fi
-          # packages remaining longer than $max_package_age_build_list days on the build list
-          if [ "$((commit_date + 24*60*60*max_package_age_build_list))" -lt "$(date '+%s')" ]; then
-            printf '%s %s %s %s\n' \
-              "${pkg}" \
-              "${rev}" \
-              "${mod_rev}" \
-              "${repo}"
-          fi
-        done < \
-          "${work_dir}/build-list"
-      ;;
-      'staging')
-        # packages remaining longer than $max_package_age_staging days in staging
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.done' -mtime "+${max_package_age_staging}" -printf '%f\n' | \
-          sed '
-            s|\.done$||
-          '
-      ;;
-      *)
-        >&2 printf 'unknown archaic-source "%s" - skipped.\n' "${source}"
-      ;;
-    esac
-  done | \
-    sort -u
-}
-
-# modification_revision_link "${mod_rev}" "${repo}" "${pkg}"
-# print the given modification revision possibly with a html link to github
-
-modification_revision_link() {
-  local mod_rev="$1"
-  local repo="$2"
-  local pkg="$3"
-
-  if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
-    printf '<a href="https://github.com/archlinux32/packages/tree/%s/%s/%s">%s</a>\n' \
-      "${mod_rev}" \
-      "${repo}" \
-      "${pkg}" \
-      "${mod_rev}"
-  else
-    printf '%s\n' \
-      "${mod_rev}"
-  fi
 }
 
 # trigger_mirror_refreshs
