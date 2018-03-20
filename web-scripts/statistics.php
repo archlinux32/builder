@@ -164,6 +164,4 @@ header ("Content-type: image/png");
 
 ImagePNG ($im);
 
-// passthru('wc -l /srv/http/statistics');
-
 ?>
