@@ -528,7 +528,7 @@ echo 'Now actually sort it.'
 
 {
   # this part will have the correct build order, but all the infos are missing
-  tsort "${work_dir}/build-order" 2> "${work_dir}/tsort.error" | \
+  tsort "${work_dir}/build-order" | \
     nl -ba | \
     awk '{print $1 " not-git also-not-git whatever " $2}'
   # this part has all the infos, but possibly the wrong order
@@ -542,43 +542,6 @@ echo 'Now actually sort it.'
   sort -k1n,1 | \
   awk '{print $5 " " $7 " " $8 " " $9}' > \
   "${work_dir}/build-list.new.new"
-
-rm --one-file-system -rf "${work_dir}/build-list.loops.new"
-mkdir "${work_dir}/build-list.loops.new"
-
-if [ -s "${work_dir}/tsort.error" ]; then
-  >&2 echo 'WARNING: There is a dependency cycle!'
-  >&2 cat "${work_dir}/tsort.error"
-  >&2 echo
-  >&2 echo 'I will continue anyway.'
-  # save loops in separate files each, so breaking them is easier
-  awk '
-    /^tsort: \S+: input contains a loop:$/{
-      n++;
-      getline
-    }
-    {
-      print $2 >"'"${work_dir}"'/build-list.loops.new/loop_" n
-    }
-    ' "${work_dir}/tsort.error"
-
-  # remove lines from loop files which are no packages
-  find "${work_dir}/build-list.loops.new" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' \
-    -printf '%p\n' | \
-    while read -r loop; do
-      {
-        sort -u "${loop}"
-        cut -d' ' -f1 "${work_dir}/build-list.new.new" | \
-          sort -u
-      } | \
-        sort | \
-        uniq -d | \
-        sponge "${loop}"
-    done
-else
-  rm "${work_dir}/tsort.error"
-fi
 
 # shellcheck disable=SC2016
 {
@@ -608,9 +571,8 @@ mysql_find_build_assignment_loops
 
 # Move the .new-files to the actual files
 
-rm -rf --one-file-system "${work_dir}/build-list.loops"
 {
-  printf '%s\n' "build-list.loops" "build-list.new" "build-list" "deletion-list"
+  printf '%s\n' "build-list.new" "build-list" "deletion-list"
   # shellcheck disable=SC2086
   printf '%s.revision\n' ${repo_names}
 } | \

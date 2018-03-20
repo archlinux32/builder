@@ -169,18 +169,6 @@ if [ "$5" = 'ERROR' ]; then
   if [ ! -s "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
     rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
 
-    # unlock every loop this package would have broken and which is not
-    # broken by another locked package
-    locked_packages=$(
-      find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' -printf '%f\n' | \
-        sed 's@^\(.\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
-    )
-    find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-      -regex '.*/loop_[0-9]\+' \
-      -exec grep -qxF "$1" '{}' \; \
-      -not -exec grep -qxF "${locked_packages}" '{}' \; \
-      -exec rm '{}.locked' \;
-
     # move that build order to the end of the build-list
     sed -i '
       /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
@@ -537,12 +525,6 @@ find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
   -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{4\}' \
   -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4")"'\.[^.]\+' \
   -exec rm '{}' \;
-
-# remove all loops which are broken by this package
-find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-  -regex '.*/loop_[0-9]\+' \
-  -exec grep -qxF "$1" '{}' \; \
-  -exec rm '{}.locked' \;
 
 # remove package from build list
 sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"

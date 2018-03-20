@@ -103,12 +103,6 @@ hand_out_assignment() {
   } | \
     mysql_run_query
 
-  # lock every loop this package breaks
-  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' \
-    -exec grep -qxF "$1" '{}' \; \
-    -exec touch '{}.locked' \;
-
   exit 0
 
 }

@@ -74,23 +74,6 @@ sort "${work_dir}/deletion-list" > \
 
 # shellcheck disable=SC2016
 {
-  printf 'SELECT `package_sources`.`pkgbase`'
-  printf ' FROM `package_sources`'
-  mysql_join_package_sources_build_assignments
-  mysql_join_build_assignments_build_dependency_loops
-  printf ';\n'
-} | \
-  mysql_run_query | \
-  sort > \
-  "${tmp_dir}/loops.mysql"
-find "${work_dir}/build-list.loops" -regextype grep -mindepth 1 -maxdepth 1 \
-  -regex '.*/loop_[0-9]\+' \
-  -exec 'cat' '{}' \; | \
-  sort > \
-  "${tmp_dir}/loops.file"
-
-# shellcheck disable=SC2016
-{
   printf 'SELECT '
   printf '`binary_packages`.`%s`,' \
     'pkgname' \
@@ -219,10 +202,6 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   diff -u \
     "${tmp_dir}/deletion-list.file" \
     "${tmp_dir}/deletion-list.mysql" || \
-    true
-  diff -u \
-    "${tmp_dir}/loops.file" \
-    "${tmp_dir}/loops.mysql" >&2 || \
     true
   diff -u \
     "${tmp_dir}/tested.file" \
