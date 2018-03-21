@@ -53,7 +53,8 @@ $result = $mysql -> query(
   "(SELECT count(*) " .
     "FROM `build_dependency_loops` " .
     "WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`" .
-  ") AS `loops` " .
+  ") AS `loops`, " .
+  "`build_slaves`.`name` AS `build_slave` " .
   "FROM `build_assignments` " .
   "JOIN `architectures` ON `build_assignments`.`architecture` = `architectures`.`id` " .
   "JOIN `package_sources` ON `build_assignments`.`package_source` = `package_sources`.`id` " .
@@ -61,6 +62,7 @@ $result = $mysql -> query(
   "JOIN `git_repositories` ON `upstream_repositories`.`git_repository`=`git_repositories`.`id` " .
   "JOIN `binary_packages` ON `binary_packages`.`build_assignment` = `build_assignments`.`id` " .
   "JOIN `repositories` ON `binary_packages`.`repository` = `repositories`.`id` " .
+  "LEFT JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id` " .
   "WHERE `repositories`.`name`=\"build-list\"" . $match
 );
 if ($result -> num_rows > 0) {
@@ -162,6 +164,10 @@ if ($result -> num_rows > 0) {
         $row["is_blocked"]
       );
     }
+    if (isset($row["build_slave"]))
+      $rows[$count]["build_slave"] = $row["build_slave"];
+    else
+      $rows[$count]["build_slave"] = "&nbsp;";
     $count++;
   }
 
@@ -186,6 +192,7 @@ if ($result -> num_rows > 0) {
   print "<th>loops</th>";
   print "<th>build error</th>";
   print "<th>blocked</th>";
+  print "<th>handed out to</th>";
   print "</tr>\n";
 
   foreach($rows as $row) {
@@ -200,6 +207,7 @@ if ($result -> num_rows > 0) {
     print "<td>".$row["loops"]."</td>";
     print "<td>".$row["fail_reasons"]."</td>";
     print "<td>".$row["is_blocked"]."</td>";
+    print "<td>".$row["build_slave"]."</td>";
 
     print "</tr>\n";
   }
