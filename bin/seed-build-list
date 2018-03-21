@@ -27,6 +27,8 @@ usage() {
   >&2 echo '    Do not actually update build-list, just print it.'
   >&2 echo '  -p|--package $pkg_regex:'
   >&2 echo '    Update packages matching $pkg_regex.'
+  >&2 echo '  -w|--wait:'
+  >&2 echo '    Wait for lock if necessary.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
@@ -35,13 +37,14 @@ tmp_dir=$(mktemp -d 'tmp.seed-build-list.XXXXXXXXXX' --tmpdir)
 trap "rm -rf --one-file-system '${tmp_dir:?}'" EXIT
 
 eval set -- "$(
-  getopt -o ahi:m:np: \
+  getopt -o ahi:m:np:w \
     --long auto \
     --long help \
     --long ignore: \
     --long mirror: \
     --long no-action \
     --long package: \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
     echo usage
   )"
@@ -52,6 +55,7 @@ touch "${tmp_dir}/ignore-packages"
 
 auto=false
 update=true
+wait_for_lock='-n'
 
 while true
 do
@@ -80,6 +84,9 @@ do
       echo "$1" >> \
         "${tmp_dir}/package-regexes"
     ;;
+    -w|--wait)
+      wait_for_lock=''
+    ;;
     --)
       shift
       break
@@ -101,6 +108,15 @@ if [ ! -s "${tmp_dir}/mirrors" ] && \
   ! ${auto}; then
   # nothing to do
   exit 0
+fi
+
+# get locks
+if ${update}; then
+  exec 9> "${sanity_check_lock_file}"
+  flock -s ${wait_for_lock} 9
+
+  exec 8> "${build_list_lock_file}"
+  flock ${wait_for_lock} 8
 fi
 
 repos="${stable_package_repositories}"
@@ -347,13 +363,6 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   sort -u | \
   tr '\t' ' ' | \
   if ${update}; then
-    # always block if locked
-    exec 9> "${build_list_lock_file}"
-    flock 9
-
-    exec 8> "${sanity_check_lock_file}"
-    flock -s 8
-
     while read -r pkgbase git_rev mod_git_rev repo; do
       printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" >&2
       generate_package_metadata "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}"
