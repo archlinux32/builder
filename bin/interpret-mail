@@ -190,7 +190,7 @@ sed -n "$(
 )" "${tmp_dir}/raw-content"
 
 if [ -s "${tmp_dir}/block" ]; then
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --block "${tmp_dir}/block"; then
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --block "${tmp_dir}/block"; then
     log 'Successfully blocked %s packages.\n' "$(wc -l < "${tmp_dir}/block")"
   else
     log 'There was an error while blocking the packages - ignoring this message.\n'
@@ -201,7 +201,7 @@ if [ -s "${tmp_dir}/stabilize" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/stabilize"
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --tested "${tmp_dir}/stabilize"; then
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --tested "${tmp_dir}/stabilize"; then
     log 'Successfully marked %s packages as tested.\n' "$(wc -l < "${tmp_dir}/stabilize")"
   else
     log 'There was an error while marking the packages as tested - ignoring this message.\n'
@@ -209,7 +209,7 @@ if [ -s "${tmp_dir}/stabilize" ]; then
 fi
 
 if [ -s "${tmp_dir}/unblock" ]; then
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --unblock "${tmp_dir}/unblock"; then
+  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --unblock "${tmp_dir}/unblock"; then
     log 'Successfully unblocked %s packages.\n' "$(wc -l < "${tmp_dir}/unblock")"
   else
     log 'There was an error while unblocking the packages - ignoring this message.\n'
@@ -218,7 +218,7 @@ fi
 
 if [ -s "${tmp_dir}/schedule" ]; then
   # shellcheck disable=SC2046
-  "${base_dir}/bin/seed-build-list" $(
+  "${base_dir}/bin/seed-build-list" --wait $(
     tr '[:space:]' '\n' < \
       "${tmp_dir}/schedule" | \
       grep -vxF '' | \
@@ -234,7 +234,7 @@ if [ -s "${tmp_dir}/copy-to-build-support" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/copy-to-build-support"
-  if run_and_log_on_error "${base_dir}/bin/copy-to-build-support" "${tmp_dir}/copy-to-build-support"; then
+  if run_and_log_on_error "${base_dir}/bin/copy-to-build-support" --wait "${tmp_dir}/copy-to-build-support"; then
     log 'Successfully copied %s packages to [build-support].\n' "$(wc -l < "${tmp_dir}/copy-to-build-support")"
   else
     log 'There was an error while copying the packages to [build-support] - ignoring this message.\n'
