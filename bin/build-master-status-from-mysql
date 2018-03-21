@@ -17,6 +17,9 @@ if ! flock -n 9; then
   exit
 fi
 
+# shellcheck disable=SC2119
+mysql_cleanup
+
 # shellcheck disable=SC2016
 {
   printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
