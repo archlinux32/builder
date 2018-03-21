@@ -8,6 +8,7 @@ This includes scripts to be run on the build master as well as scripts to be run
 * `base-devel`
 * `bc`
 * `git`
+* `graphviz`
 * `ii`
 * some mysql-server
 * `nginx` or equivalent
