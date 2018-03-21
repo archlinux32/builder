@@ -8,4 +8,18 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: acutally do something here :-)
+# TODO: receive/save some statistics about current build
+
+if [ "$(
+  # shellcheck disable=SC2016,SC2154
+  {
+    printf 'SELECT count(*) FROM `build_slaves`'
+    mysql_join_build_slaves_build_assignments
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+      "$(printf '%s' "${slave}" | base64 -w0)"
+  } | \
+    mysql_run_query
+  )" -ne 1 ]; then
+  >&2 echo 'You do not build anything currently - abort whatever you are doing.'
+  exit 2
+fi
