@@ -18,25 +18,28 @@ usage() {
   >&2 echo '  -n|--no-report:   Do not report what packages were modified.'
   >&2 echo '  -t|--tested:      Mark package(s) as tested.'
   >&2 echo '  -u|--unblock:     Unblock package(s).'
+  >&2 echo '  -w|--wait:        Wait for lock if necessary.'
   >&2 echo ''
   >&2 echo 'Exactly one of -b|-t|-u is needed for actual operation.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bfhntu \
+  getopt -o bfhntuw \
     --long block \
     --long faulty \
     --long help \
     --long no-report \
     --long tested \
     --long unblock \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 action=''
 report=true
+wait_for_lock='-n'
 
 while true
 do
@@ -74,6 +77,9 @@ do
         usage
       fi
       action='unblock'
+    ;;
+    -w|--wait)
+      wait_for_lock=''
     ;;
     --)
       shift
@@ -123,13 +129,13 @@ if ! [ -r "${input_file}" ]; then
 fi
 
 exec 9> "${sanity_check_lock_file}"
-if ! flock -s -n 9; then
+if ! flock -s ${wait_for_lock} 9; then
   >&2 echo 'Cannot get sanity-check lock.'
   exit
 fi
 
 exec 8> "${package_database_lock_file}"
-if ! flock -n 8; then
+if ! flock ${wait_for_lock} 8; then
   >&2 echo 'Cannot get package-database lock.'
   exit
 fi
