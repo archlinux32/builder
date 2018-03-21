@@ -5,11 +5,61 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# shellcheck disable=SC2016
+usage() {
+  >&2 echo ''
+  >&2 echo 'copy-to-build-support [options] package-list:'
+  >&2 echo '  copy the packages listed in package-list into [build-support]'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:'
+  >&2 echo '    Show this help and exit.'
+  >&2 echo '  -w|--wait:'
+  >&2 echo '    Wait for lock if necessary.'
+  [ -z "$1" ] && exit 1 || exit "$1"
+}
+
+eval set -- "$(
+  getopt -o hw \
+    --long help \
+    --long wait \
+    -n "$(basename "$0")" -- "$@" || \
+    echo usage
+  )"
+
+wait_for_lock='-n'
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -w|--wait)
+      wait_for_lock=''
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
 if [ "$#" -ne 1 ]; then
-  >&2 echo 'usage:'
-  >&2 echo '  copy-to-build-support package-list'
-  exit 2
+  >&2 echo 'No package-list was given.'
+  usage
 fi
+
+exec 9> "${sanity_check_lock_file}"
+flock -s ${wait_for_lock} 9
+
+exec 8> "${package_database_lock_file}"
+flock ${wait_for_lock} 8
 
 tmp_dir=$(mktemp -d "${work_dir}/tmp.copy-to-build-support.0.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
