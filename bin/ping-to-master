@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# periodically connects to the buildmaster to call ping-from slave to:
+#  - report any update on the build process
+#  - show that the build is still running
+#  - get notified by the build master if the build is not necessary anymore
+
+# shellcheck source=conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# TODO: abort build if requested to
+
+parent_pid="$1"
+parent_tmp_dir="$2"
+
+exec 9> "${work_dir}/ping-build-master.lock"
+
+while kill -0 "${parent_pid}" && \
+  [ -f "${parent_tmp_dir}/.ping-build-master" ]; do
+
+  # shellcheck disable=SC2029
+  find "${parent_tmp_dir}" \
+    -xdev \
+    -type f \
+    -name '*.build-log' \
+    -exec wc -l {} \; | \
+    sed 's, .*/, ,' | \
+    ssh \
+      -i "${master_build_server_identity}" \
+      -p "${master_build_server_port}" \
+      "${master_build_server_user}@${master_build_server}" \
+      'ping-from-slave' "$(cat "${parent_tmp_dir}/.ping-build-master")"
+
+  # we wait upto 60 seconds to get the lock - if we get it, the parent
+  # must have released it and we're finished
+  if flock -w 60 9; then
+    break
+  fi
+done

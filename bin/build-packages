@@ -258,6 +258,7 @@ while [ "${count}" -ne 0 ]; do
         fi
         cd "${base_dir}"
         recursively_umount_and_rm "${tmp_dir}"
+        flock -u 9 || true
         exit "${err}"
       }
       find "${work_dir}" \
@@ -371,6 +372,17 @@ while [ "${count}" -ne 0 ]; do
         find . -maxdepth 1 -type f \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -exec \
           rm {} \;
 
+        echo 'building' > "${tmp_dir}/.ping-build-master"
+        if [ -z "${forced_package}" ]; then
+          # we get a lock on "${work_dir}/ping-build-master.lock",
+          # if we release that lock, ping-to-master should stop _immediately_
+          exec 9> "${work_dir}/ping-build-master.lock"
+          if ! flock -n 9; then
+            >&2 echo 'ERROR: Cannot lock ping-to-master - this should not happen.'
+            exit 2
+          fi
+          "${base_dir}/bin/ping-to-master" "$$" "${tmp_dir}" &
+        fi
         >&2 printf '%s: building package "%s" (revisions %s %s, repository %s, straw %s) ...' \
           "$(date +'%Y-%m-%d %T')" \
           "${package}" \
@@ -390,6 +402,7 @@ while [ "${count}" -ne 0 ]; do
           >&2 printf ' ok.\n'
           tar_content_dir=$(mktemp -d "${tmp_dir}/tar-content.XXXXXX")
           find . -maxdepth 1 -type f -name '*-debug-*.pkg.tar.xz*' -delete
+          echo 'post-build' > "${tmp_dir}/.ping-build-master"
           >&2 printf 'signing package(s)\n'
           find . -maxdepth 1 -type f -name '*.pkg.tar.xz' \
             -execdir gpg --local-user="${package_key}" --detach-sign '{}' \; \
@@ -501,6 +514,7 @@ while [ "${count}" -ne 0 ]; do
               fi
             done
           >&2 printf ' ok.\n'
+          echo 'uploading' > "${tmp_dir}/.ping-build-master"
           if ${upload_to_build_master}; then
             find "${tar_content_dir}/" -maxdepth 1 \
               \( \
@@ -565,6 +579,7 @@ while [ "${count}" -ne 0 ]; do
           success=true
           break
         fi
+        echo 'failure' > "${tmp_dir}/.ping-build-master"
         >&2 printf ' failed.\n'
       done
 
@@ -619,6 +634,7 @@ while [ "${count}" -ne 0 ]; do
       # clean up tmp_dir
       cd "${base_dir}"
       recursively_umount_and_rm "${tmp_dir}"
+      flock -u 9 || true
       trap - EXIT
 
       continue
