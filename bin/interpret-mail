@@ -161,7 +161,7 @@ sed -n '
   /\n$/!ba
   s/\n$//
   p
-' "${tmp_dir}/plain-content" |
+' "${tmp_dir}/plain-content" | \
   sed '
     :start_loop
       $!{
