@@ -143,55 +143,6 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   sort -u > \
   "${tmp_dir}/testing.file"
 
-# shellcheck disable=SC2016
-{
-  printf 'SELECT '
-  printf '`package_sources`.`%s`,' \
-    'pkgbase' \
-    'git_revision' \
-    'mod_git_revision'
-  printf '`upstream_repositories`.`name`,`install_targets`.`name`'
-  printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_dependencies
-  mysql_join_dependencies_dependency_types
-  mysql_join_dependencies_install_targets
-  mysql_join_binary_packages_build_assignments
-  mysql_join_build_assignments_package_sources
-  mysql_join_package_sources_upstream_repositories
-  printf ' WHERE `dependency_types`.`relevant_for_building`'
-} | \
-  mysql_run_query | \
-  tr '\t' ' ' | \
-  sort -u > \
-  "${tmp_dir}/build-dependencies.mysql"
-{
-  cat "${tmp_dir}/build-dependencies.mysql"
-  # shellcheck disable=SC2016
-  {
-    printf 'SELECT DISTINCT '
-    printf '`package_sources`.`%s`,' \
-      'pkgbase' 'git_revision' 'mod_git_revision'
-    printf '`upstream_repositories`.`name`'
-    printf ' FROM `upstream_repositories`'
-    mysql_join_upstream_repositories_package_sources
-    mysql_join_package_sources_build_assignments
-    mysql_join_build_assignments_binary_packages
-  } | \
-    mysql_run_query | \
-    tr '\t' ' ' | \
-    while read -r pkgbase git_revision mod_git_revision repository; do
-      if [ -f "${work_dir}/package-infos/${pkgbase}.${git_revision}.${mod_git_revision}.${repository}.build-depends" ]; then
-        # TODO: consider versions dependencies, too
-        grep -v '[<=>]' "${work_dir}/package-infos/${pkgbase}.${git_revision}.${mod_git_revision}.${repository}.build-depends" | \
-          sed '
-            s/^/'"${pkgbase} ${git_revision} ${mod_git_revision} ${repository}"' /
-          '
-      fi
-    done
-} | \
-  sort -u > \
-  "${tmp_dir}/build-dependencies.file"
-
 {
   diff -u \
     "${tmp_dir}/locked.file" \
@@ -213,10 +164,6 @@ find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
   diff -u \
     "${tmp_dir}/testing.file" \
     "${tmp_dir}/testing.mysql" || \
-    true
-  diff -u \
-    "${tmp_dir}/build-dependencies.file" \
-    "${tmp_dir}/build-dependencies.mysql" || \
     true
 } | \
   sed '
