@@ -145,20 +145,19 @@ while [ $# -gt 0 ]; do
         "${tmp_dir}/messages"
 
       errors=$(
-        grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$' "${work_dir}/build-list"
-      ) || true
-      if [ -n "${errors}" ]; then
-        if [ ${silence} -le 1 ]; then
-          printf '\nThe following build orders are wrongly formatted:\n%s\n' \
-            "${errors}" >> \
-            "${tmp_dir}/messages"
-        fi
-        i_am_insane
-      fi
-
-      errors=$(
-        cut -d' ' -f1 < \
-          "${work_dir}/build-list" | \
+        # shellcheck disable=SC2016
+        {
+          printf 'SELECT `architectures`.`name`,`package_sources`.`pkgbase` FROM `package_sources`'
+          mysql_join_package_sources_build_assignments
+          mysql_join_build_assignments_architectures
+          printf ' WHERE EXISTS('
+            printf 'SELECT * FROM `binary_packages`'
+            mysql_join_binary_packages_repositories
+            printf ' WHERE `repositories`.`name`="build-list"'
+            printf ' AND `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+          printf ');\n'
+        } | \
+          mysql_run_query | \
           sort | \
           uniq -d
       )
@@ -172,13 +171,16 @@ while [ $# -gt 0 ]; do
       fi
 
       errors=$(
+        # shellcheck disable=SC2016
         {
-          cut -d' ' -f1 < \
-            "${work_dir}/build-list"
-          cat "${work_dir}/deletion-list"
+          printf 'SELECT `a`.`pkgname` FROM `binary_packages` AS `a`'
+          mysql_join_binary_packages_repositories 'a' 'a_r'
+          printf ' AND `a_r`.`name`="build-list"'
+          printf ' JOIN `binary_packages` AS `b` ON `a`.`pkgname`=`b`.`pkgname`'
+          mysql_join_binary_packages_repositories 'b' 'b_r'
+          printf ' AND `b_r`.`name`="deletion-list";\n'
         } | \
-          sort | \
-          uniq -d
+          mysql_run_query
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
