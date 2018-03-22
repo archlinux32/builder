@@ -22,23 +22,6 @@ mysql_cleanup
 
 # shellcheck disable=SC2016
 {
-  printf 'SELECT DISTINCT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
-  printf ' FROM `package_sources`'
-  mysql_join_package_sources_upstream_repositories
-  mysql_join_package_sources_build_assignments
-  mysql_join_build_assignments_binary_packages
-  mysql_join_binary_packages_repositories
-  printf ' WHERE `repositories`.`name`="build-list"'
-} | \
-  mysql_run_query | \
-  tr '\t' ' ' | \
-  sort > \
-  "${tmp_dir}/build-list.mysql"
-sort "${work_dir}/build-list" > \
-  "${tmp_dir}/build-list.file"
-
-# shellcheck disable=SC2016
-{
   printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
   printf ' FROM `package_sources`'
   mysql_join_package_sources_build_assignments
@@ -55,10 +38,6 @@ sort "${work_dir}/deletion-list" > \
 
 {
   mysql_sanity_check || true
-  diff -u \
-    "${tmp_dir}/build-list.file" \
-    "${tmp_dir}/build-list.mysql" || \
-    true
   diff -u \
     "${tmp_dir}/deletion-list.file" \
     "${tmp_dir}/deletion-list.mysql" || \
