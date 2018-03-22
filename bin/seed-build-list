@@ -113,10 +113,16 @@ fi
 # get locks
 if ${update}; then
   exec 9> "${sanity_check_lock_file}"
-  flock -s ${wait_for_lock} 9
+  if ! flock -s ${wait_for_lock} 9; then
+    >&2 echo 'Cannot get sanity-check lock.'
+    exit 1
+  fi
 
   exec 8> "${build_list_lock_file}"
-  flock ${wait_for_lock} 8
+  if ! flock ${wait_for_lock} 8; then
+    >&2 echo 'Cannot get build-list lock.'
+    exit 1
+  fi
 fi
 
 repos="${stable_package_repositories}"
