@@ -105,7 +105,7 @@ touch "${tmp_dir}/messages"
 trap 'finish' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- git-repositories build-list mysql repos package-database state-files
+  set -- git-repositories build-list mysql repos package-database track-state
 fi
 
 while [ $# -gt 0 ]; do
@@ -337,51 +337,50 @@ while [ $# -gt 0 ]; do
 
     ;;
 
-    state-files)
+    track-state)
 
-      for status in 'staging' 'testing'; do
+      [ ${silence} -gt 0 ] || \
+        printf 'checking if all packages are tracked correctly ...' >> \
+        "${tmp_dir}/messages"
 
-        [ ${silence} -gt 0 ] || \
-          printf 'checking state-files of "%s" ...' "${status}" >> \
-          "${tmp_dir}/messages"
-
-        errors=$(
+      errors=$(
+        {
+          # shellcheck disable=SC2016
           {
-            if [ "${status}" = 'staging' ]; then
-              find "${work_dir}/package-states" -name '*.done' \
-                -exec sed 's|^|package-state-file |' '{}' \;
-            else
-              find "${work_dir}/package-states" \( -name '*.testing' -o -name '*.tested' \) \
-                -exec sed 's|^|package-state-file |' '{}' \;
-            fi
-            ls_master_mirror 'i686' | \
-              grep "${status}\$" | \
-              while read -r repo; do
-                ls_master_mirror "i686/${repo}"
-              done | \
-              grep '\.pkg\.tar\.xz$' | \
-              sed 's|^|package-file |'
+            printf 'SELECT "mysql",CONCAT(`repositories`.`name`,"/",'
+            mysql_package_name_query
+            printf ') FROM `binary_packages`'
+            mysql_join_binary_packages_repositories
+            printf ' AND `repositories`.`is_on_master_mirror`'
+            mysql_join_binary_packages_architectures
           } | \
-            sort -k2 | \
-            uniq -cf1 | \
-            grep -v '^\s*2\s' | \
-            awk '{print $2 " " $3}'
-        )
-        if [ -n "${errors}" ]; then
-          if [ ${silence} -le 1 ]; then
-            printf '\nThe following %s packages do not have state files or vice versa:\n%s\n' \
-              "${status}" \
-              "${errors}" >> \
-              "${tmp_dir}/messages"
-          fi
-          i_am_insane
+            mysql_run_query | \
+            tr '\t' ' '
+          ls_master_mirror 'i686' | \
+            while read -r repo; do
+              ls_master_mirror "i686/${repo}" | \
+                sed '
+                  /\.pkg\.tar\.xz$/!d
+                  s,^,package-file '"${repo}"'/,
+                '
+            done
+        } | \
+          sed 's/\(-[0-9]\+\)\.0\(-[^- ]\+$\)/\1\2/' | \
+          sort -k2 | \
+          uniq -uf1
+      )
+      if [ -n "${errors}" ]; then
+        if [ ${silence} -le 1 ]; then
+          printf '\nThe following packages from the master mirror are not tracked in the database or vice versa:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
+        i_am_insane
+      fi
 
-        [ ${silence} -gt 0 ] || \
-          echo ' passed.' >> \
-          "${tmp_dir}/messages"
-
-      done
+      [ ${silence} -gt 0 ] || \
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
