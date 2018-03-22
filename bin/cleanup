@@ -99,9 +99,6 @@ find "${build_log_directory}/success" -maxdepth 1 -type f -mtime +14 \
   -not -exec zgrep -q '^+.*ELF file .* has text relocations' '{}' \; \
   -delete
 
-# remove old package meta data
-delete_old_metadata
-
 # remove dependency graphs of packages on the deletion list
 sed '
   s|^|'"${webserver_directory}"'/graphs/|
