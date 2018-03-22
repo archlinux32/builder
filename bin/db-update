@@ -123,6 +123,8 @@ fi
 tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+export TMPDIR="${tmp_dir}"
+
 for source_stability in 'testing' 'staging'; do
   find "${tmp_dir}" -mindepth 1 -delete
 
