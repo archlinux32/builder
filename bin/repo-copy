@@ -26,7 +26,7 @@ to_repo="$2"
 shift
 shift
 
-tmp_dir=$(mktemp -d)
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/repo-tools.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 # extract the databases
