@@ -20,28 +20,8 @@ fi
 # shellcheck disable=SC2119
 mysql_cleanup
 
-# shellcheck disable=SC2016
-{
-  printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
-  printf ' FROM `package_sources`'
-  mysql_join_package_sources_build_assignments
-  mysql_join_build_assignments_binary_packages
-  mysql_join_binary_packages_repositories
-  printf ' WHERE `repositories`.`name`="deletion-list"'
-  printf ' OR `binary_packages`.`is_to_be_deleted`;\n'
-} | \
-  mysql_run_query | \
-  sort > \
-  "${tmp_dir}/deletion-list.mysql"
-sort "${work_dir}/deletion-list" > \
-  "${tmp_dir}/deletion-list.file"
-
 {
   mysql_sanity_check || true
-  diff -u \
-    "${tmp_dir}/deletion-list.file" \
-    "${tmp_dir}/deletion-list.mysql" || \
-    true
 } | \
   sed '
     s,^-.*$,<font color="#FF0000">\0</font>,

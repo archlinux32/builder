@@ -99,17 +99,6 @@ fi
 # delete_package package
 # mark $package for deletion
 delete_package() {
-  # shellcheck disable=SC2016
-  {
-    printf 'SELECT DISTINCT `package_sources`.`pkgbase`'
-    printf ' FROM `package_sources`'
-    mysql_join_package_sources_build_assignments
-    mysql_join_build_assignments_binary_packages
-    printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s")' \
-      "$(printf '%s' "$1" | base64 -w0)"
-  } | \
-    mysql_run_query >> \
-    "${work_dir}/deletion-list.new"
   # TODO: Once we want to rely on the database for test_exclusion, we
   # need to run the command below unconditionally, but with some
   # changes, so we can easily revert.
@@ -200,10 +189,6 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 # If a new package is added, then ensure that it's not on the deletion list.
 
-cp \
-  "${work_dir}/deletion-list" \
-  "${work_dir}/deletion-list.new"
-
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
@@ -291,7 +276,6 @@ done | \
       fi
     fi
     if [ "${mode}" = 'A' ] || [ "${mode}" = 'M' ]; then
-      sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
       # shellcheck disable=SC2016
       {
         # delete old build assignment and associated binary packages
@@ -328,9 +312,6 @@ done | \
     >&2 echo "unknown git diff mode '${mode}'"
     exit 1
   done
-
-sort -u "${work_dir}/deletion-list.new" | \
-  sponge "${work_dir}/deletion-list.new"
 
 echo 'apply blacklisting'
 # ignore blacklisted packages and dependent packages
@@ -462,15 +443,10 @@ echo "${black_listed}" | \
     delete_package "${package}"
   done
 
-sort -u "${work_dir}/deletion-list.new" | \
-  sponge "${work_dir}/deletion-list.new"
-
 
 if [ -n "${test_exclusion}" ]; then
-  # we should not actually update the build-list et. al, but solely print this difference:
-  if diff --color -u "${work_dir}/deletion-list" "${work_dir}/deletion-list.new"; then
-    printf 'If you put "%s" on the blacklist, no additional packages will end up on the deletion list.\n' "${test_exclusion}"
-  fi
+  # TODO: reimplement test_exclusion with information from the database
+  >&2 echo 'sry, not yet done.'
   exit 0
 fi
 
@@ -504,11 +480,8 @@ mysql_find_build_assignment_loops
 
 # Move the .new-files to the actual files
 
-{
-  printf '%s\n' "deletion-list"
-  # shellcheck disable=SC2086
-  printf '%s.revision\n' ${repo_names}
-} | \
+# shellcheck disable=SC2086
+printf '%s.revision\n' ${repo_names} | \
   while read -r file; do
     mv "${work_dir}/${file}.new" "${work_dir}/${file}"
   done
