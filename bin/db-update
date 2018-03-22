@@ -207,12 +207,6 @@ for source_stability in 'testing' 'staging'; do
       mysql_join_repositories_repository_stabilities
       printf ' AND `repository_stabilities`.`name`="%s"' \
         "${source_stability}"
-      # TODO: we may relax this condition, if we a) got rid of state files
-      # or b) improved keeping them in sync (*.testing -> /dev/null is not
-      # implemented, only .tested -> /dev/null)
-      if [ ! "${source_stability}" = 'staging' ]; then
-        printf ' AND `binary_packages`.`is_tested`'
-      fi
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
@@ -401,62 +395,6 @@ for source_stability in 'testing' 'staging'; do
     printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`;\n'
   } | \
     mysql_run_query
-
-  sed_apply_rm=$(
-    while read -r pkg _ _; do
-      printf '/^%s$/d\n' "$(str_to_regex "${pkg}")"
-    done < \
-      "${tmp_dir}/rm"
-  )
-
-  sed_apply_remove_part_of_mv=$(
-    while read -r pkg _ _; do
-      printf '/^%s$/d\n' "$(str_to_regex "${pkg}")"
-    done < \
-      "${tmp_dir}/mv"
-  )
-
-  sed_apply_move_part_of_mv=$(
-    while read -r pkg _ _; do
-      printf '/^%s$/{\n' "$(str_to_regex "${pkg}")"
-      printf 'w %%s\n'
-      printf 'd\n'
-      printf '}\n'
-    done < \
-      "${tmp_dir}/mv"
-  )
-
-  find "${work_dir}/package-states/" \
-    \( \
-      -name '*.done' -o \
-      -name '*.testing' -o \
-      -name '*.tested' \
-    \) \
-    -exec sed -i "${sed_apply_rm}" '{}' \;
-  find "${work_dir}/package-states/" \
-    -name '*.tested' \
-    -exec sed -i "${sed_apply_remove_part_of_mv}" '{}' \;
-  find "${work_dir}/package-states/" \
-    -name '*.done' \
-    -exec grep -qxF "$(cut -d' ' -f1 < "${tmp_dir}/mv")" '{}' \; \
-    -printf '%p\n' | \
-    while read -r sf; do
-      sed -i "$(
-        printf '%s\n' "${sed_apply_move_part_of_mv}" | \
-          sed '
-            s,%s,'"${sf%.done}.testing"',g
-          '
-      )" "${sf}"
-    done
-  find "${work_dir}/package-states/" \
-    \( \
-      -name '*.done' -o \
-      -name '*.testing' -o \
-      -name '*.tested' \
-    \) \
-    -type f \
-    -not -exec test -s '{}' \; \
-    -delete
 done
 
 trigger_mirror_refreshs

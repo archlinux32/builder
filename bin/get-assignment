@@ -18,16 +18,7 @@
 # TODO: honor manual build order of tool-chain:
 # toolchain build order: linux-api-headers->glibc->binutils->gcc->binutils->glibc
 
-mkdir -p "${work_dir}/package-states"
-
 hand_out_assignment() {
-
-  # we don't care anymore if an older version of this package was
-  # "locked" or "broken"
-  find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-    -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{3\}\.\(locked\|broken\)' \
-    -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4.")"'[^.]\+' \
-    -delete
 
   # move that build order to the end of the build-list
   sed -i '
@@ -57,21 +48,7 @@ hand_out_assignment() {
     printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
     printf ' LIMIT 1;\n'
-  } | \
-    mysql_run_query | \
-    tr '\t' ' '
 
-  {
-    # shellcheck disable=SC2154
-    echo "${slave}"
-    if [ -r "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-      cat "${work_dir}/package-states/$1.$2.$3.$4.locked"
-    fi
-  } | \
-    sort -u | \
-    sponge "${work_dir}/package-states/$1.$2.$3.$4.locked"
-  # shellcheck disable=SC2016
-  {
     printf 'UPDATE `build_slaves`'
     printf ' SET `currently_building` = ('
     printf ' SELECT `build_assignments`.`id`'
@@ -86,6 +63,7 @@ hand_out_assignment() {
     printf ' `upstream_repositories`.`name` = from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
     printf ')'
+    # shellcheck disable=SC2154
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"
 
@@ -101,7 +79,8 @@ hand_out_assignment() {
     printf ' `upstream_repositories`.`name` = from_base64("%s");\n' \
       "$(printf '%s' "$4" | base64 -w0)"
   } | \
-    mysql_run_query
+    mysql_run_query | \
+    tr '\t' ' '
 
   exit 0
 

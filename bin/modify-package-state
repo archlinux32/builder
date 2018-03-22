@@ -243,46 +243,8 @@ while read -r package reason; do
     {
       printf 'UPDATE %s SET %s %s' "${combiner}" "${modifier}" "${selector}"
       printf ';\n'
-      # TODO: remove the below part, once the database if fully functional
-      printf 'UPDATE `binary_packages` AS `a`'
-      printf ' JOIN `binary_packages` AS `b`'
-      printf ' ON `a`.`build_assignment`=`b`.`build_assignment`'
-      mysql_join_binary_packages_repositories 'b'
-      printf ' SET `b`.`is_tested`=1'
-      printf ' WHERE `a`.`is_tested`'
-      printf ' AND NOT `b`.`is_tested`'
-      printf ' AND NOT `repositories`.`name`="deletion-list";\n'
     } | \
       mysql_run_query
-    case "${action}" in
-      'block')
-        printf '%s' "${reason}" > \
-          "${work_dir}/package-states/${package}.blocked"
-      ;;
-      'unblock')
-        rm -f "${work_dir}/package-states/${package}.blocked"
-      ;;
-      'faulty')
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
-          -name '*.tested' \
-          -exec grep -lxF "${package}" '{}' \; | \
-          while read -r sf; do
-            mv "${sf}" "${sf%ed}ing"
-          done
-      ;;
-      'tested')
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 \
-          -name '*.testing' \
-          -exec grep -lxF "${package}" '{}' \; | \
-          while read -r sf; do
-            mv "${sf}" "${sf%ing}ed"
-          done
-      ;;
-      *)
-        >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
-        exit 42
-      ;;
-    esac
     printf '%s %s\n' "${action}" "${package}"
   fi
 done \

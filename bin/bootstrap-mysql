@@ -3,6 +3,10 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: this should become some sort of mysql dump to bootstrap the
+# tables and stored functions only - when the database is gone, we're
+# pretty much screwed anyway :-D
+
 tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
@@ -792,67 +796,11 @@ fi
 } | \
   mysql_run_query
 
-find "${work_dir}/package-states" \
-  -maxdepth 1 \
-  -mindepth 1 \
-  \( \
-    -name '*.done' -o \
-    -name '*.testing' -o \
-    -name '*.tested' \
-  \) \
-  -exec sed '
-    1!d
-    s@^.*-\([^-]\+\)-\([^-.]\+\)\.pkg\.tar\.xz$@{} \1 \2 \0@
-    s@^\S*/@@
-    s/^\(\S\+\)\.\(done\|testing\|tested\) /\1 /
-    s/ \([0-9]\+\) / \1.0 /
-    s/ [0-9]\+\.\([0-9]\+\) / \1 /
-  ' {} \; | \
-  while read -r state_file sub_pkgrel arch package_file; do
-    printf '%s ' "${state_file}"
-    repository=$(
-      grep '^\S\+ '"$(str_to_regex "${package_file}")"'$' "${tmp_dir}/master-mirror-listing" | \
-        cut -d' ' -f1
-    )
-    if [ "$(echo "${repository}" | grep -cx '\S\+')" -ne 1 ]; then
-      printf 'not found exactly once on the master mirror.\n'
-      >&2 printf '"%s"\n' "${state_file}" "${sub_pkgrel}" "${arch}" "${package_file}"
-      continue
-    fi
-    mysql_generate_package_metadata "${sub_pkgrel}" "${repository}" "${state_file}"
-    printf ' ok\n'
-  done
-
 tr ' ' '.' < \
   "${work_dir}/build-list" | \
   while read -r state_file; do
     mysql_generate_package_metadata 'build-list' "${state_file}"
   done
-
-# shellcheck disable=SC2016
-find "${work_dir}/package-states" -name '*.blocked' -printf '%p %f\n' | \
-  sed '
-    s|\.\([^. ]\+\)\.\([^. ]\+\)\.\([^. ]\+\)\.blocked$| \1 \2 \3|
-  ' | \
-  while read -r state_file pkgbase git_revision mod_git_revision repository; do
-    printf 'UPDATE `build_assignments`'
-    mysql_join_build_assignments_package_sources
-    mysql_join_package_sources_upstream_repositories
-    printf ' SET `build_assignments`.`is_blocked`=from_base64("%s")' \
-      "$(
-        tr -d '\n' < \
-          "${state_file}" | \
-          base64 -w0
-      )"
-    printf ' WHERE'
-    printf ' `package_sources`.`%s`=from_base64("%s") AND' \
-      'pkgbase'          "$(printf '%s' "${pkgbase}" |          base64 -w0)" \
-      'git_revision'     "$(printf '%s' "${git_revision}" |     base64 -w0)" \
-      'mod_git_revision' "$(printf '%s' "${mod_git_revision}" | base64 -w0)"
-    printf ' `upstream_repositories`.`name`=from_base64("%s");\n' \
-      "$(printf '%s' "${repository}" | base64 -w0)"
-  done | \
-  mysql_run_query
 
 grep '^\('"$(
   # shellcheck disable=SC2086

@@ -89,9 +89,6 @@ if [ "$5" = 'ERROR' ]; then
       '*.build-log.gz'
   )
 
-  # shellcheck disable=SC2154
-  echo "${slave}" >> \
-    "${work_dir}/package-states/$1.$2.$3.$4.broken"
   # shellcheck disable=SC2016
   {
     if [ -n "${saved_build_logs}" ]; then
@@ -161,23 +158,6 @@ if [ "$5" = 'ERROR' ]; then
       )"
   } | \
     mysql_run_query
-
-  # shellcheck disable=SC2154
-  sed -i '
-    /^'"$(str_to_regex "${slave}")"'$/d
-  ' "${work_dir}/package-states/$1.$2.$3.$4.locked"
-  if [ ! -s "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-    rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
-
-    # move that build order to the end of the build-list
-    sed -i '
-      /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
-        $ b
-        d
-      }
-      $ a '"$1 $2 $3 $4" \
-      "${work_dir}/build-list"
-  fi
 
   # release lock on build-list - otherwise seed-build-list won't run
   flock -u 9
@@ -517,24 +497,9 @@ for package in ${packages}; do
   remove_old_package_versions 'i686' "${destination}" "${package}"
 done
 
-# remove old state files (these should be only "done" markers, but
-# actually we don't care what it is) - as long as it's not "testing" or "tested"
-find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-  -not -name '*.testing' \
-  -not -name '*.tested' \
-  -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{4\}' \
-  -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4")"'\.[^.]\+' \
-  -exec rm '{}' \;
-
 # remove package from build list
 sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
 
-# remove package lock file
-if ! [ "${destination}" = 'build-support' ]; then
-  # shellcheck disable=SC2086
-  printf '%s\n' ${packages} > \
-    "${work_dir}/package-states/$1.$2.$3.$4.done"
-fi
 # shellcheck disable=SC2016
 {
   printf 'UPDATE `build_assignments`'
@@ -578,6 +543,3 @@ fi
   printf 'DROP TABLE `loops_to_delete`;\n'
 } | \
   mysql_run_query
-rm -f \
-  "${work_dir}/package-states/$1.$2.$3.$4.locked" \
-  "${work_dir}/package-states/$1.$2.$3.$4.broken"

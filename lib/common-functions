@@ -4,10 +4,6 @@
 
 # shellcheck disable=SC2039
 
-# TODO: have full information (currently in files) in database
-
-# TODO: remove state files
-
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
   . 'conf/default.conf'

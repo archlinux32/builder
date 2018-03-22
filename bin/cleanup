@@ -19,26 +19,6 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-# remove blocked/broken/locked markes of packages not on the buildlist anymore
-
-{
-  find "${work_dir}/package-states" -maxdepth 1 \( -name '*.broken' -o -name '*.locked' -o -name '*.blocked' \) -printf '%f\n' | \
-    sed '
-      s|^\(.*\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$|state \0 \1 \2 \3 \4 \5|
-    '
-  awk '{
-    print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4 " broken"
-    print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4 " blocked"
-    print "order " $1 "." $2 "." $3 "." $4 " " $1 " " $2 " " $3 " " $4 " locked"
-  }' "${work_dir}/build-list"
-} | \
-  sort -k3 | \
-  uniq -uf2 | \
-  grep '^state ' | \
-  awk '{print $2}' | \
-  sed "s|^|${work_dir}/package-states/|" | \
-  xargs -rn1 rm
-
 # remove logs where package is not broken/locked anymore
 
 {
