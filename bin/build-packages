@@ -7,9 +7,6 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: report back in regular intervals, so the build master can
-# abort if the package is outdated and/or someone else finished it.
-
 # TODO: build other 'architectures', too (pentium4, i486)
 
 # shellcheck disable=SC2016
