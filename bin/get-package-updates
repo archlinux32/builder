@@ -110,7 +110,6 @@ delete_package() {
   } | \
     mysql_run_query >> \
     "${work_dir}/deletion-list.new"
-  sed -i "/^$(str_to_regex "${1}") /d" "${work_dir}/build-list.new"
   # TODO: Once we want to rely on the database for test_exclusion, we
   # need to run the command below unconditionally, but with some
   # changes, so we can easily revert.
@@ -202,9 +201,6 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a new package is added, then ensure that it's not on the deletion list.
 
 cp \
-  "${work_dir}/build-list" \
-  "${work_dir}/build-list.new"
-cp \
   "${work_dir}/deletion-list" \
   "${work_dir}/deletion-list.new"
 
@@ -223,26 +219,9 @@ for repo in ${repo_names}; do
       git -C "${repo_path}" diff --no-renames --name-status "${old_repo_revision}" "${new_repo_revision}"
     fi
   } | \
-    # Packages which are already on the build list should receive a git_revision bump if _any_ file changed.
-    # Thus, we rename any file "PKGBUILD" to trigger the successive logic.
-    if [ "${repo}" = 'archlinux32' ]; then
-      sed "$(
-        sed '
-          s/ .*$//
-          s|^|\\@^.\\t[^/]\\+/|
-          s|$|/@ s@/[^/]*$@/PKGBUILD@|
-        ' "${work_dir}/build-list"
-      )"
-    else
-      sed "$(
-        sed '
-          s/ .*$//
-          s|^|\\@^.\\t|
-          s|$|/@ s@/[^/]*$@/PKGBUILD@|
-        ' "${work_dir}/build-list"
-      )"
-    fi | \
     # only track changes in PKGBUILDs
+    # TODO: However, packages which are already on the build list should
+    # receive a git_revision bump if _any_ file changed.
     grep '/PKGBUILD$' | \
     if [ "${repo}" = "archlinux32" ]; then
     # modify the directory structure from the modifiaction-repository
@@ -312,11 +291,6 @@ done | \
       fi
     fi
     if [ "${mode}" = 'A' ] || [ "${mode}" = 'M' ]; then
-      # new or modified PKGBUILD
-      sed -i "/^$(str_to_regex "${package}") /d" "${work_dir}/build-list.new"
-      # shellcheck disable=SC2154
-      echo "${package} ${git_revision} ${new_repo_revisions__archlinux32} ${repository}" >> \
-        "${work_dir}/build-list.new"
       sed -i "/^$(str_to_regex "${package}")\$/d" "${work_dir}/deletion-list.new"
       # shellcheck disable=SC2016
       {
@@ -346,6 +320,7 @@ done | \
           )"
       } | \
         mysql_run_query
+      # shellcheck disable=SC2154
       mysql_generate_package_metadata 'to-be-decided' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       continue
     fi
@@ -530,7 +505,7 @@ mysql_find_build_assignment_loops
 # Move the .new-files to the actual files
 
 {
-  printf '%s\n' "build-list" "deletion-list"
+  printf '%s\n' "deletion-list"
   # shellcheck disable=SC2086
   printf '%s.revision\n' ${repo_names}
 } | \

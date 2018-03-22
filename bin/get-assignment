@@ -20,15 +20,6 @@
 
 hand_out_assignment() {
 
-  # move that build order to the end of the build-list
-  sed -i '
-    /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
-      $ b
-      d
-    }
-    $ a '"$1 $2 $3 $4" \
-    "${work_dir}/build-list"
-
   # shellcheck disable=SC2016
   {
     printf 'SELECT '

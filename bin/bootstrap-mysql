@@ -796,12 +796,6 @@ fi
 } | \
   mysql_run_query
 
-tr ' ' '.' < \
-  "${work_dir}/build-list" | \
-  while read -r state_file; do
-    mysql_generate_package_metadata 'build-list' "${state_file}"
-  done
-
 grep '^\('"$(
   # shellcheck disable=SC2086
   printf '%s\\|' ${standalone_package_repositories} ${stable_package_repositories}
