@@ -17,7 +17,8 @@ if ( ! $result = $mysql -> query(
   "FROM `build_assignments` " .
   "JOIN `architectures` ON `build_assignments`.`architecture`=`architectures`.`id` " .
   "JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id` " .
-  "WHERE `build_assignments`.`is_black_listed` IS NOT NULL")) {
+  "WHERE `build_assignments`.`is_black_listed` IS NOT NULL " .
+  "ORDER BY `package_sources`.`pkgbase`")) {
   die($mysql->error);
 }
 if ($result -> num_rows > 0) {
