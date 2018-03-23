@@ -176,7 +176,7 @@ if [ "$5" = 'ERROR' ]; then
         ' | \
         tr ' ' '\n' | \
         sed '
-          s/^/-p ^\\(haskell-\\)\\?/
+          s/^/-p ^(haskell-)?/
           s/-[0-9.]\+$/\$/
         ' | \
         sort -u
