@@ -88,7 +88,7 @@ if [ ! "$1" = 'slim' ]; then
       ' package_source BIGINT :package_sources' \
       ' architecture SMALLINT :architectures' \
       ' is_blocked VARCHAR(128) NULL' \
-      ' is_black_listed VARCHAR(128) NULL' \
+      ' is_black_listed TEXT NULL' \
       ' is_broken BIT' \
       ' priority SMALLINT' \
       ' UNIQUE content package_source architecture' \
