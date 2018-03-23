@@ -1,5 +1,10 @@
 <?php
 
+if (isset($_GET["from"]))
+  $min_time="from_base64(\"" . base64_encode("-".$_GET["from"]) . "\")";
+else
+  $min_time="\"-7 00:00:00\"";
+
 $mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
 if ($mysql->connect_error) {
   die("Connection failed: " . $mysql->connect_error);
@@ -19,7 +24,7 @@ if (! $result = $mysql -> query(
     "`statistics`.`blocked_tasks_count`," .
     "`statistics`.`next_tasks_count`" .
     "FROM `statistics` " .
-    "WHERE `statistics`.`date`>=ADDTIME(NOW(),\"-7 00:00:00\") " .
+    "WHERE `statistics`.`date`>=ADDTIME(NOW()," . $min_time . ") " .
     "ORDER BY `statistics`.`date`"
   ))
   die($mysql->error);
