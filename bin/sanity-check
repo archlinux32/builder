@@ -119,13 +119,25 @@ while [ $# -gt 0 ]; do
       for repo in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repo}"'}"'
         repo_revision=$(
-          cat "${work_dir}/${repo}.revision"
+          # shellcheck disable=SC2016
+          {
+            printf 'SELECT `git_repositories`.`head` FROM `git_repositories`'
+            printf ' WHERE `git_repositories`.`name`=from_base64("%s");\n' \
+              "$(printf '%s' "${repo}" | base64 -w0)"
+          } | \
+            mysql_run_query
         )
-        if ! git -C "${repo_path}" archive "${repo_revision}" -- | \
-          tar -t > /dev/null; then
+        if ! obj_type=$(git -C "${repo_path}" cat-file -t "${repo_revision}" 2>/dev/null); then
           if [ ${silence} -le 1 ]; then
-            printf '\nThe repository %s (%s) cannot archive the current revision %s.\n' \
+            printf '\nThe repository %s (%s) does not know the current revision %s.\n' \
               "${repo}" "${repo_path}" "${repo_revision}" >> \
+              "${tmp_dir}/messages"
+          fi
+          i_am_insane
+        elif [ "${obj_type}" != 'commit' ]; then
+          if [ ${silence} -le 1 ]; then
+            printf '\nThe repository %s (%s) knows the current revision %s, but it is not a commit, but a %s.\n' \
+              "${repo}" "${repo_path}" "${repo_revision}" "${obj_type}" >> \
               "${tmp_dir}/messages"
           fi
           i_am_insane
