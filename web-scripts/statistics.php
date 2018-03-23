@@ -1,54 +1,49 @@
 <?php
 
-$columns = array(
-  'stable',
-  'tasks',
-  'pending_packages',
-  'staging',
-  'testing',
-  'broken',
-  'loops',
-  'looped_packages',
-  'locked',
-  'blocked',
-  'next_pending',
-  'tested'
-);
+if (isset($_GET["from"]))
+  $min_time="from_base64(\"" . base64_encode("-".$_GET["from"]) . "\")";
+else
+  $min_time="\"-7 00:00:00\"";
 
-$print_columns = array(
-  'tasks',
-  'pending_packages',
-  'staging',
-  'testing',
-  'tested',
-  'broken',
-  'loops',
-  'looped_packages',
-  'locked',
-  'blocked',
-  'next_pending'
-);
+$mysql = new mysqli("localhost", "webserver", "empty", "buildmaster");
+if ($mysql->connect_error) {
+  die("Connection failed: " . $mysql->connect_error);
+}
+if (! $result = $mysql -> query(
+    "SELECT DISTINCT ".
+    "UNIX_TIMESTAMP(`statistics`.`date`) AS `date`," .
+    "`statistics`.`pending_tasks_count`," .
+    "`statistics`.`pending_packages_count`," .
+    "`statistics`.`staging_packages_count`," .
+    "`statistics`.`testing_packages_count`," .
+    "`statistics`.`tested_packages_count`," .
+    "`statistics`.`broken_tasks_count`," .
+    "`statistics`.`dependency_loops_count`," .
+    "`statistics`.`dependency_looped_tasks_count`," .
+    "`statistics`.`locked_tasks_count`," .
+    "`statistics`.`blocked_tasks_count`," .
+    "`statistics`.`next_tasks_count`" .
+    "FROM `statistics` " .
+    "WHERE `statistics`.`date`>=ADDTIME(NOW()," . $min_time . ") " .
+    "ORDER BY `statistics`.`date`"
+  ))
+  die($mysql->error);
 
 $t_min = -1;
 $t_max = -1;
 $val_max = -1;
 
-foreach (explode("\n",trim(file_get_contents('/srv/http/statistics'))) as $val) {
-  $val = explode(" ",$val);
-  if (($t_min == -1) || ($t_min > $val[0]))
-    $t_min = $val[0];
-  if (($t_max == -1) || ($t_max < $val[0]))
-    $t_max = $val[0];
-  foreach ($columns as $id => $column) {
-    if (count($val) > $id+1)
-      $values[$column][$val[0]] = $val[$id+1];
-  };
-  foreach ($print_columns as $column) {
-    if (array_key_exists($column,$values))
-      if (($val_max == -1) || ($val_max < $values[$column][$val[0]]))
-        $val_max = $values[$column][$val[0]];
-  }
+while($vals = $result->fetch_assoc()) {
+  if ($t_min == -1)
+    $t_min = $vals["date"];
+  $t_max = $vals["date"];
+  foreach ($vals as $column => $val)
+    if ($column != "date") {
+      $values[$column][$vals["date"]] = $val;
+      $val_max = max($val_max,$val);
+    }
 };
+$print_columns = array_keys($values);
 
 $max_len = 0;
 foreach ($print_columns as $column) {
@@ -61,7 +56,7 @@ $width = 1600;
 $height = 600;
 $border = 5;
 $legend_line_length = 10;
-$legend_height = 3 * ImageFontHeight(5) + $legend_line_length;
+$legend_height = 4 * ImageFontHeight(5) + $legend_line_length;
 
 $im = @ImageCreate ($width + $legend_line_length + $max_len * ImageFontWidth(5), $height + $legend_height)
       or die ("Cannot create new gd-image-stream");
@@ -69,18 +64,18 @@ $im = @ImageCreate ($width + $legend_line_length + $max_len * ImageFontWidth(5),
 $background_color = ImageColorAllocate ($im, 255, 255, 255);
 $foreground_color = ImageColorAllocate ($im, 0, 0, 0);
 
-$colors['stable'] = ImageColorAllocate ($im, 0, 0, 0);
-$colors['tasks'] = ImageColorAllocate ($im, 0, 0, 128);
-$colors['pending_packages'] = ImageColorAllocate ($im, 0, 0, 255);
-$colors['staging'] = ImageColorAllocate ($im, 0, 100, 0);
-$colors['testing'] = ImageColorAllocate ($im, 0, 200, 0);
-$colors['tested'] = ImageColorAllocate ($im, 100, 255, 0);
-$colors['broken'] = ImageColorAllocate ($im, 255, 0, 0);
-$colors['loops'] = ImageColorAllocate ($im, 128, 128, 0);
-$colors['looped_packages'] = ImageColorAllocate ($im, 255, 128, 128);
-$colors['locked'] = ImageColorAllocate ($im, 128, 128, 128);
-$colors['blocked'] = ImageColorAllocate ($im, 128, 0, 0);
-$colors['next_pending'] = ImageColorAllocate ($im, 0, 255, 255);
+$colors['stable_packages_count'] = ImageColorAllocate ($im, 0, 0, 0);
+$colors['pending_tasks_count'] = ImageColorAllocate ($im, 0, 0, 128);
+$colors['pending_packages_count'] = ImageColorAllocate ($im, 0, 0, 255);
+$colors['staging_packages_count'] = ImageColorAllocate ($im, 0, 100, 0);
+$colors['testing_packages_count'] = ImageColorAllocate ($im, 0, 200, 0);
+$colors['tested_packages_count'] = ImageColorAllocate ($im, 100, 255, 0);
+$colors['broken_tasks_count'] = ImageColorAllocate ($im, 255, 0, 0);
+$colors['dependency_loops_count'] = ImageColorAllocate ($im, 128, 128, 0);
+$colors['dependency_looped_tasks_count'] = ImageColorAllocate ($im, 255, 128, 128);
+$colors['locked_tasks_count'] = ImageColorAllocate ($im, 128, 128, 128);
+$colors['blocked_tasks_count'] = ImageColorAllocate ($im, 128, 0, 0);
+$colors['next_tasks_count'] = ImageColorAllocate ($im, 0, 255, 255);
 
 function scale($x, $x_min, $x_max, $scale, $log) {
   if ($log) {
@@ -128,13 +123,13 @@ function print_graph($data, $color) {
 
 ImageRectangle($im, $legend_line_length, 0, $width-1+$legend_line_length, $height-1, $foreground_color);
 
-ImageString($im, 5, $legend_line_length, $height + $legend_line_length + 2*ImageFontHeight(5), "( ".trim(shell_exec("uptime | sed 's|^.*\\s\\(load\\)|\\1|'"))." )", $foreground_color);
+ImageString($im, 5, $legend_line_length, $height + 2*$legend_line_length + 2*ImageFontHeight(5), "( ".trim(shell_exec("uptime | sed 's|^.*\\s\\(load\\)|\\1|'"))." )", $foreground_color);
 
 $xpos = $legend_line_length;
 foreach ($print_columns as $column) {
   print_graph($values[$column], $colors[$column]);
-  ImageString($im, 5, $xpos, $height + $legend_line_length + ImageFontHeight(5), $column, $colors[$column]);
-  $xpos += (strlen($column) + 1.75) * ImageFontWidth(5);
+  ImageString($im, 5, $xpos, $height + $legend_line_length + ImageFontHeight(5), substr($column,0,-strlen("_count")), $colors[$column]);
+  $xpos += (strlen($column) - strlen("_count") + 1.75) * ImageFontWidth(5);
 }
 
 ImageString($im, 5, $legend_line_length, $height + $legend_line_length, date('Y-m-d H:i', $t_min), $foreground_color);
@@ -173,7 +168,5 @@ for ($val=0; $val<=$val_max;) {
 header ("Content-type: image/png");
 
 ImagePNG ($im);
-
-// passthru('wc -l /srv/http/statistics');
 
 ?>

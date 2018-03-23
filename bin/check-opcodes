@@ -101,7 +101,7 @@ log "Checking for architecture: $ARCH ($OPCODE_ARGS)"
 bsdtar --no-fflags -x -C $tmp_dir -f $PACKAGE
 
 # shellcheck disable=SC2044
-for absfile in $(find $tmp_dir -name '*.so*' -type f); do
+for absfile in $(find $tmp_dir -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -type f); do
 	file=$(basename $absfile)
 	log "Checking shared library: $file"
 	readelf -a $absfile > $tmp_dir/$file.elf

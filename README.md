@@ -5,10 +5,18 @@ This includes scripts to be run on the build master as well as scripts to be run
 ## requirements
 * `moreutils`
 ### build master only
-* some ssh-server
-* `git`
-* `pkgbuild-introspection`
+* `base-devel`
 * `bc`
+* `git`
+* `graphviz`
+* `ii`
+* some mysql-server
+* `nginx` or equivalent
+* `php-gd`
+* `php-fpm` or quivalent
+* `rsync`
+* `screen`
+* some ssh-server
 ### build slave only
 * some ssh-client
 * `wget`

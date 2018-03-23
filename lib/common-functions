@@ -2,13 +2,22 @@
 
 # contains functions used by more than one script
 
-# TODO: include link depenendencies in run-depends metadata
-
 # shellcheck disable=SC2039
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
   . 'conf/default.conf'
+fi
+
+if [ ! -s "${work_dir}/build-master-sanity" ]; then
+  {
+    date
+    printf 'sourcing common-functions for %s\n' "$0"
+    printf '%s parameters:' "$#"
+    printf ' "%s"' "$@"
+    printf '\n'
+  } >> \
+    "${work_dir}/command-log"
 fi
 
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision
@@ -79,262 +88,25 @@ find_repository_with_commit() {
 find_git_repository_to_package_repository() {
 
   local repository
-  local package_repository
-  local repo_path
 
-  package_repository="$1"
-
-  if [ "$1" = 'build-support' ]; then
-    echo 'packages'
-    return 0
-  fi
-
-  for repository in ${repo_names}; do
-    if [ "${repository}" = "archlinux32" ]; then
-      continue
-    fi
-    eval 'repo_path="${repo_paths__'"${repository}"'}"'
-    if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- | \
-      tar -t --wildcards '*/repos' | \
-      grep '^\([^/]\+/\)\{3\}PKGBUILD$' | \
-      cut -d/ -f3 | \
-      sed 's|-[^-]\+$||' | \
-      sort -u | \
-      grep -qxF "${package_repository}"; then
-      echo "${repository}"
-      return 0
-    fi
-  done
-  >&2 echo "can't find git repository with package repository '$1'"
-  exit 1
-
-}
-
-# generate_package_metadata $package $git_revision $mod_git_revision $repository
-# or
-# generate_package_metadata $package.$git_revision.$mod_git_revision.$repository
-# generate the meta data files of a package (dependencies, built packages, ...)
-
-generate_package_metadata() {
-
-  local package="$1"
-  local git_revision="$2"
-  local mod_git_revision="$3"
-  local repository="$4"
-  local file_prefix
-  local file
-  local PKGBUILD
-
-  if [ $# -eq 1 ]; then
-    # second form
-    repository="${package##*.}"
-    package="${package%.*}"
-    mod_git_revision="${package##*.}"
-    package="${package%.*}"
-    git_revision="${package##*.}"
-    package="${package%.*}"
-  fi
-
-  file_prefix="${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}"
-
-  if [ -e "${file_prefix}.builds" ] && \
-    [ -e "${file_prefix}.build-depends" ] && \
-    [ -e "${file_prefix}.run-depends" ] && \
-    [ -e "${file_prefix}.groups" ] && \
-    [ -e "${file_prefix}.packages" ]; then
-    return 0
-  fi
-
-  if ! make_source_info "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${file_prefix}.SRCINFO"; then
-    printf '"make_source_info %s %s %s %s %s" failed.\n' "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${file_prefix}.SRCINFO"
-    exit 1
-  fi
-  if [ ! -s "${file_prefix}.SRCINFO" ]; then
-    >&2 printf '"%s" not created by "make_source_info" - eh, what?' "${file_prefix}.SRCINFO"
-    exit 1
-  fi
-
-  # otherwise this just calls for trouble
-  sed -i '
-    /^[^=]*=\s*$/d
-    s/_i686\(\s*=\)/\1/
-  ' "${file_prefix}.SRCINFO"
-
-  # extract "groups" = groups \cup provides
-  grep "$(printf '^\t\\(groups\\|provides\\) = ')" "${file_prefix}.SRCINFO" | \
-    cut -d= -f2 | \
-    sed 's|^\s\+||; s|[<>]$||' | \
-    sort -u > \
-    "${file_prefix}.groups"
-
-  # extract "packages" = pkgname
-  grep '^pkgname = ' "${file_prefix}.SRCINFO" | \
-    cut -d= -f2 | \
-    sed 's|^\s\+||; s|[<>]$||' | \
-    sort -u > \
-    "${file_prefix}.packages"
-
-  # extract "builds" = provides \cup pkgname \cup groups
-  cat "${file_prefix}.groups" "${file_prefix}.packages" | \
-    sort -u > \
-    "${file_prefix}.builds"
-
-  # extract "build-depends" = makedepends \cup checkdepends \cup depends \cup \{ base, base-devel \} \setminus "builds"
-  {
+  repository=$(
+    # shellcheck disable=SC2016
     {
-      printf 'all_depend = %s\n' 'base' 'base-devel'
-      sed -n "$(
-        printf '/^\t%s = /p\n' \
-          'depends' \
-          'makedepends' \
-          'checkdepends'
-      )" "${file_prefix}.SRCINFO"
+      printf 'SELECT `git_repositories`.`name` FROM `git_repositories`'
+      mysql_join_git_repositories_upstream_repositories
+      printf ' WHERE `upstream_repositories`.`name`=from_base64("%s");\n' \
+        "$(printf '%s' "$1" | base64 -w0)"
     } | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u
-    sed 'p' "${file_prefix}.builds"
-  } | \
-    sort | \
-    uniq -u > \
-    "${file_prefix}.build-depends"
-
-  # extract "run-depends" = depends \cup \{ base \} \setminus "builds"
-  {
-    {
-      printf 'all_depend = %s\n' 'base'
-      sed -n "$(printf '/^\tdepends = /p')" "${file_prefix}.SRCINFO"
-    } | \
-      cut -d= -f2 | \
-      sed 's|^\s\+||; s|[<>]$||' | \
-      sort -u
-    sed 'p' "${file_prefix}.builds"
-  } | \
-    sort | \
-    uniq -u > \
-    "${file_prefix}.run-depends"
-
-  rm "${file_prefix}.SRCINFO"
-
-}
-
-# delete_old_metadata
-# delete old (=unneeded) meta data of packages
-
-delete_old_metadata() {
-
-  local current_metadata
-
-  current_metadata=$(
-    find "${work_dir}/package-infos" -mindepth 1 -maxdepth 1 -printf '%f\n' | \
-      sed '
-        s|\.[^.]\+$||
-        s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
-      ' | \
-      sort -u
+      mysql_run_query
   )
+  if [ -z "${repository}" ]; then
+    >&2 echo "can't find git repository with package repository '$1'"
+    exit 1
+  else
+    echo "${repository}"
+    return 0
+  fi
 
-  ( # the new shell is intentional
-    # what we have
-    echo "${current_metadata}"
-
-    # package-states should stay
-    find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -printf '%f\n' | \
-      sed '
-        s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
-      ' | \
-      sort -u | \
-      sed 'p'
-
-    # build-list items should stay
-    sed 'p' "${work_dir}/build-list"
-
-    tmp_dir=$(mktemp -d 'tmp.common-functions.delete_old_metadata.XXXXXXXXXX' --tmpdir)
-    trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-
-    echo "${current_metadata}" | \
-      sort -k1,1 > \
-      "${tmp_dir}/current-metadata"
-
-    # the newest of the following should stay:
-    {
-      # deletion-list items
-      cat "${work_dir}/deletion-list"
-      # all packages in the repos
-      for repo in ${repo_names}; do
-        eval 'git -C "${repo_paths__'"${repo}"'}" archive '"$(cat "${work_dir}/${repo}.revision")" | \
-          tar -t | \
-          sed '
-            s|/$||
-            /\//d
-          '
-      done
-    } | \
-      sort -u | \
-      join -j 1 -o 2.2,2.3,2.4,2.1 - "${tmp_dir}/current-metadata" | \
-      sort -k4,4 > \
-      "${tmp_dir}/find-newest-revisions"
-
-    uniq -uf3 < \
-      "${tmp_dir}/find-newest-revisions" | \
-      awk '{print $4 " " $1 " " $2 " " $3}' | \
-      sed 'p'
-
-    uniq -Df3 < \
-      "${tmp_dir}/find-newest-revisions" | \
-      uniq --group=append -f3 | \
-      {
-        revs=''
-        mod_revs=''
-        opkg=''
-        orepo=''
-        while read -r rev mod_rev repo pkg; do
-
-          if [ -z "${rev}" ] && \
-            [ -z "${mod_rev}" ] && \
-            [ -z "${repo}" ] && \
-            [ -z "${pkg}" ]; then
-
-            printf '%s %s %s %s\n' \
-              "$(
-                printf '%s\n' ${revs} | \
-                  find_newest_of_git_revisions
-              )" \
-              "$(
-                printf '%s\n' ${mod_revs} | \
-                  find_newest_of_git_revisions
-              )" \
-              "${orepo}" \
-              "${opkg}"
-
-            revs=''
-            mod_revs=''
-            orepo=''
-            opkg=''
-            continue
-          fi
-          revs=$(
-            # shellcheck disable=SC2086
-            printf '%s\n' ${revs} ${rev} | \
-              sort -u
-          )
-          mod_revs=$(
-            # shellcheck disable=SC2086
-            printf '%s\n' ${mod_revs} ${mod_rev} | \
-              sort -u
-          )
-          orepo="${repo}"
-          opkg="${pkg}"
-        done
-      } | \
-      awk '{print $4 " " $1 " " $2 " " $3}' | \
-      sed 'p'
-  ) | \
-    sort | \
-    uniq -u | \
-    while read -r pkg rev mod_rev repo; do
-      rm -f "${work_dir}/package-infos/${pkg}.${rev}.${mod_rev}.${repo}."*
-    done
 }
 
 # repository_of_package $package.$repo_revision.$mod_repo_revision.$repository
@@ -365,7 +137,7 @@ repository_of_package() {
 # official_or_community $package.$repo_revision.$mod_repo_revision.$repository $ending
 # print wether the specified package is an official package (print
 # $ending) or a community package (print 'community-$ending') or a
-# build-suppor package (print 'build-support')
+# build-support package (print 'build-support')
 
 official_or_community() {
   local prepo
@@ -394,6 +166,9 @@ ls_master_mirror() {
 
 }
 
+# TODO: the actions of remove_old_package_versions should be done
+# on basis of the information in the database
+
 # remove_old_package_versions $arch $repository $package_file
 
 # removes all older (not-newer) versions of $package_file
@@ -416,6 +191,84 @@ remove_old_package_versions() {
   local arch="$1"
   local repository="$2"
   local package="$3"
+
+  local pkgname
+  local epoch
+  local pkgver
+  local pkgrel
+  local sub_pkgrel
+  pkgname="${package%-*}"
+  pkgrel="${pkgname##*-}"
+  sub_pkgrel="${pkgrel##*.}"
+  if [ "${sub_pkgrel}" = "${pkgrel}" ]; then
+    sub_pkgrel='0'
+  else
+    pkgrel="${pkgrel%.*}"
+  fi
+  pkgname="${pkgname%-*}"
+  pkgver="${pkgname##*-}"
+  epoch="${pkgver%%:*}"
+  if [ "${epoch}" = "${pkgver}" ]; then
+    epoch='0'
+  else
+    pkgver="${pkgver#*:}"
+  fi
+  pkgname="${pkgname%-*}"
+
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT "bogus",CONCAT(from_base64("%s"),"/",from_base64("%s")),1,from_base64("%s");\n' \
+      "$(
+        printf '%s' "${repository}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${package}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${package}" | \
+          sed '
+            s/^.*-\([^-]\+-[^-]\+\)-[^-]\+$/\1/
+          ' | \
+          base64 -w0
+      )"
+    printf 'SELECT '
+    printf '`binary_packages`.`id`,'
+    printf 'CONCAT(`repositories`.`name`,"/",'
+    mysql_package_name_query
+    printf '),'
+    # should we delete packages of identical version?
+    printf 'IF((`more_stable_repos`.`id`!=`repositories`.`id`) AND (`more_stable_repos`.`stability`=`repositories`.`stability`),2,0),'
+    printf 'CONCAT('
+      printf 'IF(`binary_packages`.`epoch`=0,"",CONCAT(`binary_packages`.`epoch`,":")),'
+      printf '`binary_packages`.`pkgver`,"-",'
+      printf '`binary_packages`.`pkgrel`,".",'
+      printf '`binary_packages`.`sub_pkgrel`'
+    printf ')'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_architectures
+    printf ' JOIN `repository_stability_relations` ON `repository_stability_relations`.`less_stable`=`repositories`.`stability`'
+    printf ' JOIN `repositories` AS `more_stable_repos` ON `repository_stability_relations`.`more_stable`=`more_stable_repos`.`stability`'
+    # name must match
+    printf ' WHERE `binary_packages`.`pkgname`=from_base64("%s")' \
+      "$(printf '%s' "${package%-*-*-*}" | base64 -w0)"
+    # repository, where package should be deleted, should be less stable
+    printf ' AND `more_stable_repos`.`name`=from_base64("%s")' \
+      "$(printf '%s' "${repository}" | base64 -w0)"
+    printf ';\n'
+  } | \
+    mysql_run_query | \
+    tr '\t' ' ' | \
+    expand_version 4 | \
+    sort -k4V,4 -k3r,3 | \
+    shrink_version 4 | \
+    sed -n '
+      /^bogus /q
+      p
+    ' | \
+    cut -d' ' -f1,2 >&2
 
   # repositories in which older packages should be deleted
   local delete_older_repositories
@@ -582,7 +435,7 @@ remove_old_package_versions() {
           sed 's/ AND$//'
         printf ';\n'
       done | \
-      ${mysql_command}
+      mysql_run_query
 
     sed '
       s| \(\S\+\)$|-\1|
@@ -815,6 +668,7 @@ find_package_repository_to_package() {
 extract_source_directory() {
 
   local git_repo="$1"
+  # shellcheck disable=SC2034
   local rev="$2"
   local mod_rev="$3"
   local output="$4"
@@ -834,39 +688,18 @@ extract_source_directory() {
       "${output}/PKGBUILD"
   fi
 
+  # we do not want to update pkgver, so we just undefine it
+  printf 'unset -f pkgver\n' >> \
+    "${output}/PKGBUILD"
+
   mangle_pkgbuild "${output}/PKGBUILD" "${sub_pkgrel}"
 
   # shellcheck disable=SC2016
   sed -i '/^\$Id\$$/d' "${output}/PKGBUILD"
 
-}
-
-# find_dependencies_on_build_list $package $git_revision $mod_git_revision $repository
-# return a list of packages on the build list which are (run- / build- / check-time)
-# dependencies of the given package
-
-find_dependencies_on_build_list() {
-
-  local package="$1"
-  local git_revision="$2"
-  local mod_git_revision="$3"
-  local repository="$4"
-
-  generate_package_metadata "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-
-  {
-    cat "${work_dir}/package-infos/${package}.${git_revision}.${mod_git_revision}.${repository}.build-depends"
-    awk '{print $1 "." $2 "." $3 "." $4}' < \
-      "${work_dir}/build-list" | \
-      sed '
-        s|^|'"${work_dir}"'/package-infos/|
-        s|$|\.builds|
-      ' | \
-      xargs -r cat | \
-      sort -u
-  } | \
-    sort | \
-    uniq -d
+  # we don't want write permissions on the PKGBUILD - otherwise pkgver()
+  # will change the version! (**HACK**)
+  chmod -w "${output}/PKGBUILD"
 
 }
 
@@ -969,133 +802,6 @@ shrink_version() {
   '
 }
 
-# find_biggest_subset_of_packages $omega $keep $all_builds $all_depends [ $force ]
-
-# Return (to stdout) the biggest subset A of the packages in $omega whose
-# runtime dependencies in $omega \cup $keep are also in A
-
-# $all_builds and $all_depends either point to an empty file - then they will get
-# filled with cached data for subsequent calls - or to the same files of a previous
-# call
-
-# If non-empty, $force contains packages which are assumed to match the above
-# condition without checking.
-
-# The arguments are names of files with one $package.$revision.$mod_revision.$repository
-# per line.
-
-find_biggest_subset_of_packages() {
-
-  ( # the new shell is intentional
-    omega="$1"
-    keep="$2"
-    all_builds="$3"
-    all_depends="$4"
-    if [ $# -eq 4 ]; then
-      force='/dev/null'
-    elif [ $# -eq 5 ]; then
-      force="$5"
-    else
-      >&2 printf 'find_biggest_subset_of_packages: Wrong number of arguments: %s given, 4 or 5 expected.' "$#"
-      return 2
-    fi
-
-    if [ ! -s "${all_builds}" ]; then
-      find "${work_dir}/package-infos/" -maxdepth 1 -name '*.builds' \
-        -exec sed '
-          s|^|{} |
-          s|^\S\+/||
-          s|\.builds | |
-        ' {} \; | \
-        sort -k2,2 > \
-        "${all_builds}"
-    fi
-
-    if [ ! -s "${all_depends}" ]; then
-      find "${work_dir}/package-infos/" -maxdepth 1 -name '*.run-depends' \
-        -exec sed '
-          s|^|{} |
-          s|^\S\+/||
-          s|\.run-depends | |
-        ' {} \; | \
-        grep -v ' base$' | \
-        sort -k2,2 > \
-        "${all_depends}"
-    fi
-
-    sort -u "${omega}" | \
-      sponge "${omega}"
-
-    temp_dir=$(mktemp -d 'tmp.common-functions.find_biggest_subset_of_packages.XXXXXXXXXX' --tmpdir)
-    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
-
-    {
-      sort -u "${keep}"
-      cat "${force}" "${force}"
-    } | \
-      sort | \
-      uniq -u > \
-      "${temp_dir}/keep.new"
-    touch "${temp_dir}/keep"
-
-    while [ -s "${temp_dir}/keep.new" ]; do
-      cat "${temp_dir}/keep.new" "${temp_dir}/keep" | \
-        sort -u | \
-        sponge "${temp_dir}/keep"
-
-      {
-        # we append all packages which are run-dependencies of keep-packages
-        # to the keep-list
-        sed '
-          s|^|'"${work_dir}"'/package-infos/|
-          s|$|.run-depends|
-        ' "${temp_dir}/keep" | \
-          xargs -r grep -HF '' | \
-          sed '
-            s|^.*/||
-            s|\.run-depends:| |
-          ' | \
-          sort -u | \
-          sort -k2,2 | \
-          uniq -f1 | \
-          join -1 2 -2 2 -o 2.1 - "${all_builds}"
-
-        # we append all packages with run-dependencies on the keep-list
-        # to the keep-list
-        sed '
-          s|^|'"${work_dir}"'/package-infos/|
-          s|$|.builds|
-        ' "${temp_dir}/keep" | \
-          xargs -r grep -HF '' | \
-          sed '
-            s|^.*/||
-            s|\.builds:| |
-          ' | \
-          sort -u | \
-          sort -k2,2 | \
-          uniq -f1 | \
-          join -1 2 -2 2 -o 2.1 - "${all_depends}"
-      } | \
-        sort -u | \
-        join -1 1 -2 1 -o 2.1 - "${omega}" | \
-        sort -u > \
-        "${temp_dir}/keep.new"
-
-      # "new" is only what has not been there before and what is not forced
-      cat "${temp_dir}/keep" "${temp_dir}/keep" "${force}" "${force}" "${temp_dir}/keep.new" | \
-        sort | \
-        uniq -u | \
-        sponge "${temp_dir}/keep.new"
-    done
-
-    cat "${omega}" "${temp_dir}/keep" "${temp_dir}/keep" | \
-      sort | \
-      uniq -u
-
-  )
-
-}
-
 # sort_square_bracket_content $file
 # sort the content of [] in $file, print to stdout
 
@@ -1168,167 +874,6 @@ smoothen_namcap_log() {
     sponge "${file}"
 }
 
-# print_list_of_archaic_packages $source1 $source2 ...
-# print a list of packages which have not been touched for a while,
-# but which are still in the pipeline, e.g. in $source1, $source2 or ...
-
-print_list_of_archaic_packages() {
-  for source in "$@"; do
-    case "${source}" in
-      'testing')
-        # packages remaining longer than $max_package_age_testing days in testing will be marked tested if no bug for them exists on FS32
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_testing}" \
-          -exec head -n1 {} \; | \
-          "${base_dir}/bin/modify-package-state" -n --tested /dev/stdin
-        # packages remaining longer than $max_package_age_broken_testing days in testing (w/o being tested!) will be considered outdated
-        # and no longer block other packages from being moved
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.testing' -mtime "+${max_package_age_broken_testing}" -printf '%f\n' | \
-          sed '
-            s|\.testing$||
-          '
-      ;;
-      'build-list')
-        while read -r pkg rev mod_rev repo; do
-          git_repo=$(
-            find_repository_with_commit "${rev}"
-          )
-          eval repo_path='"${repo_paths__'"${git_repo}"'}"'
-          commit_date=$(
-            git -C "${repo_path}" show -s --format=%ct "${rev}"
-          )
-          mod_commit_date=$(
-            git -C "${repo_paths__archlinux32}" show -s --format=%ct "${mod_rev}"
-          )
-          if [ "${mod_commit_date}" -gt "${commit_date}" ]; then
-            commit_date="${mod_commit_date}"
-          fi
-          # packages remaining longer than $max_package_age_build_list days on the build list
-          if [ "$((commit_date + 24*60*60*max_package_age_build_list))" -lt "$(date '+%s')" ]; then
-            printf '%s %s %s %s\n' \
-              "${pkg}" \
-              "${rev}" \
-              "${mod_rev}" \
-              "${repo}"
-          fi
-        done < \
-          "${work_dir}/build-list"
-      ;;
-      'staging')
-        # packages remaining longer than $max_package_age_staging days in staging
-        find "${work_dir}/package-states" -mindepth 1 -maxdepth 1 -name '*.done' -mtime "+${max_package_age_staging}" -printf '%f\n' | \
-          sed '
-            s|\.done$||
-          '
-      ;;
-      *)
-        >&2 printf 'unknown archaic-source "%s" - skipped.\n' "${source}"
-      ;;
-    esac
-  done | \
-    sort -u
-}
-
-# receive_buglist $category
-# receive the buglist from bugs.archlinux32.org for $category (e.g. 'Testing')
-# and print it to stdout
-
-receive_buglist() {
-  local category
-  category="$1"
-  curl -LSs 'https://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \
-    sed '
-      1 d
-      /^[^,]\+,"Packages: '"${category}"'",/ ! d
-      s/^\([^,]\+,\)\{3\}//
-      s/^\("[^"]\+"\|[^"][^,]*\),"//
-      s/".*$//
-    '
-}
-
-# next_sub_pkgrel $package $git_revision $mod_git_revision $repository
-# giv out the next sub-pkgrel of the given package
-
-next_sub_pkgrel() {
-  ( # new shell is intentional
-    package="$1"
-    git_revision="$2"
-    mod_git_revision="$3"
-    repository="$4"
-    git_repo=$(find_git_repository_to_package_repository "${repository}")
-
-    temp_dir=$(mktemp -d 'tmp.common-functions.next_sub_pkgrel.XXXXXXXXXX' --tmpdir)
-    trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
-
-    find_pkgbuilds "${package}" "${repository}" "${git_repo}" "${git_revision}" "${mod_git_revision}"
-    extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${temp_dir}" '0'
-
-    version=$(
-      cd "${temp_dir}"
-      makepkg --printsrcinfo | \
-        sed -n '
-          /^\s*\(epoch\|pkg\(name\|ver\|rel\)\) = /{s|^\s\+||;p}
-        ' | \
-      sed '
-        /^pkgname = /{
-          s/^.*= //
-          w pkgnames
-          d
-        }
-        s|^epoch = \(.*\)$|1 \1:|
-        s|^pkgver = \(.*\)$|2 \1-|
-        s|^pkgrel = \([^.]*\)\(\..*\)\?$|3 \1|
-      ' | \
-        sort -k1n,1 | \
-        sed '
-          s|^[0-9] ||
-          :a
-          N
-          s|\n[0-9] \(\S\+\)$|\1|
-        ta
-      '
-    )
-    sub_pkgrel=$(
-      ls_master_mirror 'i686/*/' | \
-        sed -n "$(
-          sed '
-            s/$/-'"${version}"'/
-            s/\./\\./g
-            s/^/^/
-            s/$/\\(\\.\\([0-9]\\+\\)\\)\\?-[^-]\\+$/
-            s|^.*$|/\0/{ s/\0/\\2/; s/^$/0/; p; b; }|
-          ' "${temp_dir}/pkgnames"
-        )" | \
-        sort -n | \
-        tail -n1
-    )
-    if [ -z "${sub_pkgrel}" ]; then
-      echo '0'
-    else
-      echo "$((sub_pkgrel+1))"
-    fi
-  )
-}
-
-# modification_revision_link "${mod_rev}" "${repo}" "${pkg}"
-# print the given modification revision possibly with a html link to github
-
-modification_revision_link() {
-  local mod_rev="$1"
-  local repo="$2"
-  local pkg="$3"
-
-  if git -C "${repo_paths__archlinux32}" archive "${mod_rev}" -- "${repo}/${pkg}/PKGBUILD" > /dev/null 2>&1; then
-    printf '<a href="https://github.com/archlinux32/packages/tree/%s/%s/%s">%s</a>\n' \
-      "${mod_rev}" \
-      "${repo}" \
-      "${pkg}" \
-      "${mod_rev}"
-  else
-    printf '%s\n' \
-      "${mod_rev}"
-  fi
-}
-
 # trigger_mirror_refreshs
 # trigger a refresh of capable tier 1 mirrors (as backup for master mirror)
 
@@ -1345,4 +890,36 @@ trigger_mirror_refreshs() {
   for trigger_url in ${mirror_refresh_trigger_urls}; do
     screen -S trigger-mirror-update -d -m curl -L "${trigger_url}"
   done
+}
+
+# extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name
+extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name() {
+  pkgname="$1"
+  pkgname="${pkgname%.pkg.tar.xz}"
+  arch="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  sub_pkgrel="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  pkgrel="${sub_pkgrel%.*}"
+  if [ "${pkgrel}" = "${sub_pkgrel}" ]; then
+    sub_pkgrel='0'
+  else
+    sub_pkgrel="${sub_pkgrel##*.}"
+  fi
+  epoch="${pkgname##*-}"
+  pkgname="${pkgname%-*}"
+  pkgver="${epoch#*:}"
+  if [ "${pkgver}" = "${epoch}" ]; then
+    epoch='0'
+  else
+    epoch="${epoch%%:*}"
+  fi
+}
+
+# irc_say
+# say content of stdin in irc channel
+irc_say() {
+  if [ -p "${irc_dir}/#archlinux32/in" ]; then
+    sponge "${irc_dir}/#archlinux32/in"
+  fi
 }

@@ -20,7 +20,7 @@ usage() {
 i_am_insane() {
   if [ ! -s "${work_dir}/build-master-sanity" ]; then
     printf '\001ACTION goes insane.\001\n' | \
-      sponge "${irc_dir}/#archlinux-ports/in"
+      irc_say
   fi
   echo 'build master is insane' > \
     "${work_dir}/build-master-sanity"
@@ -103,7 +103,7 @@ touch "${tmp_dir}/messages"
 trap 'finish' EXIT
 
 if [ $# -eq 0 ]; then
-  set -- git-repositories build-list repos package-database state-files
+  set -- git-repositories build-list mysql repos package-database track-state
 fi
 
 while [ $# -gt 0 ]; do
@@ -119,13 +119,25 @@ while [ $# -gt 0 ]; do
       for repo in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repo}"'}"'
         repo_revision=$(
-          cat "${work_dir}/${repo}.revision"
+          # shellcheck disable=SC2016
+          {
+            printf 'SELECT `git_repositories`.`head` FROM `git_repositories`'
+            printf ' WHERE `git_repositories`.`name`=from_base64("%s");\n' \
+              "$(printf '%s' "${repo}" | base64 -w0)"
+          } | \
+            mysql_run_query
         )
-        if ! git -C "${repo_path}" archive "${repo_revision}" -- | \
-          tar -t > /dev/null; then
+        if ! obj_type=$(git -C "${repo_path}" cat-file -t "${repo_revision}" 2>/dev/null); then
           if [ ${silence} -le 1 ]; then
-            printf '\nThe repository %s (%s) cannot archive the current revision %s.\n' \
+            printf '\nThe repository %s (%s) does not know the current revision %s.\n' \
               "${repo}" "${repo_path}" "${repo_revision}" >> \
+              "${tmp_dir}/messages"
+          fi
+          i_am_insane
+        elif [ "${obj_type}" != 'commit' ]; then
+          if [ ${silence} -le 1 ]; then
+            printf '\nThe repository %s (%s) knows the current revision %s, but it is not a commit, but a %s.\n' \
+              "${repo}" "${repo_path}" "${repo_revision}" "${obj_type}" >> \
               "${tmp_dir}/messages"
           fi
           i_am_insane
@@ -145,20 +157,19 @@ while [ $# -gt 0 ]; do
         "${tmp_dir}/messages"
 
       errors=$(
-        grep -vn '^\S\+ [0-9a-f]\{40\} [0-9a-f]\{40\} \S\+$' "${work_dir}/build-list"
-      ) || true
-      if [ -n "${errors}" ]; then
-        if [ ${silence} -le 1 ]; then
-          printf '\nThe following build orders are wrongly formatted:\n%s\n' \
-            "${errors}" >> \
-            "${tmp_dir}/messages"
-        fi
-        i_am_insane
-      fi
-
-      errors=$(
-        cut -d' ' -f1 < \
-          "${work_dir}/build-list" | \
+        # shellcheck disable=SC2016
+        {
+          printf 'SELECT `architectures`.`name`,`package_sources`.`pkgbase` FROM `package_sources`'
+          mysql_join_package_sources_build_assignments
+          mysql_join_build_assignments_architectures
+          printf ' WHERE EXISTS('
+            printf 'SELECT * FROM `binary_packages`'
+            mysql_join_binary_packages_repositories
+            printf ' WHERE `repositories`.`name`="build-list"'
+            printf ' AND `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+          printf ');\n'
+        } | \
+          mysql_run_query | \
           sort | \
           uniq -d
       )
@@ -172,13 +183,16 @@ while [ $# -gt 0 ]; do
       fi
 
       errors=$(
+        # shellcheck disable=SC2016
         {
-          cut -d' ' -f1 < \
-            "${work_dir}/build-list"
-          cat "${work_dir}/deletion-list"
+          printf 'SELECT `a`.`pkgname` FROM `binary_packages` AS `a`'
+          mysql_join_binary_packages_repositories 'a' 'a_r'
+          printf ' AND `a_r`.`name`="build-list"'
+          printf ' JOIN `binary_packages` AS `b` ON `a`.`pkgname`=`b`.`pkgname`'
+          mysql_join_binary_packages_repositories 'b' 'b_r'
+          printf ' AND `b_r`.`name`="deletion-list";\n'
         } | \
-          sort | \
-          uniq -d
+          mysql_run_query
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
@@ -268,17 +282,18 @@ while [ $# -gt 0 ]; do
 
         errors=$(
           {
-            tar -tzf "${tmp_dir}/${repo}.db.tar.gz" | \
-              grep '/$' | \
-              sed '
-                s|/$||
-                s|^|in_database |
+            tar -Oxzf "${tmp_dir}/${repo}.db.tar.gz" --wildcards '*/desc' 2>/dev/null | \
+              sed -n '
+                /^%FILENAME%$/ {
+                  N
+                  s/^.*\n/in_database /
+                  p
+                }
               '
             echo "${packages}" | \
-              grep '\S' | \
               sed '
-                s|-[^-]\+$||
-                s|^|in_repository |
+                /\.pkg\.tar\.xz$/ !d
+                s/^/in_repository /
               ' | \
               sort -u
           } | \
@@ -334,51 +349,80 @@ while [ $# -gt 0 ]; do
 
     ;;
 
-    state-files)
+    track-state)
 
-      for status in 'staging' 'testing'; do
+      [ ${silence} -gt 0 ] || \
+        printf 'checking if all packages are tracked correctly ...' >> \
+        "${tmp_dir}/messages"
 
-        [ ${silence} -gt 0 ] || \
-          printf 'checking state-files of "%s" ...' "${status}" >> \
-          "${tmp_dir}/messages"
-
-        errors=$(
+      errors=$(
+        {
+          # shellcheck disable=SC2016
           {
-            if [ "${status}" = 'staging' ]; then
-              find "${work_dir}/package-states" -name '*.done' \
-                -exec sed 's|^|package-state-file |' '{}' \;
-            else
-              find "${work_dir}/package-states" \( -name '*.testing' -o -name '*.tested' \) \
-                -exec sed 's|^|package-state-file |' '{}' \;
-            fi
-            ls_master_mirror 'i686' | \
-              grep "${status}\$" | \
-              while read -r repo; do
-                ls_master_mirror "i686/${repo}"
-              done | \
-              grep '\.pkg\.tar\.xz$' | \
-              sed 's|^|package-file |'
+            printf 'SELECT "mysql",CONCAT(`repositories`.`name`,"/",'
+            mysql_package_name_query
+            printf ') FROM `binary_packages`'
+            mysql_join_binary_packages_repositories
+            printf ' AND `repositories`.`is_on_master_mirror`'
+            mysql_join_binary_packages_architectures
           } | \
-            sort -k2 | \
-            uniq -cf1 | \
-            grep -v '^\s*2\s' | \
-            awk '{print $2 " " $3}'
-        )
-        if [ -n "${errors}" ]; then
-          if [ ${silence} -le 1 ]; then
-            printf '\nThe following %s packages do not have state files or vice versa:\n%s\n' \
-              "${status}" \
-              "${errors}" >> \
-              "${tmp_dir}/messages"
-          fi
-          i_am_insane
+            mysql_run_query | \
+            tr '\t' ' '
+          ls_master_mirror 'i686' | \
+            while read -r repo; do
+              ls_master_mirror "i686/${repo}" | \
+                sed '
+                  /\.pkg\.tar\.xz$/!d
+                  s,^,package-file '"${repo}"'/,
+                '
+            done
+        } | \
+          sed 's/\(-[0-9]\+\)\.0\(-[^- ]\+$\)/\1\2/' | \
+          sort -k2 | \
+          uniq -uf1
+      )
+      if [ -n "${errors}" ]; then
+        if [ ${silence} -le 1 ]; then
+          printf '\nThe following packages from the master mirror are not tracked in the database or vice versa:\n%s\n' \
+            "${errors}" >> \
+            "${tmp_dir}/messages"
         fi
+        i_am_insane
+      fi
 
-        [ ${silence} -gt 0 ] || \
-          echo ' passed.' >> \
+      [ ${silence} -gt 0 ] || \
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
+
+    ;;
+
+    mysql)
+
+      [ ${silence} -gt 0 ] || \
+        printf 'checking mysql-sanity-check-file ...' >> \
+        "${tmp_dir}/messages"
+
+      if [ -s "${webserver_directory}/mysql-sanity.html" ]; then
+        if [ ${silence} -le 1 ]; then
+          printf '\nThere is something wrong with the database:\n'
+          cat "${webserver_directory}/mysql-sanity.html"
+        fi >> \
           "${tmp_dir}/messages"
+        i_am_insane
+      fi
 
-      done
+      # hopefully, this gets rid of false positives :-)
+      sleep 1
+
+      if find "${work_dir}" -mindepth 1 -maxdepth 1 -name 'tmp.mysql-functions.query.*' | \
+        grep '\S' >> \
+        "${tmp_dir}/messages"; then
+        i_am_insane
+      fi
+
+      [ ${silence} -gt 0 ] || \
+        echo ' passed.' >> \
+        "${tmp_dir}/messages"
 
     ;;
 
@@ -399,5 +443,5 @@ done
 if [ -f "${work_dir}/build-master-sanity" ]; then
   rm "${work_dir}/build-master-sanity"
   printf '\001ACTION resumes sanity.\001\n' | \
-    sponge "${irc_dir}/#archlinux-ports/in"
+    irc_say
 fi

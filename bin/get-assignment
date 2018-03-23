@@ -15,49 +15,37 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-mkdir -p "${work_dir}/package-states"
+# TODO: honor manual build order of tool-chain:
+# toolchain build order: linux-api-headers->glibc->binutils->gcc->binutils->glibc
 
 hand_out_assignment() {
 
-  # find out the sub_pkgrel
-  sub_pkgrel=$(
-    next_sub_pkgrel "$1" "$2" "$3" "$4"
-  )
-
-  # we don't care anymore if an older version of this package was
-  # "locked" or "broken"
-  find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-    -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{3\}\.\(locked\|broken\)' \
-    -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4.")"'[^.]\+' \
-    -delete
-
-  # move that build order to the end of the build-list
-  sed -i '
-    /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
-      $ b
-      d
-    }
-    $ a '"$1 $2 $3 $4" \
-    "${work_dir}/build-list"
-
-  echo "$1 $2 $3 $4 ${sub_pkgrel}"
-  {
-    # shellcheck disable=SC2154
-    echo "${slave}"
-    if [ -r "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-      cat "${work_dir}/package-states/$1.$2.$3.$4.locked"
-    fi
-  } | \
-    sort -u | \
-    sponge "${work_dir}/package-states/$1.$2.$3.$4.locked"
   # shellcheck disable=SC2016
   {
+    printf 'SELECT '
+    printf '`package_sources`.`%s`,' \
+      'pkgbase' 'git_revision' 'mod_git_revision'
+    printf '`upstream_repositories`.`name`,`binary_packages`.`sub_pkgrel`'
+    printf ' FROM `upstream_repositories`'
+    mysql_join_upstream_repositories_package_sources
+    mysql_join_package_sources_build_assignments
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+      'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+      "$(printf '%s' "$4" | base64 -w0)"
+    printf ' LIMIT 1;\n'
+
     printf 'UPDATE `build_slaves`'
     printf ' SET `currently_building` = ('
     printf ' SELECT `build_assignments`.`id`'
     printf ' FROM `build_assignments`'
-    printf ' JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id`'
-    printf ' JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`'
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
     printf ' WHERE'
     printf ' `package_sources`.`%s` = from_base64("%s") AND' \
       'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
@@ -66,16 +54,24 @@ hand_out_assignment() {
     printf ' `upstream_repositories`.`name` = from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
     printf ')'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");' \
+    # shellcheck disable=SC2154
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"
-  } | \
-    ${mysql_command}
 
-  # lock every loop this package breaks
-  find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-    -regex '.*/loop_[0-9]\+' \
-    -exec grep -qxF "$1" '{}' \; \
-    -exec touch '{}.locked' \;
+    printf 'UPDATE `build_assignments`'
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
+    printf ' SET `build_assignments`.`priority`=0'
+    printf ' WHERE'
+    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
+      'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision'     "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' `upstream_repositories`.`name` = from_base64("%s");\n' \
+      "$(printf '%s' "$4" | base64 -w0)"
+  } | \
+    mysql_run_query | \
+    tr '\t' ' '
 
   exit 0
 
@@ -108,140 +104,106 @@ clean_up() {
 tmp_dir=$(mktemp -d 'tmp.get-assignment.XXXXXXXXXX' --tmpdir)
 trap clean_up EXIT
 
-# Check if there are any pending packages at all and if the requester
-# has already got an assignment.
+# if we're building something already, hand it out (again)
+currently_building=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT '
+    mysql_query_select_pkgbase_and_revision
+    mysql_join_build_assignments_build_slaves
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+      "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' LIMIT 1;\n'
+  } | \
+    mysql_run_query
+)
 
-pending_packages=false
-
-while read -r package git_revision mod_git_revision repository; do
-
-  generate_package_metadata "${package}.${git_revision}.${mod_git_revision}.${repository}"
-
-  if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
-    # has this slave already got or does he prefer this assignment?
-    # note, that the dependencies are met, because this package is already locked
-    if grep -qxF "${slave}" "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" || \
-      printf ',%s,' "$1" | \
-        grep -qF ",${package},"; then
-      hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-    fi
-  elif [ ! -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
-    pending_packages=true
-  fi
-
-done < "${work_dir}/build-list"
-
-if ! ${pending_packages}; then
-  >&2 echo 'come back after the next run of get-package-updates - currently there are no pending packages'
-  exit 3
+if [ -n "${currently_building}" ]; then
+  # shellcheck disable=SC2086
+  hand_out_assignment ${currently_building}
 fi
 
-# Find first package of build-list whose "dependencies" are all met
-# 1st: prefered packages on the build list which have all dependencies met
-# 2nd: unbroken packages on the build list which have all dependencies met
-# 3rd: unbroken packages breaking a loop
-# 4th: broken packages which have all dependencies met or break a loop
+# a package with [all dependencies met or which is part of a loop]
+# and which is currently not being built, ordered by:
+# 1: we requested it
+# 2: its priority
+# 3: is not yet built
+# 4: was built the longest time ago
+next_building=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT '
+    printf '`package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
+      "$(
+        printf '%s' "$1" | \
+          base64 -w0
+      )"
+    printf '`build_assignments`.`priority`,'
+    printf 'COALESCE('
+    printf 'MAX(`failed_builds`.`date`),0'
+    printf ') AS `last_trial`,'
+    mysql_query_is_part_of_loop '`build_assignments`.`id`'
+    printf ' AS `part_of_loop`,'
+    mysql_query_select_pkgbase_and_revision
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' LEFT'
+    mysql_join_build_assignments_failed_builds
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND NOT EXISTS ('
+      printf ' SELECT *'
+      printf ' FROM `build_slaves`'
+      printf ' WHERE `build_slaves`.`currently_building`=`build_assignments`.`id`'
+    printf ') AND ('
+      printf '`build_assignments`.`is_blocked` IS NULL'
+      printf ' OR'
+      printf ' `package_sources`.`pkgbase`=from_base64("%s")' \
+        "$(
+          printf '%s' "$1" | \
+            base64 -w0
+        )"
+    printf ') AND ('
+      mysql_query_is_part_of_loop '`build_assignments`.`id`'
+      printf ' OR NOT '
+      mysql_query_has_pending_dependencies '`build_assignments`.`id`'
+    printf ')'
+    printf ' GROUP BY `build_assignments`.`id`'
+    printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
+    printf ' LIMIT 1;\n'
+  } | \
+    mysql_run_query | \
+    sed '
+      y/\t/ /
+      s/^.* \(\S\+\( \S\+\)\{3\}\)$/\1/
+    '
+)
+if [ -n "${next_building}" ]; then
+  # shellcheck disable=SC2086
+  hand_out_assignment ${next_building}
+fi
 
-for iteration in 'prefered' 'fresh' 'loops' 'broken'; do
+# Check if there are any pending packages at all
+count_pending=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT count(*)'
+    printf ' FROM `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_blocked` IS NULL'
+    printf ';\n'
+  } | \
+    mysql_run_query
+)
 
-  case "${iteration}" in
-    'prefered')
-      hand_out_blocked=true
-      hand_out_broken=true
-      hand_out_loop=false
-      echo "$1" | \
-        tr ',' '\n' | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'fresh')
-      hand_out_blocked=false
-      hand_out_broken=false
-      hand_out_loop=false
-      {
-        cat "${work_dir}/build-list"
-        find "${work_dir}/package-states" -name '*.broken' -printf '%f\n' | \
-          sed '
-            s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)\.[^.]\+$| \1 \2 \3|
-            p
-          '
-      } | \
-        sort -k1,1 -k2 | \
-        uniq -u | \
-        cut -d' ' -f1 | \
-        uniq > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'loops')
-      hand_out_blocked=false
-      hand_out_broken=false
-      hand_out_loop=true
-      find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-        -regex '.*/loop_[0-9]\+' \
-        -exec cat {} \; | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-    'broken')
-      hand_out_blocked=false
-      hand_out_broken=true
-      hand_out_loop=true
-      cut -d' ' -f1 < \
-        "${work_dir}/build-list" | \
-        sort -u > \
-        "${tmp_dir}/hand-out-only-these-packages"
-    ;;
-  esac
-
-  cat -n "${work_dir}/build-list" | \
-    sort -k2,2 | \
-    join -1 1 -2 2 -o 2.1,2.2,2.3,2.4,2.5 "${tmp_dir}/hand-out-only-these-packages" - | \
-    sort -k1,1 | \
-    sed 's|^\s*\S\+\s\+||' > \
-    "${tmp_dir}/try-to-hand-out-these-packages"
-
-  while read -r package git_revision mod_git_revision repository; do
-
-    # package locked? (we have taken care of those in the previous loop)
-    if [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.locked" ]; then
-      continue
-    fi
-
-    # package blocked?
-    if ! ${hand_out_blocked} &&
-      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.blocked" ]; then
-      continue
-    fi
-
-    # package broken?
-    if ! ${hand_out_broken} && \
-      [ -f "${work_dir}/package-states/${package}.${git_revision}.${mod_git_revision}.${repository}.broken" ]; then
-      continue
-    fi
-
-    # dependencies met?
-    if [ -n "$(find_dependencies_on_build_list "${package}" "${git_revision}" "${mod_git_revision}" "${repository}")" ]; then
-      # do we hand out looped packages?
-      if ! ${hand_out_loop}; then
-        continue
-      fi
-      # is it a looped package?
-      if ! find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-        -regex '.*/loop_[0-9]\+' \
-        -exec cat {} \; | \
-        grep -qxF "${package}"; then
-        continue
-      fi
-    fi
-
-    hand_out_assignment "${package}" "${git_revision}" "${mod_git_revision}" "${repository}"
-
-  done < \
-    "${tmp_dir}/try-to-hand-out-these-packages"
-
-done
-
-# Remove the lock file
-
->&2 echo 'come back later - there are still packages to be built, but currently none has all its dependencies ready'
-exit 2
+if [ "${count_pending}" -eq 0 ]; then
+  >&2 echo 'come back after the next run of get-package-updates - currently there are no pending packages'
+  exit 3
+else
+  >&2 echo 'come back later - there are still packages to be built, but currently none has all its dependencies ready'
+  exit 2
+fi

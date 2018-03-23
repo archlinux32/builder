@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# shellcheck disable=SC2039
+
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
@@ -16,25 +18,28 @@ usage() {
   >&2 echo '  -n|--no-report:   Do not report what packages were modified.'
   >&2 echo '  -t|--tested:      Mark package(s) as tested.'
   >&2 echo '  -u|--unblock:     Unblock package(s).'
+  >&2 echo '  -w|--wait:        Wait for lock if necessary.'
   >&2 echo ''
   >&2 echo 'Exactly one of -b|-t|-u is needed for actual operation.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bfhntu \
+  getopt -o bfhntuw \
     --long block \
     --long faulty \
     --long help \
     --long no-report \
     --long tested \
     --long unblock \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
 action=''
 report=true
+wait_for_lock='-n'
 
 while true
 do
@@ -73,6 +78,9 @@ do
       fi
       action='unblock'
     ;;
+    -w|--wait)
+      wait_for_lock=''
+    ;;
     --)
       shift
       break
@@ -95,26 +103,19 @@ if [ $# -ne 1 ]; then
   usage
 fi
 
-clean_up() {
-  rm -rf --one-file-system "${tmp_dir}"
-}
-tmp_dir=$(mktemp -d 'tmp.modify-package-state.XXXXXXXXXX' --tmpdir)
-trap clean_up EXIT
-
 input_file="$1"
 if ${report}; then
   if ! [ -w "${input_file}" ]; then
     >&2 printf \
-      'Cannot open file "%s" for writing.' \
+      'Cannot open file "%s" for writing.\n' \
       "${input_file}"
     exit 2
   fi
   move_output() {
     cat "${output_file}" > "${input_file}"
-    clean_up
+    rm -f "${output_file}"
   }
-  output_file="${tmp_dir}/output-file"
-  touch "${output_file}"
+  output_file=$(mktemp 'tmp.modify-package-state.XXXXXXXXXX')
   trap 'move_output' EXIT
 else
   output_file='/dev/null'
@@ -122,91 +123,130 @@ fi
 
 if ! [ -r "${input_file}" ]; then
   >&2 printf \
-    'Cannot open file "%s" for reading.' \
+    'Cannot open file "%s" for reading.\n' \
     "${input_file}"
   exit 2
 fi
 
 exec 9> "${sanity_check_lock_file}"
-if ! flock -s -n 9; then
+if ! flock -s ${wait_for_lock} 9; then
   >&2 echo 'Cannot get sanity-check lock.'
   exit
 fi
 
-if [ "${action}" = 'tested' ]; then
-  receive_buglist 'Testing' > \
-    "${tmp_dir}/package-bug-titles"
+exec 8> "${package_database_lock_file}"
+if ! flock ${wait_for_lock} 8; then
+  >&2 echo 'Cannot get package-database lock.'
+  exit
 fi
 
-{
-  err=0
-  while read -r package reason; do
-    if echo "${package}" | \
-      grep -q '\.pkg\.tar\.xz$'; then
-      package=$(
-        find "${work_dir}/package-states" -maxdepth 1 \( -name '*.tested' -o -name '*.testing' \) \
-          -exec grep -qxF "${package}" '{}' \; \
-          -printf '%f\n' | \
-          sed 's|\.[^.]\+$||' | \
-          sort -u
+while read -r package reason; do
+  case "${action}" in
+    'faulty'|'tested')
+      # we expect a binary package identifier (pkgname-epoch:pkgver-pkgrel.sub_pkgrel-arch[".pkg.tar.xz"])
+      # and we will only operate on packages in "testing" repositories
+      # shellcheck disable=SC2016
+      combiner=$(
+        printf '`binary_packages`'
+        mysql_join_binary_packages_repositories
+        mysql_join_repositories_repository_stabilities
+        mysql_join_binary_packages_architectures
       )
-      if [ -z "${package}" ]; then
-        continue
+      # shellcheck disable=SC2016,SC2031
+      selector=$(
+        extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name "${package}"
+        printf 'WHERE `repository_stabilities`.`name`="testing"'
+        printf ' AND `binary_packages`.`%s`=from_base64("%s")' \
+          'pkgname'    "$(printf '%s' "${pkgname}" | base64 -w0)" \
+          'epoch'      "$(printf '%s' "${epoch}" | base64 -w0)" \
+          'pkgver'     "$(printf '%s' "${pkgver}" | base64 -w0)" \
+          'pkgrel'     "$(printf '%s' "${pkgrel}" | base64 -w0)" \
+          'sub_pkgrel' "$(printf '%s' "${sub_pkgrel}" | base64 -w0)"
+        printf ' AND `architectures`.`name`=from_base64("%s")' \
+          "$(printf '%s' "${arch}" | base64 -w0)"
+      )
+    ;;
+    'block'|'unblock')
+      # we expect a package source identifier (pkgbase.git_revision.mod_git_revision.repository)
+      # and we will only operate on packages in "unbuilt" repositories
+      # shellcheck disable=SC2016
+      combiner=$(
+        printf '`build_assignments`'
+        mysql_join_build_assignments_package_sources
+        mysql_join_package_sources_upstream_repositories
+        mysql_join_build_assignments_binary_packages
+        mysql_join_binary_packages_repositories
+        mysql_join_repositories_repository_stabilities
+      )
+      # shellcheck disable=SC2016
+      selector=$(
+        repository="${package##*.}"
+        pkgbase="${package%.*}"
+        mod_git_revision="${pkgbase##*.}"
+        pkgbase="${pkgbase%.*}"
+        git_revision="${pkgbase##*.}"
+        pkgbase="${pkgbase%.*}"
+        printf 'WHERE `repository_stabilities`.`name`="unbuilt"'
+        printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+          "$(printf '%s' "${repository}" | base64 -w0)"
+        printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+          'pkgbase'          "$(printf '%s' "${pkgbase}" | base64 -w0)" \
+          'git_revision'     "$(printf '%s' "${git_revision}" | base64 -w0)" \
+          'mod_git_revision' "$(printf '%s' "${mod_git_revision}" | base64 -w0)"
+      )
+    ;;
+    *)
+      >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
+      exit 42
+    ;;
+  esac
+  case "${action}" in
+    'block')
+      if [ -z "${reason}" ]; then
+        >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
+        exit 2
       fi
-    fi
-    if [ "${action}" = 'block' ] || \
-      [ "${action}" = 'unblock' ]; then
-      # these packages need to be on the build list
-      if ! tr ' ' '.' < \
-        "${work_dir}/build-list" | \
-        grep -qxF "${package}"; then
-        >&2 printf 'Package "%s" is not on the build-list.\n' "${package}"
-        err=2
-        continue
-      fi
-    fi
-    case "${action}" in
-      'block')
-        if [ -z "${reason}" ]; then
-          >&2 printf 'No reason is given for blocking package "%s".\n' "${package}"
-          err=2
-        else
-          echo "${reason}" > \
-            "${work_dir}/package-states/${package}.blocked"
-          printf '%s %s\n' "${package}" "${reason}"
-        fi
-      ;;
-      'faulty')
-        if [ -f "${work_dir}/package-states/${package}.tested" ]; then
-          mv \
-            "${work_dir}/package-states/${package}.tested" \
-            "${work_dir}/package-states/${package}.testing"
-          printf '%s\n' "${package}"
-        fi
-      ;;
-      'tested')
-        if [ -f "${work_dir}/package-states/${package}.testing" ] && \
-          ! grep -qF "[${package%.*.*.*}]" "${tmp_dir}/package-bug-titles"; then
-          mv \
-            "${work_dir}/package-states/${package}.testing" \
-            "${work_dir}/package-states/${package}.tested"
-          printf '%s\n' "${package}"
-        fi
-      ;;
-      'unblock')
-        if [ -f "${work_dir}/package-states/${package}.blocked" ]; then
-          rm "${work_dir}/package-states/${package}.blocked"
-          printf '%s\n' "${package}"
-        fi
-      ;;
-      *)
-        >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
-        exit 42
-      ;;
-    esac
-  done > \
-    "${output_file}"
-
-  exit ${err}
-} < \
-  "${input_file}"
+      tester='1'
+      # shellcheck disable=SC2016
+      modifier=$(
+        printf '`build_assignments`.`is_blocked`=from_base64("%s")' \
+          "$(printf '%s' "${reason}" | base64 -w0)"
+      )
+    ;;
+    'unblock')
+      # shellcheck disable=SC2016
+      tester='NOT `build_assignments`.`is_blocked` IS NULL'
+      # shellcheck disable=SC2016
+      modifier='`build_assignments`.`is_blocked`=NULL'
+    ;;
+    'faulty')
+      # shellcheck disable=SC2016
+      tester='`binary_packages`.`has_issues`=0'
+      # shellcheck disable=SC2016
+      modifier='`binary_packages`.`is_tested`=0,`binary_packages`.`has_issues`=1'
+    ;;
+    'tested')
+      # shellcheck disable=SC2016
+      tester='`binary_packages`.`is_tested`=0'
+      # shellcheck disable=SC2016
+      modifier='`binary_packages`.`is_tested`=1'
+    ;;
+    *)
+      >&2 printf 'Whooops, action "%s" not implemented yet.\n' "${action}"
+      exit 42
+    ;;
+  esac
+  if printf 'SELECT 1 FROM %s %s AND %s LIMIT 1' "${combiner}" "${selector}" "${tester}" | \
+    mysql_run_query | \
+    grep -qxF '1'; then
+    # shellcheck disable=SC2016
+    {
+      printf 'UPDATE %s SET %s %s' "${combiner}" "${modifier}" "${selector}"
+      printf ';\n'
+    } | \
+      mysql_run_query
+    printf '%s %s\n' "${action}" "${package}"
+  fi
+done \
+  < "${input_file}" \
+  > "${output_file}"

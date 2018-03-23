@@ -7,8 +7,7 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: report back in regular intervals, so the build master can
-# abort if the package is outdated and/or someone else finished it.
+# TODO: build other 'architectures', too (pentium4, i486)
 
 # shellcheck disable=SC2016
 usage() {
@@ -220,6 +219,11 @@ while [ "${count}" -ne 0 ]; do
       if [ "${mod_git_revision}" = 'work-tree' ]; then
         mod_git_revision=$(
           # we can't just create an empty index-file with mktemp, because git doesn't like it
+          find . \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -name 'tmp.build-packages.git.*' \
+            -exec rm -rf --one-file-system {} \;
           tmp_subdir=$(mktemp -d 'tmp.build-packages.git.XXXXXXXXXX' --tmpdir)
           trap 'rm -rf --one-file-system "${tmp_subdir}"' EXIT
           export GIT_INDEX_FILE="${tmp_subdir}/index.new"
@@ -251,8 +255,18 @@ while [ "${count}" -ne 0 ]; do
         fi
         cd "${base_dir}"
         recursively_umount_and_rm "${tmp_dir}"
+        flock -u 9 || true
         exit "${err}"
       }
+      find "${work_dir}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -name 'tmp.build-packages.??????' \
+        -printf '%p\n' | \
+        while read -r old_tmp_dir; do
+          find "${old_tmp_dir}" -xdev -exec chmod 777 {} \;
+          rm -rf --one-file-system "${old_tmp_dir}"
+        done
       tmp_dir=$(mktemp -d "${work_dir}/tmp.build-packages.XXXXXX")
       trap bail_out EXIT
 
@@ -295,7 +309,19 @@ while [ "${count}" -ne 0 ]; do
             # we can't improve anything
             continue
           fi
-          tar -xz --overwrite -f "${source_name}" --exclude PKGBUILD --strip-components=1 || true
+          # shellcheck disable=SC2046
+          tar -xz --overwrite \
+            -f "${source_name}" \
+            --exclude PKGBUILD \
+            $(
+              if [ -n "${PKGBUILD_mod}" ]; then
+                git -C "${repo_paths__archlinux32}/${PKGBUILD_mod%/*}" archive "${mod_git_revision}" -- . | \
+                  tar -t | \
+                  sed 's/^/--exclude /'
+              fi
+            ) \
+            --strip-components=1 \
+            || true
         fi
 
         if echo "${straw}" | \
@@ -321,19 +347,39 @@ while [ "${count}" -ne 0 ]; do
 
         if echo "${straw}" | \
           grep -qF ':clean_chroot:'; then
-          parameters='-c'
+          outerParameters='-c'
         else
-          parameters=''
+          outerParameters=''
         fi
 
         if echo "${straw}" | \
           grep -qF ':without_check:'; then
-          parameters="${parameters} -- -- --nocheck"
+          innerParameters='--nocheck'
+        else
+          innerParameters=''
+        fi
+
+        if echo "${straw}" | \
+          grep -qF ':with_/dev/fuse:'; then
+          middleParameters='-d /dev/fuse'
+        else
+          middleParameters=''
         fi
 
         find . -maxdepth 1 -type f \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -exec \
           rm {} \;
 
+        echo 'building' > "${tmp_dir}/.ping-build-master"
+        if [ -z "${forced_package}" ]; then
+          # we get a lock on "${work_dir}/ping-build-master.lock",
+          # if we release that lock, ping-to-master should stop _immediately_
+          exec 9> "${work_dir}/ping-build-master.lock"
+          if ! flock -n 9; then
+            >&2 echo 'ERROR: Cannot lock ping-to-master - this should not happen.'
+            exit 2
+          fi
+          "${base_dir}/bin/ping-to-master" "$$" "${tmp_dir}" &
+        fi
         >&2 printf '%s: building package "%s" (revisions %s %s, repository %s, straw %s) ...' \
           "$(date +'%Y-%m-%d %T')" \
           "${package}" \
@@ -344,7 +390,7 @@ while [ "${count}" -ne 0 ]; do
         # by piping the log, we don't see anything in the terminal,
         # but all ways to duplicate the logs seem pretty elaborate
         # shellcheck disable=SC2024,SC2086
-        if sudo "${build_command}" ${parameters} > \
+        if sudo "${build_command}" ${outerParameters} -- ${middleParameters} -- ${innerParameters} > \
           "$(
             date -u --iso-8601=seconds | \
               cut -d+ -f1
@@ -353,6 +399,7 @@ while [ "${count}" -ne 0 ]; do
           >&2 printf ' ok.\n'
           tar_content_dir=$(mktemp -d "${tmp_dir}/tar-content.XXXXXX")
           find . -maxdepth 1 -type f -name '*-debug-*.pkg.tar.xz*' -delete
+          echo 'post-build' > "${tmp_dir}/.ping-build-master"
           >&2 printf 'signing package(s)\n'
           find . -maxdepth 1 -type f -name '*.pkg.tar.xz' \
             -execdir gpg --local-user="${package_key}" --detach-sign '{}' \; \
@@ -390,12 +437,50 @@ while [ "${count}" -ne 0 ]; do
                   >&2 printf ' failed. Next ...\n'
                 done
             done
+          >&2 printf 'searching for provided libraries\n'
+          find "${tar_content_dir}" -maxdepth 1 \
+            -name '*.pkg.tar.xz' \
+            -printf '%p\n' | \
+            while read -r pkgfile; do
+              pacman -Qqlp "${pkgfile}" | \
+                sed -n '
+                  s,^.*/,,
+                  /\.so\(\..\+\)\?$/p
+                ' > \
+                "${pkgfile}.so.provides"
+            done
+          >&2 printf 'searching for required libraries\n'
+          package_content_dir=$(mktemp -d "${tmp_dir}/package-content.XXXXXX")
+          find "${tar_content_dir}" -maxdepth 1 \
+            -name '*.pkg.tar.xz' | \
+            while read -r pkgfile; do
+              if printf '%s\n' "${pkgfile}" | \
+                grep -vq -- '-any\.pkg\.tar\.xz$'; then
+                # we do not check "any" packages for linked libraries
+                # (why do they have them in the first place?)
+                mkdir "${package_content_dir}/${pkgfile##*/}"
+                tar -C "${package_content_dir}/${pkgfile##*/}" -xJf "${pkgfile}" 2>/dev/null
+                find "${package_content_dir}/${pkgfile##*/}" \
+                  -name 'opt' -prune , \
+                  -exec objdump -x '{}' \; 2>/dev/null | \
+                  grep -w 'NEEDED' | \
+                  awk '{print $2}' | \
+                  sed '
+                    /\.c32$/d
+                    s,^.*/,,
+                  '
+                find "${package_content_dir:?}/${pkgfile##*/}" -xdev -exec chmod 777 '{}' \;
+                rm -rf --one-file-system "${package_content_dir:?}/${pkgfile##*/}"
+              fi | \
+                sort -u > \
+                "${pkgfile}.so.needs"
+            done
+          >&2 printf 'running namcap ...'
           if [ "${repository}" = 'multilib' ]; then
             x86_64_build_command='multilib-build'
           else
             x86_64_build_command='extra-x86_64-build'
           fi
-          >&2 printf 'running namcap ...'
           # this is a little hack: makepkg receives '--version', but namcap is run nevertheless
           # (and it only works with devtools32, because they are running namcap on *.pkg.tar.xz in the base directory, too)
           sudo "${x86_64_build_command}" -- -- --version > /dev/null 2>&1 || \
@@ -426,14 +511,31 @@ while [ "${count}" -ne 0 ]; do
               fi
             done
           >&2 printf ' ok.\n'
+          echo 'uploading' > "${tmp_dir}/.ping-build-master"
           if ${upload_to_build_master}; then
-            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir gzip '{}' \;
+            find "${tar_content_dir}/" -maxdepth 1 \
+              \( \
+                -name '*.pkg.tar.xz-namcap.log' -o \
+                -name '*.pkg.tar.xz.so.needs' -o \
+                -name '*.pkg.tar.xz.so.provides' \
+              \) \
+              -execdir gzip '{}' \;
           else
-            find "${tar_content_dir}/" -maxdepth 1 -name '*.pkg.tar.xz-namcap.log' -execdir grep -HF '' '{}' \;
+            find "${tar_content_dir}/" -maxdepth 1 \
+              -name '*.pkg.tar.xz-namcap.log' \
+              -execdir grep -HF '' '{}' \;
           fi
           # shellcheck disable=SC2046
           tar -cf 'package.tar' -C "${tar_content_dir}" -- $(
-            find "${tar_content_dir}/" -maxdepth 1 \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' \) -printf '%f\n'
+            find "${tar_content_dir}/" -maxdepth 1 \
+              \( \
+                -name '*.pkg.tar.xz' -o \
+                -name '*.pkg.tar.xz.sig' -o \
+                -name '*.pkg.tar.xz-namcap.log.gz' -o \
+                -name '*.pkg.tar.xz.so.needs.gz' -o \
+                -name '*.pkg.tar.xz.so.provides.gz' \
+              \) \
+              -printf '%f\n'
             )
           while ${upload_to_build_master}; do
             err=0
@@ -474,6 +576,7 @@ while [ "${count}" -ne 0 ]; do
           success=true
           break
         fi
+        echo 'failure' > "${tmp_dir}/.ping-build-master"
         >&2 printf ' failed.\n'
       done
 
@@ -528,6 +631,7 @@ while [ "${count}" -ne 0 ]; do
       # clean up tmp_dir
       cd "${base_dir}"
       recursively_umount_and_rm "${tmp_dir}"
+      flock -u 9 || true
       trap - EXIT
 
       continue

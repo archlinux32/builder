@@ -5,30 +5,23 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# TODO: add all (necessary) features from build-master-status
+
+tmp_dir=$(mktemp -d 'tmp.build-master-status-from-mysql.XXXXXXXXXX' --tmpdir)
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+# do not block if locked
+exec 9> "${sanity_check_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'Mysql-Sanity check skipped, cannot acquire lock.'
+  exit
+fi
+
+# shellcheck disable=SC2119
+mysql_cleanup
+
 {
   mysql_sanity_check || true
-  {
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`'
-      printf ' FROM `package_sources`'
-      printf ' JOIN `%s` ON `%s`.`%s`=`%s`.`id`' \
-        'upstream_repositories' 'package_sources' 'upstream_package_repository' 'upstream_repositories' \
-        'build_assignments' 'build_assignments' 'package_source' 'package_sources' \
-        'binary_packages' 'binary_packages' 'build_assignment' 'build_assignments' \
-        'repositories' 'binary_packages' 'repository' 'repositories'
-      printf ' WHERE `repositories`.`name`="build-list"'
-    } | \
-      ${mysql_command} --batch | \
-      sed '
-        1d
-        y/\t/ /
-        s/^/+ /
-      '
-    sed 's/^/- /' "${work_dir}/build-list"
-  } | \
-    sort -k2 -k1,1 | \
-    uniq -uf1
 } | \
   sed '
     s,^-.*$,<font color="#FF0000">\0</font>,
@@ -38,3 +31,118 @@
     $ a </body></html>
   ' | \
   sponge "${webserver_directory}/mysql-sanity.html"
+
+if [ -s "${webserver_directory}/mysql-sanity.html" ] && \
+  [ ! -s "${work_dir}/build-master-sanity" ]; then
+  printf 'girls, my database is dirty again ...\n' | \
+    irc_say
+  echo 'build master is insane' > \
+    "${work_dir}/build-master-sanity"
+fi
+
+if [ ! -s "${work_dir}/build-master-sanity" ]; then
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT IGNORE INTO `statistics` ('
+    printf '`%s`,' \
+      'date' \
+      'stable_packages_count' \
+      'pending_tasks_count' \
+      'pending_packages_count' \
+      'staging_packages_count' \
+      'testing_packages_count' \
+      'tested_packages_count' \
+      'broken_tasks_count' \
+      'dependency_loops_count' \
+      'dependency_looped_tasks_count' \
+      'locked_tasks_count' \
+      'blocked_tasks_count' \
+      'next_tasks_count' | \
+      sed 's/,$//'
+    printf ') VALUES ('
+    # date
+    printf 'NOW(),'
+    # stable_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="stable"),'
+    # pending_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # pending_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # staging_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="staging"),'
+    # testing_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND NOT `binary_packages`.`is_tested`),'
+    # tested_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND `binary_packages`.`is_tested`),'
+    # broken_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_broken`),'
+    # dependency_loops_count
+    printf '(SELECT COUNT(DISTINCT `build_dependency_loops`.`loop`) FROM'
+    printf ' `build_dependency_loops`),'
+    # dependency_looped_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_dependency_loops`.`build_assignment`) FROM'
+    printf ' `build_dependency_loops`),'
+    # locked_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_slaves`.`currently_building`) FROM'
+    printf ' `build_slaves`'
+    mysql_join_build_slaves_build_assignments
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # blocked_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_blocked` IS NOT NULL),'
+    # next_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND NOT EXISTS ('
+      printf 'SELECT * FROM `dependencies`'
+      mysql_join_dependencies_dependency_types
+      printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+      mysql_join_dependencies_install_target_providers
+      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+      printf ' WHERE `prov_r`.`name`="build-list"'
+      printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
+    printf '))'
+    printf ');\n'
+  } | \
+    mysql_run_query
+fi

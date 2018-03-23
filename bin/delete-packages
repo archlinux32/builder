@@ -13,7 +13,7 @@
 # shellcheck source=conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: finish this
+# TODO: delete other to-be-deleted packages if asked to do so
 
 # shellcheck disable=SC2016
 usage() {
@@ -69,18 +69,15 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-tmp_dir=$(mktemp -d "${work_dir}/tmp.delete-packages.XXXXXXXXXX")
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-
 # Create a lock file and a trap.
 
 if ! ${no_action}; then
 
-  exec 9> "${build_list_lock_file}"
-  if ! flock ${block_flag} 9; then
-    >&2 echo 'come back (shortly) later - I cannot lock build list.'
-    exit 0
-  fi
+#  exec 9> "${build_list_lock_file}"
+#  if ! flock ${block_flag} 9; then
+#    >&2 echo 'come back (shortly) later - I cannot lock build list.'
+#    exit 0
+#  fi
 
   exec 8> "${package_database_lock_file}"
   if ! flock ${block_flag} 8; then
@@ -96,260 +93,158 @@ if ! ${no_action}; then
 
 fi
 
-clean_up_lock_file() {
-  if ! ${no_action}; then
-    rm -f "${package_database_lock_file}" "${build_list_lock_file}"
-  fi
-  rm -rf --one-file-system "${tmp_dir}"
-}
+tmp_dir=$(mktemp -d "${work_dir}/tmp.delete-packages.XXXXXXXXXX")
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-trap clean_up_lock_file EXIT
+# shellcheck disable=SC2016
+{
+  printf 'CREATE TEMPORARY TABLE `to_deletes` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+  printf 'INSERT IGNORE INTO `to_deletes`'
+  printf ' SELECT `binary_packages`.`id`'
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_dependencies
+  mysql_join_dependencies_dependency_types
+  printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+  mysql_join_binary_packages_repositories
+  printf ' AND `repositories`.`is_on_master_mirror`'
+  printf ' WHERE `binary_packages`.`is_to_be_deleted`'
+  printf ' AND NOT EXISTS ('
+    printf 'SELECT * FROM `install_target_providers`'
+    mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+    mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+    mysql_join_repositories_repository_stabilities 'prov_r'
+    printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+    printf ' AND `repository_stabilities`.`name` NOT IN ("forbidden","virtual")'
+  printf ');\n'
 
-cp \
-  "${work_dir}/deletion-list" \
-  "${work_dir}/build-list" \
-  "${tmp_dir}/"
+  printf ' SELECT DISTINCT "repo",`repositories`.`name`'
+  printf ' FROM `to_deletes`'
+  printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  printf ';\n'
 
-all_repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
-all_repos="core"
+  printf ' SELECT "package",`repositories`.`name`,`binary_packages`.`pkgname`'
+  printf ' FROM `to_deletes`'
+  printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  printf ';\n'
 
-for repo in ${all_repos}; do
-  mkdir "${tmp_dir}/${repo}"
-  ${master_mirror_rsync_command} \
-    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db."* \
-    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files."* \
-    "${tmp_dir}/${repo}/"
-done
+  printf ' SELECT "package-file",`repositories`.`name`,'
+  mysql_package_name_query
+  printf ' FROM `to_deletes`'
+  printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  printf ';\n'
 
-for repo in ${all_repos}; do
-  tar -C "${tmp_dir}/${repo}" -xzf "${tmp_dir}/${repo}/${repo}.db.tar.gz"
-done
-
-find "${tmp_dir}" -mindepth 3 -maxdepth 3 -name 'desc' -exec \
+  printf ' SELECT "package-id",`to_deletes`.`id`'
+  printf ' FROM `to_deletes`'
+  printf ';\n'
+} | \
+  mysql_run_query | \
   sed '
-    /^%DEPENDS%$/{
-      s/.*//
-      :dep_loop
-      N
-      /\n$/{
-        s@\(^\|\n\)\(.\)@\1depends \2@g
-        bend
-      }
-      bdep_loop
+    y/\t/ /
+    /^repo /{
+      s/^\S\+ //
+      w '"${tmp_dir}"'/repositories
+      d
     }
-    /^%PROVIDES%$/{
-      s/.*//
-      :pro_loop
-      N
-      /\n$/{
-        s@\(^\|\n\)\(.\)@\1provides \2@g
-        bend
-      }
-      bpro_loop
+    /^package /{
+      s/^\S\+ //
+      w '"${tmp_dir}"'/packages
+      d
     }
-    d
-    :end
-    s/[<>=]\S*\($\|\n\)/\1/g
-    s#\(^\|\n\)\(.\)#\1{} \2#g
-  ' {} \; \
-  -printf '%p provides %p\n' | \
-  sed '
-    /^$/d
-    s|^\S\+/\([^/ ]\+\)/\([^/ ]\+\)\(-[^-/ ]\+\)\{2\}/desc |\1 \2 |
-    s| \S\+/\([^/]\+\)\(-[^/-]\+\)\{2\}/desc$| \1|
-  ' | \
-  awk '{print $3 " " $1 " " $2 " " $4}' | \
-  sed -n '
-    /^provides /{
-      s/^provides //
-      w '"${tmp_dir}"'/db.provides
-      b
+    /^package-file /{
+      s/^\S\+ //
+      s, ,/,
+      w '"${tmp_dir}"'/package-files
+      s/$/.sig/
+      w '"${tmp_dir}"'/package-files
+      d
     }
-    /^depends /{
-      s/^depends //
-      w '"${tmp_dir}"'/db.depends
-      b
+    /^package-id /{
+      s/^\S\+ //
+      w '"${tmp_dir}"'/package-ids
+      d
     }
   '
 
+if [ ! -s "${tmp_dir}/packages" ]; then
+  printf 'Nothing to delete.\n'
+  exit
+fi
 
+mkdir "${tmp_dir}/repos"
 
-echo 'OK' >&2
-exit 42
+while read -r repo; do
+  ${master_mirror_rsync_command} \
+    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db.tar.gz" \
+    "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files.tar.gz" \
+    "${tmp_dir}/repos/"
 
-# # sanity check
-#
-# for ending in 'done' 'testing'; do
-#   if [ "${ending}" = 'testing' ] && \
-#     [ -z "${packages_to_stabilize}" ]; then
-#     # if nothing is to be untested, we don't care about duplicate
-#     # testing packages (and maybe an unstaging fixes this anyway)
-#     continue
-#   fi
-#   if [ -n "$(
-#     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
-#       sed 's|\(\.[^.]\+\)\{4\}$||' | \
-#       sort | \
-#       uniq -d
-#     )" ]; then
-#     >&2 echo 'Removing duplicates not yet implemented:'
-#     find "${work_dir}/package-states" -name "*.${ending}" -printf '%f\n' | \
-#       sed 's|\(\.[^.]\+\)\{4\}$||' | \
-#       sort | \
-#       uniq -d
-#     exit 42
-#   fi
-# done
-#
-# # packages which are done
-#
-# find "${work_dir}/package-states" -maxdepth 1 -type f -name '*.done' -printf '%f\n' | \
-#   sed '
-#     s|\.done$||
-#   ' | \
-#   sort -u > \
-#   "${tmp_dir}/done-packages"
-#
-# # packages still on the build-list
-#
-# tr ' ' '.' < \
-#   "${work_dir}/build-list" | \
-#   sort -u > \
-#   "${tmp_dir}/keep-packages"
-#
-# find "${work_dir}/package-infos" -name '*.groups' \
-#   -exec grep -qx 'base\(-devel\)\?' {} \; \
-#   -printf '%f\n' | \
-#   sed '
-#     s|\.groups$||
-#   ' | \
-#   sort -u > \
-#   "${tmp_dir}/base-packages"
-#
-# # no base / base-devel packages on the build list?
-# if [ -z "$(
-#     join -j 1 \
-#       "${tmp_dir}/base-packages" \
-#       "${tmp_dir}/keep-packages"
-#   )" ]; then
-#   # unstage all base / base-devel packages from staging
-#   cat "${tmp_dir}/base-packages" "${tmp_dir}/base-packages" "${tmp_dir}/keep-packages" | \
-#     sort | \
-#     uniq -u | \
-#     sponge "${tmp_dir}/keep-packages"
-# fi
-#
-# # find all dependencies of the unstageable packages
-# mv \
-#   "${tmp_dir}/keep-packages" \
-#   "${tmp_dir}/new-keep-packages"
-# touch "${tmp_dir}/keep-packages"
-#
-# while [ -s "${tmp_dir}/new-keep-packages" ]; do
-#
-#   cat "${tmp_dir}/new-keep-packages" "${tmp_dir}/keep-packages" | \
-#     sort -u | \
-#     sponge "${tmp_dir}/keep-packages"
-#
-#   sed '
-#     s|^|'"${work_dir}"'/package-infos/|
-#     s|$|.depends|
-#   ' "${tmp_dir}/keep-packages" | \
-#     xargs -r grep -HF '' | \
-#     sed '
-#       s|^.*/||
-#       s|\.depends:| |
-#     ' | \
-#     sort -u | \
-#     sort -k2,2 > \
-#     "${tmp_dir}/keep-packages.depends"
-#
-#   sed '
-#     s|^|'"${work_dir}"'/package-infos/|
-#     s|$|.builds|
-#   ' "${tmp_dir}/done-packages" | \
-#     xargs -r grep -HF '' | \
-#     sed '
-#       s|^.*/||
-#       s|\.builds:| |
-#     ' | \
-#     sort -u | \
-#     sort -k2,2 > \
-#     "${tmp_dir}/done-packages.builds"
-#
-#   join -j 2 -o 1.1 \
-#     "${tmp_dir}/done-packages.builds" \
-#     "${tmp_dir}/keep-packages.depends" | \
-#     sort -u > \
-#     "${tmp_dir}/new-keep-packages"
-#
-#   # "new" is only what has not been there before
-#   cat "${tmp_dir}/keep-packages" "${tmp_dir}/keep-packages" "${tmp_dir}/new-keep-packages" | \
-#     sort | \
-#     uniq -u | \
-#     sponge "${tmp_dir}/new-keep-packages"
-#
-# done
-#
-# # unlock build list
-#
-# rm -f "${build_list_lock_file}"
-# flock -u 9
-#
-# clean_up_lock_file() {
-#   rm -rf --one-file-system "${tmp_dir}"
-#   rm -f "${package_database_lock_file}"
-# }
-#
-# # calculate unstageable packages from keep_packages and done_packages
-#
-# done_packages=$(
-#   cat \
-#     "${tmp_dir}/keep-packages" \
-#     "${tmp_dir}/keep-packages" \
-#     "${tmp_dir}/done-packages" | \
-#     sort | \
-#     uniq -u
-# )
-#
-# # move packages in packages_to_stabilize from *testing/ to the stable repos
-#
-# # shellcheck disable=SC2046
-# move_packages $(
-#
-#   for package in ${packages_to_stabilize}; do
-#
-#     if [ -z "${package}" ]; then
-#       continue
-#     fi
-#
-#     printf '%s/%s/%s\n' \
-#       "${package}" \
-#       "$(official_or_community "${package}" 'testing')" \
-#       "$(repository_of_package "${package}")"
-#
-#   done
-#
-# )
-#
-# # move packages from *staging to *testing
-#
-# # shellcheck disable=SC2046
-# move_packages $(
-#
-#   for package in ${done_packages}; do
-#
-#     if [ -z "${package}" ]; then
-#       continue
-#     fi
-#
-#     printf '%s/%s/%s\n' \
-#       "${package}" \
-#       "$(official_or_community "${package}" 'staging')" \
-#       "$(official_or_community "${package}" 'testing')"
-#
-#   done
-#
-# )
-#
-# clean_up_lock_file
+  tar -Oxzf "${tmp_dir}/repos/${repo}.db.tar.gz" --wildcards '*/desc' | \
+    sed -n '
+      /^%FILENAME%$/{
+        N
+        s/^\S\+\n\(\S\+-[^-.]\+\)\(-[^-]\+\)/\1.0\2 \1\2/
+        T
+        p
+      }
+    ' | \
+    while read -r old new; do
+      printf 's,/%s\\(\\.sig\\)\\?$,/%s\\1,\n' \
+        "$(str_to_regex "${old}")" \
+        "$(str_to_regex "${new}")"
+    done >> \
+    "${tmp_dir}/sub_pkgrel-removal.sed"
+
+  # shellcheck disable=SC2046
+  repo-remove "${tmp_dir}/repos/${repo}.db.tar.gz" \
+    $(
+      grep "^$(str_to_regex "${repo}") " "${tmp_dir}/packages" | \
+        cut -d' ' -f2
+    )
+  if ! ${no_action}; then
+    ${master_mirror_rsync_command} \
+      "${tmp_dir}/repos/${repo}.db.tar.gz" \
+      "${tmp_dir}/repos/${repo}.files.tar.gz" \
+      "${master_mirror_rsync_directory}/i686/${repo}/"
+  fi
+done < \
+  "${tmp_dir}/repositories"
+
+if [ -s "${tmp_dir}/sub_pkgrel-removal.sed" ]; then
+  sed -i -f "${tmp_dir}/sub_pkgrel-removal.sed" "${tmp_dir}/package-files"
+fi
+
+if ${no_action}; then
+  printf 'Now, I would remove the packages from the database and delete the following files from the master mirror:\n'
+  sed '
+    s,^,  ,
+  ' "${tmp_dir}/package-files"
+  exit
+fi
+
+# shellcheck disable=SC2016
+{
+  printf 'CREATE TEMPORARY TABLE `to_deletes` (`id` BIGINT, UNIQUE KEY (`id`));\n'
+  printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `to_deletes`;\n' \
+    "${tmp_dir}/package-ids"
+
+  printf 'UPDATE `binary_packages` '
+  printf ' JOIN `to_deletes` ON `to_deletes`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_architectures
+  printf ' SET `repository`=('
+    printf 'SELECT `repositories`.`id`'
+    printf ' FROM `repositories`'
+    printf ' WHERE `repositories`.`name`="deletion-list"'
+  printf ');\n'
+} | \
+  mysql_run_query
+
+sed '
+  s,^,rm "i686/,
+  s,$,",
+' "${tmp_dir}/package-files" | \
+  ${master_mirror_sftp_command}

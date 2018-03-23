@@ -23,11 +23,24 @@ if ! flock -s -n 8; then
   exit 1
 fi
 
+# shellcheck disable=SC2016
 {
-  sed -n "/^$1/p" "${work_dir}/build-list"
-  sed "/^$1/d" "${work_dir}/build-list"
+  printf 'UPDATE `build_assignments`'
+  mysql_join_build_assignments_package_sources
+  mysql_join_build_assignments_binary_packages
+  mysql_join_binary_packages_repositories
+  printf ' SET `build_assignments`.`priority`=('
+    printf 'SELECT COALESCE(MAX(`all_priorities`.`priority`),0)+1'
+    printf ' FROM ('
+      printf 'SELECT `others`.`priority`'
+      printf ' FROM `build_assignments` AS `others`'
+    printf ') AS `all_priorities`'
+  printf ')'
+  printf ' WHERE `package_sources`.`pkgbase` REGEXP from_base64("%s")' \
+    "$(printf '%s' "$1" | base64 -w0)"
+  printf ' AND `repositories`.`name`="build-list";\n'
 } | \
-  sponge "${work_dir}/build-list"
+  mysql_run_query
 
 # Remove the lock file
 

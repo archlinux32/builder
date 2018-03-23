@@ -1,0 +1,92 @@
+#!/bin/sh
+
+# Rudimentary copy a package from one repository to another.
+# Note, that we do _not_ need to have the package itself, since all
+# relevant information is already in the original package database.
+
+# "Rudimentary" means the following restrictions:
+#   - no arguments are accepted
+#   - no database signatures are handled
+#   - only *.db.tar.gz and *.files.tar.gz are recognized as database
+
+usage() {
+  >&2 echo 'usage:'
+  >&2 echo ' repo-copy from-repo.db.tar.gz to-repo.db.tar.gz package1 package2 ...'
+  >&2 echo
+  >&2 echo 'Note, that the packages must be given with version, e.g. "linux-4.15.7-1.0".'
+  exit 2
+}
+
+if [ $# -le 2 ]; then
+  usage
+fi
+
+from_repo="$1"
+to_repo="$2"
+shift
+shift
+
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/repo-tools.XXXXXXXXXX")
+trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
+
+# extract the databases
+for repo in 'from' 'to'; do
+  for archive in 'db' 'files'; do
+    eval 'repo_db="${'"${repo}"'_repo}"'
+    if [ "${repo_db}" = "${repo_db%.db.tar.gz}" ]; then
+      >&2 printf '"%s" has an invalid suffix.\n' "${repo_db}"
+      usage
+    fi
+    if [ "${archive}" = 'files' ]; then
+      repo_db="${repo_db%.db.tar.gz}.files.tar.gz"
+    fi
+    if [ ! -f "${repo_db}" ]; then
+      >&2 printf 'Cannot open file "%s".\n' "${repo_db}"
+      usage
+    fi
+    mkdir "${tmp_dir}/${repo}.${archive}"
+    bsdtar -C "${tmp_dir}/${repo}.${archive}" -xf "${repo_db}"
+  done
+done
+
+# move the packages
+for package in "$@"; do
+  errors=$(
+    find "${tmp_dir}/to.db" "${tmp_dir}/to.files" -mindepth 1 -maxdepth 1 \
+      -printf '%f\n' | \
+      sed 's/-[^-]\+-[^-]\+$//' | \
+      grep -xF "${package%-*-*}"
+  )
+  if [ -n "${errors}" ]; then
+    >&2 printf 'The target repository "%s" already contains the following packages - "repo-remove" them first:\n' \
+      "${to_repo}"
+    >&2 printf '%s\n' "${errors}"
+    exit 2
+  fi
+  for archive in 'db' 'files'; do
+    if [ ! -d "${tmp_dir}/from.${archive}/${package}" ]; then
+      >&2 printf 'Repository "%s" does not contain package "%s"\n' \
+        "${from_repo}" "${package}"
+      exit 2
+    fi
+    mv "${tmp_dir}/from.${archive}/${package}" "${tmp_dir}/to.${archive}/"
+  done
+done
+
+# pack the database
+for archive in 'db' 'files'; do
+  repo_db="${to_repo}"
+  if [ "${archive}" = 'files' ]; then
+    repo_db="${repo_db%.db.tar.gz}.files.tar.gz"
+  fi
+  bsdtar -C "${tmp_dir}" -czf "${tmp_dir}/${repo_db##*/}" --strip-components=1 "to.${archive}"
+done
+
+# move the database in place
+for archive in 'db' 'files'; do
+  repo_db="${to_repo}"
+  if [ "${archive}" = 'files' ]; then
+    repo_db="${repo_db%.db.tar.gz}.files.tar.gz"
+  fi
+  mv "${tmp_dir}/${repo_db##*/}" "${repo_db}"
+done

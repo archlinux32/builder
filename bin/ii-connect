@@ -8,7 +8,7 @@
 # start ii if it is not running
 if ! pgrep -x ii > /dev/null; then
   rm -rf --one-file-system "${irc_dir}"
-  screen -S ii -d -m ii -f buildmaster -n buildmaster
+  screen -S ii -d -m ii -s irc.freenode.net -f buildmaster -n buildmaster
   sleep 10
 fi
 
@@ -19,12 +19,12 @@ if tail -n1 "${irc_dir}/nickserv/out" 2> /dev/null | \
     sponge "${irc_dir}/nickserv/in"
 fi
 
-# join #archlinux-ports if not yet done
+# join #archlinux32 if not yet done
 if ! grep ' buildmaster\.archlinux32\.org .* buildmaster$' "${irc_dir}/out" | \
   tail -n1 | \
-  grep -q ' #archlinux-ports '; then
+  grep -q ' #archlinux32 '; then
   {
-    echo '/j #archlinux-ports'
+    echo '/j #archlinux32'
     echo '/WHO buildmaster'
   } | \
     sponge "${irc_dir}/in"
@@ -39,7 +39,6 @@ fi
 if [ "$1" = 'watch' ]; then
   while pgrep -x 'ii' > /dev/null; do
     find "${irc_dir}" \
-      -regextype sed \
       -type f \
       -name 'out' \
       -printf '%p\n' | \
@@ -51,10 +50,10 @@ if [ "$1" = 'watch' ]; then
         else
           prefix=''
         fi
-        regex='^\S\+ \S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
+        regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
         if grep -q "${regex}" "${out_file}"; then
           sed -n '
-            s/'"${regex}"'/\1 /
+            s/'"${regex}"'/\2 /
             T
             p
           ' "${out_file}" | \

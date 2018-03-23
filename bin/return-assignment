@@ -47,17 +47,37 @@ trap clean_up_lock_file EXIT
 if [ "$5" = 'ERROR' ]; then
 # the build failed on the build slave
 
-  if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
-    ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-    >&2 echo 'Too late, package already outdated, I ignore this error report.'
+  # shellcheck disable=SC2016
+  infos=$(
+    {
+      printf 'SELECT DISTINCT `build_assignments`.`id`,IF(`build_assignments`.`is_broken`,"true","false") FROM `build_slaves`'
+      mysql_join_build_slaves_build_assignments
+      mysql_join_build_assignments_package_sources
+      mysql_join_package_sources_upstream_repositories
+      mysql_join_build_assignments_binary_packages
+      mysql_join_binary_packages_repositories
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+        "$(
+          # shellcheck disable=SC2154
+          printf '%s' "${slave}" | \
+            base64 -w0
+        )"
+      printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+        'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+        'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+        'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+      printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+        "$(printf '%s' "$4" | base64 -w0)"
+      printf ' AND `repositories`.`name`="build-list"'
+    } | \
+      mysql_run_query | \
+      tr '\t' ' '
+  )
+  if [ -z "${infos}" ]; then
+    >&2 echo 'You do not build this package (anymore) - move on.'
     exit 2
   fi
-
-  # shellcheck disable=SC2154
-  if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
-    >&2 echo 'You do not build this package - move on.'
-    exit 2
-  fi
+  was_broken_before="${infos##* }"
 
   # save sent build logs
   saved_build_logs=$(
@@ -69,15 +89,6 @@ if [ "$5" = 'ERROR' ]; then
       '*.build-log.gz'
   )
 
-  if [ -f "${work_dir}/package-states/$1.$2.$3.$4.broken" ]; then
-    was_broken_before=true
-  else
-    was_broken_before=false
-  fi
-
-  # shellcheck disable=SC2154
-  echo "${slave}" >> \
-    "${work_dir}/package-states/$1.$2.$3.$4.broken"
   # shellcheck disable=SC2016
   {
     if [ -n "${saved_build_logs}" ]; then
@@ -94,8 +105,7 @@ if [ "$5" = 'ERROR' ]; then
           printf 'SELECT `fail_reasons`.`id`,replace(to_base64(`fail_reasons`.`identifier`),"\\n","")'
           printf ' FROM `fail_reasons` ORDER BY `fail_reasons`.`severity`'
         } | \
-          ${mysql_command} --raw --batch | \
-          sed '1d'
+          mysql_run_query
       )
       for saved_build_log in ${saved_build_logs}; do
         printf '%s' "${fail_reason_identifiers}" | \
@@ -139,7 +149,7 @@ if [ "$5" = 'ERROR' ]; then
       printf 'DROP TABLE `failures`;\n'
     fi
     printf 'UPDATE `build_assignments`'
-    printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
+    mysql_join_build_assignments_build_slaves
     printf ' SET `build_assignments`.`is_broken`=1, `build_slaves`.`currently_building`=NULL'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(
@@ -147,36 +157,7 @@ if [ "$5" = 'ERROR' ]; then
           base64 -w0
       )"
   } | \
-    ${mysql_command}
-
-  # shellcheck disable=SC2154
-  sed -i '
-    /^'"$(str_to_regex "${slave}")"'$/d
-  ' "${work_dir}/package-states/$1.$2.$3.$4.locked"
-  if [ ! -s "${work_dir}/package-states/$1.$2.$3.$4.locked" ]; then
-    rm "${work_dir}/package-states/$1.$2.$3.$4.locked"
-
-    # unlock every loop this package would have broken and which is not
-    # broken by another locked package
-    locked_packages=$(
-      find "${work_dir}/package-states/" -maxdepth 1 -name '*.locked' -printf '%f\n' | \
-        sed 's@^\(.\+\)\.\([0-9a-f]\{40\}\.\)\{2\}[^.]\+\.locked$@\1@'
-    )
-    find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-      -regex '.*/loop_[0-9]\+' \
-      -exec grep -qxF "$1" '{}' \; \
-      -not -exec grep -qxF "${locked_packages}" '{}' \; \
-      -exec rm '{}.locked' \;
-
-    # move that build order to the end of the build-list
-    sed -i '
-      /^'"$(str_to_regex "$1 $2 $3 $4")"'$/ {
-        $ b
-        d
-      }
-      $ a '"$1 $2 $3 $4" \
-      "${work_dir}/build-list"
-  fi
+    mysql_run_query
 
   # release lock on build-list - otherwise seed-build-list won't run
   flock -u 9
@@ -195,7 +176,7 @@ if [ "$5" = 'ERROR' ]; then
         ' | \
         tr ' ' '\n' | \
         sed '
-          s/^/-p ^haskell-/
+          s/^/-p ^(haskell-)?/
           s/-[0-9.]\+$/\$/
         ' | \
         sort -u
@@ -209,21 +190,19 @@ if [ "$5" = 'ERROR' ]; then
       fi
     )
 
-    if [ -p "${irc_dir}/#archlinux-ports/in" ]; then
-      {
-        printf '%s is broken (says %s).' \
-          "$1" \
-          "${slave}"
-        if [ -n "${rescheduled_packages}" ]; then
-          printf -- ' - I rescheduled:'
-          # shellcheck disable=SC2086
-          printf ' %s,' ${rescheduled_packages} | \
-            sed 's/,$/./'
-        fi
-        printf '\n'
-      } | \
-        sponge "${irc_dir}/#archlinux-ports/in"
-    fi
+    {
+      printf '%s is broken (says %s).' \
+        "$1" \
+        "${slave}"
+      if [ -n "${rescheduled_packages}" ]; then
+        printf -- ' - I rescheduled:'
+        # shellcheck disable=SC2086
+        printf ' %s,' ${rescheduled_packages} | \
+          sed 's/,$/./'
+      fi
+      printf '\n'
+    } | \
+      irc_say
   fi
 
   exit 0
@@ -245,16 +224,30 @@ clean_up_lock_file() {
   rm -f "${package_database_lock_file}"
 }
 
-if ! grep -qxF "$1 $2 $3 $4" "${work_dir}/build-list" ||
-  ! [ -f "${work_dir}/package-states/$1.$2.$3.$4.locked" ] ||
-  ! [ "$5" = "$(next_sub_pkgrel "$1" "$2" "$3" "$4")" ]; then
+# shellcheck disable=SC2016
+if ! {
+    printf 'SELECT count(*)'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_build_slaves
+    mysql_join_binary_packages_repositories
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_slaves`.`name`=from_base64("%s")' \
+      "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' AND `package_sources`.`%s`=from_base64("%s")' \
+      'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
+      'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
+      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
+    printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
+      "$(printf '%s' "$4" | base64 -w0)"
+    printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
+      "$(printf '%s' "$5" | base64 -w0)"
+  } | \
+    mysql_run_query | \
+    grep -qvxF '0'; then
   >&2 echo 'Sorry, the sent package is outdated.'
-  exit 2
-fi
-
-# shellcheck disable=SC2154
-if ! grep -qxF "${slave}" "${work_dir}/package-states/$1.$2.$3.$4.locked"; then
-  >&2 echo 'Whoops, this package is not built by this slave.'
   exit 2
 fi
 
@@ -274,17 +267,41 @@ tar -x \
   --no-wildcards-match-slash \
   '*.pkg.tar.xz' \
   '*.pkg.tar.xz.sig' \
-  '*.pkg.tar.xz-namcap.log.gz'
+  '*.pkg.tar.xz-namcap.log.gz' \
+  '*.pkg.tar.xz.so.needs.gz' \
+  '*.pkg.tar.xz.so.provides.gz'
 
-# check if all packages are signed and all signatures belong to a package
+# check if all packages come with:
+#  - a package file
+#  - a signature
+#  - a namcap log
+#  - a list of needed libraries
+#  - a list of provided libraries
 missing_files=$(
-  find . -maxdepth 1 -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' -o -name '*.pkg.tar.xz-namcap.log.gz' | \
+  find . -maxdepth 1 \( \
+    \( \
+      -name '*.pkg.tar.xz' \
+      -printf '%f package\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz.sig' \
+      -printf '%f signature\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz-namcap.log.gz' \
+      -printf '%f namcap\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz.so.needs.gz' \
+      -printf '%f needed-libraries\n' \
+    \) -o \
+    \( \
+      -name '*.pkg.tar.xz.so.provides.gz' \
+      -printf '%f provided-libraries\n' \
+    \) \
+  \) | \
     sed '
-      s@\.sig$@ signature@
-      t
-      s@-namcap\.log\.gz$@ namcap@
-      t
-      s@$@ package@
+      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\.gz\|\.so\.\(provides\|needs\)\.gz\) /\1 /
     ' | \
     sort -k1,1 -k2,2 | \
     sed '
@@ -315,11 +332,23 @@ missing_files=$(
         p
         g
       }
+      / needed-libraries /!{
+        h
+        s/^\(\S\+\) .*$/List of libraries needed by "\1" is missing./
+        p
+        g
+      }
+      / provided-libraries /!{
+        h
+        s/^\(\S\+\) .*$/List of libraries provided by "\1" is missing./
+        p
+        g
+      }
     '
 )
 
 if [ -n "${missing_files}" ]; then
-  >&2 echo 'The following packages lack a signature, namcap log or package file:'
+  >&2 echo 'The following packages lack a signature, namcap log, package file or list of needed/provided libraries:'
   >&2 echo "${missing_files}"
   exit 3
 fi
@@ -353,16 +382,27 @@ package_errors=$(
     # shellcheck disable=SC2086
     printf '%s\n' ${packages} | \
       sed '
-        s@\(-[^-]\+\)\{2\}-\([^-]\+\)\.pkg\.tar\.xz$@ \2@
-        / any$/{
-          s|any$|i686|
-        }
         s|^|was_built: |
       '
-    sed '
-      s|$| i686|
-      s|^|expected: |
-    ' "${work_dir}/package-infos/$1.$2.$3.$4.packages"
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT CONCAT('
+        printf '"expected: ",'
+        mysql_package_name_query
+      printf ')'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_architectures
+      mysql_join_binary_packages_build_slaves
+      mysql_join_binary_packages_repositories
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+        "$(
+          printf '%s' "${slave}" | \
+            base64 -w0
+        )"
+      printf ' AND `repositories`.`name`="build-list"'
+      printf ';\n'
+    } | \
+      mysql_run_query
   } | \
     sort -k2 | \
     uniq -u -f1
@@ -376,6 +416,62 @@ fi
 
 # move namcap.logs
 find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
+
+# insert provided libraries into database
+# shellcheck disable=SC2016
+{
+  for lib_link in 'pl:provides' 'nl:needs'; do
+    printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(128));\n' \
+      "${lib_link%:*}"
+    find . -maxdepth 1 -name '*.pkg.tar.xz.so.'"${lib_link#*:}"'.gz' -execdir zgrep -HF '' '{}' \; | \
+      sed -n '
+        s,^\./\(.\+\.pkg\.tar\.xz\)\.so\.'"${lib_link#*:}"'\.gz:\([^:]\+\)$,\1\n\2,
+        T
+        p
+      ' | \
+      base64_encode_each | \
+      sed '
+        N
+        s/^\(\S\+\)\n\(\S\+\)$/(from_base64("\1"),from_base64("\2")),/
+        $s/,$/;/
+        2 s/^/INSERT INTO `'"${lib_link%:*}"'` (`pkgfile`,`lib`) VALUES /
+      '
+    printf 'INSERT IGNORE INTO `install_targets` (`name`)'
+    printf ' SELECT DISTINCT `%s`.`lib` FROM `%s`;\n' \
+      "${lib_link%:*}" "${lib_link%:*}"
+    if [ "${lib_link%:*}" = 'pl' ]; then
+      printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
+    else
+      printf 'INSERT IGNORE INTO `dependencies` (`dependent`,`depending_on`,`dependency_type`)'
+    fi
+    printf ' SELECT `binary_packages`.`id`,`install_targets`.`id`'
+    if [ "${lib_link%:*}" = 'nl' ]; then
+      printf ',`dependency_types`.`id`'
+    fi
+    printf ' FROM `install_targets`'
+    if [ "${lib_link%:*}" = 'nl' ]; then
+      printf ' JOIN `dependency_types` ON `dependency_types`.`name`="link"'
+    fi
+    printf ' JOIN `%s` ON `%s`.`lib`=`install_targets`.`name`' \
+      "${lib_link%:*}" "${lib_link%:*}"
+    printf ' JOIN `binary_packages`'
+    mysql_join_binary_packages_architectures
+    mysql_join_binary_packages_build_slaves
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+      "$(
+        printf '%s' "${slave}" | \
+          base64 -w0
+      )"
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' AND '
+    mysql_package_name_query
+    printf '=`%s`.`pkgfile`' \
+      "${lib_link%:*}"
+    printf ';\n'
+  done
+} | \
+  mysql_run_query
 
 # move packages
 destination=$(official_or_community "$1.$2.$3.$4" 'staging')
@@ -401,58 +497,46 @@ for package in ${packages}; do
   remove_old_package_versions 'i686' "${destination}" "${package}"
 done
 
-# remove old state files (these should be only "done" markers, but
-# actually we don't care what it is) - as long as it's not "testing" or "tested"
-find "${work_dir}/package-states" -maxdepth 1 -regextype grep \
-  -not -name '*.testing' \
-  -not -name '*.tested' \
-  -regex '.*/'"$(str_to_regex "$1")"'\(\.[^.]\+\)\{4\}' \
-  -not -regex '.*/'"$(str_to_regex "$1.$2.$3.$4")"'\.[^.]\+' \
-  -exec rm '{}' \;
-
-# remove all loops which are broken by this package
-find "${work_dir}/build-list.loops" -maxdepth 1 -regextype grep \
-  -regex '.*/loop_[0-9]\+' \
-  -exec grep -qxF "$1" '{}' \; \
-  -exec rm '{}.locked' \;
-
-# remove package from build list
-sed -i "/^$(str_to_regex "$1 $2 $3 $4")\$/d" "${work_dir}/build-list"
-
-# remove package lock file
-if ! [ "${destination}" = 'build-support' ]; then
-  # shellcheck disable=SC2086
-  printf '%s\n' ${packages} > \
-    "${work_dir}/package-states/$1.$2.$3.$4.done"
-fi
 # shellcheck disable=SC2016
 {
   printf 'UPDATE `build_assignments`'
-  printf ' JOIN `build_slaves` ON `build_slaves`.`currently_building`=`build_assignments`.`id`'
-  printf ' JOIN `binary_packages` ON `binary_packages`.`build_assignment`=`build_assignments`.`id`'
+  mysql_join_build_assignments_build_slaves
+  mysql_join_build_assignments_binary_packages
+  mysql_join_binary_packages_repositories '' 'old_repo'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
-  printf ' `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`=from_base64("%s")),' \
+  printf ' `build_assignments`.`priority`=0,'
+  printf ' `binary_packages`.`repository`=(SELECT `new_repo`.`id` FROM `repositories` AS `new_repo` WHERE `new_repo`.`name`=from_base64("%s")),' \
     "$(
       printf '%s' "${destination}" | \
         base64 -w0
     )"
   printf ' `binary_packages`.`has_issues`=0,'
   printf ' `binary_packages`.`is_tested`=0'
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
     "$(
       printf '%s' "${slave}" | \
         base64 -w0
     )"
-  printf 'UPDATE `build_slaves` SET'
-  printf ' `build_slaves`.`currently_building`=NULL'
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+  printf ' AND `old_repo`.`name`="build-list";\n'
+  printf 'UPDATE `build_slaves` AS `to_update`'
+  printf ' JOIN `build_slaves` AS `current_slave`'
+  printf ' ON `to_update`.`currently_building`=`current_slave`.`currently_building`'
+  printf ' SET `to_update`.`currently_building`=NULL'
+  printf ' WHERE `current_slave`.`name`=from_base64("%s");\n' \
     "$(
       printf '%s' "${slave}" | \
         base64 -w0
     )"
+  printf 'CREATE TEMPORARY TABLE `loops_to_delete` (`loop` MEDIUMINT);\n'
+  printf 'INSERT INTO `loops_to_delete`'
+  printf ' SELECT `build_dependency_loops`.`loop` FROM `build_dependency_loops`'
+  mysql_join_build_dependency_loops_binary_packages
+  mysql_join_binary_packages_repositories
+  printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
+  printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('
+  printf 'SELECT * FROM `loops_to_delete` WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'
+  printf ');\n'
+  printf 'DROP TABLE `loops_to_delete`;\n'
 } | \
-  ${mysql_command}
-rm -f \
-  "${work_dir}/package-states/$1.$2.$3.$4.locked" \
-  "${work_dir}/package-states/$1.$2.$3.$4.broken"
+  mysql_run_query
