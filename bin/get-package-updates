@@ -127,31 +127,30 @@ delete_package() {
   fi
 }
 
-# Update git repositories (official packages, community packages and the repository of package customizations).
-
-for repo in ${repo_names}; do
-  eval repo_path='"${repo_paths__'"${repo}"'}"'
-  git -C "${repo_path}" fetch origin master:master
-done
-
-# Read previous git revision numbers from files.
-
 something_new=false
 
 for repo in ${repo_names}; do
-  eval "old_repo_revisions__${repo}='$(
-    cat "${work_dir}/${repo}.revision" 2> /dev/null || \
-      echo NONE
-  )'"
   eval repo_path='"${repo_paths__'"${repo}"'}"'
-  eval "new_repo_revisions__${repo}='$(
-    if ${pull}; then
-      git -C "${repo_path}" rev-parse HEAD
-    else
-      cat "${work_dir}/${repo}.revision"
-    fi | \
-      tee "${work_dir}/${repo}.revision.new"
+  # Update git repositories (official packages, community packages and the repository of package customizations).
+  git -C "${repo_path}" fetch origin master:master
+  # read previous git revision numbers from database.
+  # shellcheck disable=SC2016
+  eval "old_repo_revisions__${repo}='$(
+    {
+      printf 'SELECT `git_repositories`.`head` FROM `git_repositories`'
+      printf ' WHERE `git_repositories`.`name`=from_base64("%s");\n' \
+        "$(printf '%s' "${repo}" | base64 -w0)"
+    } | \
+      mysql_run_query
   )'"
+  # determine new git revision
+  if ${pull}; then
+    eval "new_repo_revisions__${repo}='$(
+      git -C "${repo_path}" rev-parse HEAD
+    )'"
+  else
+    eval 'new_repo_revisions__'"${repo}"'="${old_repo_revisions__'"${repo}"'}"'
+  fi
   if ! eval '[ "${new_repo_revisions__'"${repo}"'}" = "${old_repo_revisions__'"${repo}"'}" ]'; then
     something_new=true
   fi
@@ -241,24 +240,26 @@ done | \
   while read -r mode package git_revision repository; do
     if [ "${mode}" = 'D' ]; then
       # deleted PKGBUILD
-      git_revision=$(cat "${work_dir}/archlinux32.revision.new")
+      # shellcheck disable=SC2154
+      git_revision="${new_repo_revisions__archlinux32}"
       found_package=false
       for repository in ${repo_names}; do
         eval 'repo_path="${repo_paths__'"${repository}"'}"'
         if [ "${repository}" = "archlinux32" ]; then
-          if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision.new")" 2> /dev/null | \
+          if git -C "${repo_path}" archive "${new_repo_revisions__archlinux32}" 2> /dev/null | \
             tar -t 2> /dev/null | \
             grep -q "/$(str_to_regex "${package}")/PKGBUILD$"; then
             found_package=true
             break;
           fi
         else
-          if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision.new")" -- "${package}/repos" 2> /dev/null | \
-            tar -t --wildcards "${package}/repos/*/PKGBUILD" 2> /dev/null | \
-            cut -d/ -f3 | \
-            grep -v 'staging\|testing\|-unstable' | \
-            grep -vq -- '-i686$'; then
-            git_revision=$(cat "${work_dir}/${repository}.revision.new")
+          # shellcheck disable=SC2154
+          if eval 'git -C "${repo_path}" archive "${new_repo_revisions__'"${repository}"'}" -- "${package}/repos" 2> /dev/null | ' \
+            'tar -t --wildcards "${package}/repos/*/PKGBUILD" 2> /dev/null | ' \
+            'cut -d/ -f3 | ' \
+            'grep -v '"'"'staging\|testing\|-unstable'"'"' | ' \
+            'grep -vq -- '"'"'-i686$'"'"; then
+            eval 'git_revision="${new_repo_revisions__'"${repository}"'}"'
             found_package=true
             break;
           fi
@@ -420,11 +421,14 @@ if [ "${deletion_list_count}" -gt 1000 ]; then
     {
       printf '\001ACTION refuses to blacklist %s packages.\001\n' "${deletion_list_count}"
       for repo_name in ${repo_names}; do
-        if ! diff -q "${work_dir}/${repo_name}.revision" "${work_dir}/${repo_name}.revision.new" >/dev/null; then
+        eval 'old_revision="${old_repo_revisions__'"${repo_name}"'}"'
+        eval 'new_revision="${new_repo_revisions__'"${repo_name}"'}"'
+        # shellcheck disable=SC2154
+        if [ "${old_revision}" != "${new_revision}" ]; then
           printf '%s: %s -> %s\n' \
             "${repo_name}" \
-            "$(cat "${work_dir}/${repo_name}.revision")" \
-            "$(cat "${work_dir}/${repo_name}.revision.new")"
+            "${old_revision}" \
+            "${new_revision}"
         fi
       done
     } | \
@@ -501,14 +505,6 @@ echo 'Done - mark decisions as final.'
 # update loop list in database (beware, the packages are expected to be in "build-list",
 # not "to-be-decided", so we need to run this after moving the packages from "to-be-decided" to the "build-list".
 mysql_find_build_assignment_loops
-
-# Move the .new-files to the actual files
-
-# shellcheck disable=SC2086
-printf '%s.revision\n' ${repo_names} | \
-  while read -r file; do
-    mv "${work_dir}/${file}.new" "${work_dir}/${file}"
-  done
 
 # Remove the lock file
 
