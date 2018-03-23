@@ -622,8 +622,8 @@ fi
             base64 -w0
         )" \
         "$(
-          base64_encode_each < \
-            "${work_dir}/${repo}.revision"
+          git -C "${repo_path}" rev-parse HEAD | \
+            base64_encode_each
         )" | \
         sed 's|,$|),|'
     done
