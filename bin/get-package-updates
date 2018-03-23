@@ -454,6 +454,30 @@ echo 'Done - mark decisions as final.'
 
 # shellcheck disable=SC2016
 {
+  # save blacklist into database
+  printf 'CREATE TEMPORARY TABLE `bl` (`pkgbase` VARCHAR(64), `reason` TEXT);\n'
+  git -C "${repo_paths__archlinux32}" archive "${new_repo_revisions__archlinux32}" -- 'blacklist' | \
+    tar -Ox 'blacklist' | \
+    sed -n '
+      s/^\(\S\+\)\s*#\s*/\1 /
+      T
+      p
+    ' | \
+    while read -r pkgbase reason; do
+      printf '(from_base64("%s"),from_base64("%s")),\n' \
+        "$(printf '%s' "${pkgbase}" | base64 -w0)" \
+        "$(printf '%s' "${reason}" | base64 -w0)"
+    done | \
+    sed '
+      1 i INSERT INTO `bl` (`pkgbase`,`reason`) VALUES
+      $ s/,$/;/
+    '
+  printf 'UPDATE `build_assignments`'
+  mysql_join_build_assignments_package_sources
+  printf ' LEFT JOIN `bl` ON `package_sources`.`pkgbase`=`bl`.`pkgbase`'
+  printf ' SET `build_assignments`.`is_black_listed`=`bl`.`reason`;\n'
+  printf 'DROP TEMPORARY TABLE `bl`;\n'
+
   # update hashes of repositories in mysql database
   for repo in ${repo_names}; do
     printf 'UPDATE `git_repositories`'
