@@ -88,34 +88,24 @@ find_repository_with_commit() {
 find_git_repository_to_package_repository() {
 
   local repository
-  local package_repository
-  local repo_path
 
-  package_repository="$1"
-
-  if [ "$1" = 'build-support' ]; then
-    echo 'packages'
+  repository=$(
+    # shellcheck disable=SC2016
+    {
+      printf 'SELECT `git_repositories`.`name` FROM `git_repositories`'
+      mysql_join_git_repositories_upstream_repositories
+      printf ' WHERE `upstream_repositories`.`name`=from_base64("%s");\n' \
+        "$(printf '%s' "$1" | base64 -w0)"
+    } | \
+      mysql_run_query
+  )
+  if [ -z "${repository}" ]; then
+    >&2 echo "can't find git repository with package repository '$1'"
+    exit 1
+  else
+    echo "${repository}"
     return 0
   fi
-
-  for repository in ${repo_names}; do
-    if [ "${repository}" = "archlinux32" ]; then
-      continue
-    fi
-    eval 'repo_path="${repo_paths__'"${repository}"'}"'
-    if git -C "${repo_path}" archive "$(cat "${work_dir}/${repository}.revision")" -- | \
-      tar -t --wildcards '*/repos' | \
-      grep '^\([^/]\+/\)\{3\}PKGBUILD$' | \
-      cut -d/ -f3 | \
-      sed 's|-[^-]\+$||' | \
-      sort -u | \
-      grep -qxF "${package_repository}"; then
-      echo "${repository}"
-      return 0
-    fi
-  done
-  >&2 echo "can't find git repository with package repository '$1'"
-  exit 1
 
 }
 
