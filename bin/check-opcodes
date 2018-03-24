@@ -108,7 +108,7 @@ case $ARCH in
     OPCODE_ARGS='-s SSE2 -s SSE3'
     ;;
   *)
-    echo "ERROR: architecture must currently be one of i486 and i686" >&2
+    echo "ERROR: architecture must currently be one of i486, i686 and pentium3" >&2
     usage
     exit 1
 esac
