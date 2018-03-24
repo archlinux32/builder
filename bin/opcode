@@ -25,8 +25,8 @@
 #   * Remove all line in Opcode_ARM_THUMB
 # return values
 
-# shellcheck disable=SC2001,SC2034,SC2086
 
+# return values
 EXIT_FOUND=0
 EXIT_NOT_FOUND=1
 EXIT_USAGE=2
@@ -45,7 +45,6 @@ Line_Numbers=false
 Leading_Context=0
 Trailing_Context=0
 
-# shellcheck source=lib/opcode_list
 source "${0%/*}/../lib/opcode_list"   # include opcodes from a separate file
 
 # GAS-specific opcodes (unofficial names) belonging to the x64 instruction set.
@@ -166,7 +165,7 @@ usage() {
     echo "The script uses Intel opcode syntax. When used in conjunction with objdump, \`-M intel' must be set in order to prevent opcode translation using AT&T syntax."
     echo
     echo "BE AWARE THAT THE LIST OF KNOWN INSTRUCTIONS OR INSTRUCTIONS SUPPORTED BY PARTICULAR ARCHITECTURES (ESPECIALLY AMD'S) IS ONLY TENTATIVE AND MAY CONTAIN MISTAKES!"
-    kill -TRAP "$TOP_PID"
+    kill -TRAP $TOP_PID
 }
 
 list_contains() {   # Returns 0 if $2 is in array $1, 1 otherwise.
@@ -179,25 +178,25 @@ list_contains() {   # Returns 0 if $2 is in array $1, 1 otherwise.
 
 build_instruction_set() {   # $1 = enum { Arch, InstSet }, $2 = architecture or instruction set as obtained using -L or -l, $3 = "architecture"/"instruction set" to be used in error message
     local e
-    list_contains "$(eval echo \\\$${1}List)" "$2" || (echo "$2 is not a valid $3."; usage)     # Test if the architecture/instruction set is valid.
-    if [ -n "$(eval echo \\\$${1}_${2})" ]; then                                                # Add the instruction set(s) if any.
-        for e in $(eval echo \\\$${1}_${2}); do                                                 # Skip duplicates.
+    list_contains "`eval echo \\\$${1}List`" "$2" || (echo "$2 is not a valid $3."; usage)      # Test if the architecture/instruction set is valid.
+    if [ -n "`eval echo \\\$${1}_${2}`" ]; then                                                 # Add the instruction set(s) if any.
+        for e in `eval echo \\\$${1}_${2}`; do                                                  # Skip duplicates.
             list_contains "$InstSet_Base" $e || InstSet_Base="$e $InstSet_Base"
         done
     fi
     if [ $Recursive = true ]; then
-        for a in $(eval echo \\\$${1}Dep_$2); do
+        for a in `eval echo \\\$${1}Dep_$2`; do
             build_instruction_set $1 $a "$3"
         done
     fi
-    InstSet_Base=$(echo $InstSet_Base | sed 's/$ *//')                                          # Remove trailing space.
+    InstSet_Base="`echo $InstSet_Base | sed 's/$ *//'`"                                         # Remove trailing space.
 }
 
-trap 'exit $EXIT_USAGE' TRAP    # Allow usage() function to abort script execution.
+trap "exit $EXIT_USAGE" TRAP    # Allow usage() function to abort script execution.
 export TOP_PID=$$               # PID of executing process.
 
 # Parse command line arguments.
-while getopts ":ra:s:LliIcf:d:D:CvVm:nB:A:h" o; do
+while getopts ":ra:s:LliIcf:Fd:D:CvVm:nB:A:h" o; do
     case $o in
         r) Recursive=true ;;
         a) build_instruction_set Arch "$OPTARG" "architecture" ;;
@@ -209,19 +208,19 @@ while getopts ":ra:s:LliIcf:d:D:CvVm:nB:A:h" o; do
                 echo $InstSet_Base
                 exit $EXIT_USAGE
             else
-                echo -e "No instruction set or architecture set.\\n"
+                echo -e "No instruction set or architecture set.\n"
                 usage
             fi
             ;;
         I)
             if [ -n "$InstSet_Base" ]; then
                 for s in $InstSet_Base; do
-                    echo -ne "\\e[31;1m$s:\\e[0m "
+                    echo -ne "\e[31;1m$s:\e[0m "
                     eval echo "\$Opcode_$s"
                 done
                 exit $EXIT_USAGE
             else
-                echo -e "No instruction set or architecture set.\\n"
+                echo -e "No instruction set or architecture set.\n"
                 usage
             fi
             ;;
@@ -230,12 +229,12 @@ while getopts ":ra:s:LliIcf:d:D:CvVm:nB:A:h" o; do
             # Unlike architectures, instruction sets are disjoint.
             Found=false
             for s in $InstSetList; do
-                for b in $(eval echo \\\$InstSet_$s); do
+                for b in `eval echo \\\$InstSet_$s`; do
                     Found_In_Base=false
-                    for i in $(eval echo \\\$Opcode_$b); do
+                    for i in `eval echo \\\$Opcode_$b`; do
                         if [[ "$i" =~ ^$OPTARG$ ]]; then
-                            $Found_In_Base || echo -ne "Instruction set \\e[33;1m$s\\e[0m (base instruction set \\e[32;1m$b\\e[0m):"
-                            echo -ne " \\e[31;1m$i\\e[0m"
+                            $Found_In_Base || echo -ne "Instruction set \e[33;1m$s\e[0m (base instruction set \e[32;1m$b\e[0m):"
+                            echo -ne " \e[31;1m$i\e[0m"
                             Found_In_Base=true
                             Found=true
                         fi
@@ -244,7 +243,7 @@ while getopts ":ra:s:LliIcf:d:D:CvVm:nB:A:h" o; do
                 done
             done
             if [ $Found = false ]; then
-                echo -e "Operation code \\e[31;1m$OPTARG\\e[0m has not been found in the database of known instructions." \
+                echo -e "Operation code \e[31;1m$OPTARG\e[0m has not been found in the database of known instructions." \
                 "Perhaps it is translated using other than Intel syntax. If obtained from objdump, check if the \`-M intel' flag is set." \
                 "Be aware that the search is case sensitive by default (you may use the -C flag, otherwise only lower case opcodes are accepted)."
                 exit $EXIT_NOT_FOUND
@@ -263,13 +262,13 @@ while getopts ":ra:s:LliIcf:d:D:CvVm:nB:A:h" o; do
         A) Trailing_Context=$OPTARG ;;
         h) usage ;;
         \?)
-            echo -e "Unknown option: -$OPTARG\\n"
+            echo -e "Unknown option: -$OPTARG\n"
             usage
             ;;
     esac
 done
 shift $((OPTIND-1))
-[ -n "$1" ] && echo -e "Unknown command line parameter: $1\\n" && usage
+[ -n "$1" ] && echo -e "Unknown command line parameter: $1\n" && usage
 [ -z "$InstSet_Base" ] && usage
 
 # Create list of grep parameters.
@@ -283,13 +282,12 @@ Grep_Params="--color=auto -B $Leading_Context -A $Trailing_Context"
 # Build regular expression for use in grep.
 RegEx=""
 for s in $InstSet_Base; do
-    eval 'RegEx="$RegEx $Opcode_'"$s"'"'
+    eval RegEx=\"$RegEx \$Opcode_$s\"
 done
 # Add leading and trailing opcode separators to prevent false positives.
-RegEx="$Leading_Separator$(echo $RegEx | sed "s/ /$(echo "$Trailing_Separator"|sed 's/[\/&]/\\\&/g')|$(echo "$Leading_Separator"|sed 's/[\/&]/\\\&/g')/g")$Trailing_Separator"
+RegEx="$Leading_Separator`echo $RegEx | sed "s/ /$(echo "$Trailing_Separator"|sed 's/[\/&]/\\\&/g')|$(echo "$Leading_Separator"|sed 's/[\/&]/\\\&/g')/g"`$Trailing_Separator"
 
-[ $Verbose = true ] && [ $Count_Matching = false ] && RegEx="$RegEx|\$"
+[ $Verbose = true -a $Count_Matching = false ] && RegEx="$RegEx|\$"
 
-# shellcheck disable=SC2086
 # The actual search.
 grep $Grep_Params -E "$RegEx" && exit $EXIT_FOUND || exit $EXIT_NOT_FOUND

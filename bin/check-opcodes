@@ -2,28 +2,38 @@
 
 # shellcheck disable=SC2086
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage( ) {
   >&2 cat <<EOF
 
-check_opcodes: [ -a <arch> ] <package>
+check_opcodes: [options] [ -a <arch> ] <package>
 
 possible optons:
   -h|--help: Show this help page
-  -v|--verbose: Verbose output
   -a|--architecture: architecture family to check against, one of
-                     i486, i686, pentium4
+                     i486, i686, pentium3 (meaning target architecture
+                     the package should be runnable on)
+  -v|--verbose: Verbose output, print result of check for logs
+  -d|--debug: Debug output, used for development and testing
 
 EOF
   exit 1
 }
 
 VERBOSE=0
+DEBUG=0
 EXIT_CODE=0
-log( ) {
+
+verbose( ) {
   if test $VERBOSE = 1; then
+    echo "$@"
+  fi
+}
+
+debug( ) {
+  if test $DEBUG = 1; then
     echo "$@"
   fi
 }
@@ -38,7 +48,7 @@ trap 'rm -rf --one-file-system "${tmp_dir:?}"' EXIT
 
 ARCH=i686
 
-while getopts ":va:h-:" opt; do
+while getopts ":vda:h-:" opt; do
   case $opt in
     -)
       case "$OPTARG" in
@@ -47,6 +57,9 @@ while getopts ":va:h-:" opt; do
           ;;
         verbose)
           VERBOSE=1
+          ;;
+        debug)
+          DEBUG=1
           ;;
         *)
           echo "ERROR: Invalid option: --$OPTARG" >&2
@@ -59,6 +72,9 @@ while getopts ":va:h-:" opt; do
       ;;
     v)
       VERBOSE=1
+      ;;
+    d)
+      DEBUG=1
       ;;
     a)
       ARCH=$OPTARG
@@ -83,29 +99,42 @@ fi
 OPCODE_ARGS=""
 case $ARCH in
   i486)
-    OPCODE_ARGS='-r -a 486 -v'
+    OPCODE_ARGS='-r -a 386 -v'
     ;;
-	i686)
-    OPCODE_ARGS='-s MMX -s SSE -s SSE2'
+  i686)
+    OPCODE_ARGS='-s MMX -s SSE'
     ;;
-  pentium4)
-    OPCODE_ARGS='-s SSE3 -s SSSE3 -s AVX'
+  pentium3)
+    OPCODE_ARGS='-s SSE2 -s SSE3'
     ;;
-	*)
+  *)
     echo "ERROR: architecture must currently be one of i486 and i686" >&2
     usage
     exit 1
 esac
 
-log "Checking for architecture: $ARCH ($OPCODE_ARGS)"
+debug "Unpacking $PACKAGE to $tmp_dir.."
 bsdtar --no-fflags -x -C $tmp_dir -f $PACKAGE
 
+debug "Checking for architecture: $ARCH ($OPCODE_ARGS).."
+
 # shellcheck disable=SC2044
-for absfile in $(find $tmp_dir -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -type f); do
-	file=$(basename $absfile)
-	log "Checking shared library: $file"
-	readelf -a $absfile > $tmp_dir/$file.elf
-  objdump -f $absfile > $tmp_dir/$file.objdump
+for absfile in $(find $tmp_dir \( -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -type f \) -o \( -executable -type f \) ); do
+  file=$(basename $absfile)
+  relfile=${absfile#$tmp_dir}
+  debug "Checking file: $relfile"
+  set +e
+  readelf -a $absfile > $tmp_dir/$file.elf 2>/dev/null
+  if test $? != 0; then
+    debug "readelf failed, ignoring file"
+    continue
+  fi
+  objdump -f $absfile > $tmp_dir/$file.objdump 2>/dev/null
+  if test $? != 0; then
+    debug "objdump failed, ignoring file"
+    continue
+  fi
+  set -e
   file $absfile > $tmp_dir/$file.file
     
   arch=$(grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,)
@@ -120,7 +149,7 @@ for absfile in $(find $tmp_dir -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -
       arch='unknown'
       ;;
   esac
-  log "  Objdump architecture: $arch"
+  debug "  Objdump architecture: $arch"
   
   archelf=$(grep '^ \+Class' $tmp_dir/$file.elf | cut -f 2 -d : | tr -d ' ')
   case $archelf in
@@ -134,14 +163,14 @@ for absfile in $(find $tmp_dir -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -
       archelf='unknown'
       ;;
   esac
-  log "  Readelf architecture: $archelf"
+  debug "  Readelf architecture: $archelf"
 
   if test $arch != $archelf; then
-    err "$file ambigous architecture information (objdump: $arch, ELF: $archelf)"
+    err "ERROR: $file ambigous architecture information (objdump: $arch, ELF: $archelf)"
   fi
   
   if test $arch = "x86_64"; then
-    err "$file is a 64-bit library!"
+    err "ERROR: $file is a 64-bit library!"
     continue
   fi
 
@@ -150,18 +179,21 @@ for absfile in $(find $tmp_dir -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?' -
   if test $bad_opcodes != 0; then
     case $ARCH in
       i486)
-        err "$file is not built for plain i486 opcodes"
+        err "$relfile is not built for plain i486 opcodes"
         ;;
       i686)
-        err "$file contains MMX, SSE or SSE2 opcodes"
+        err "$relfile contains MMX, SSE or newer opcodes"
         ;;
-      pentium4)
-        err "$file contains SSE3 or newer opcodes"
+      pentium3)
+        err "$relfile contains SSE2 or newer opcodes"
         ;;
     esac
+    if test $DEBUG = 1; then
+      ${base_dir}/bin/opcode $OPCODE_ARGS -B 2 -A 2 < $tmp_dir/$file.asm
+    fi
   else
     if test $VERBOSE = 1; then
-      log "$file fullfills architecture constraint for $ARCH"
+      verbose "OK: $relfile fullfills architecture constraint for $ARCH"
     fi
   fi
   
