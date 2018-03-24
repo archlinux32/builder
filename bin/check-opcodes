@@ -123,18 +123,14 @@ for absfile in $(find $tmp_dir \( -regextype grep -regex '.*\.so\(\.[0-9.]\+\)\?
   file=$(basename $absfile)
   relfile=${absfile#$tmp_dir}
   debug "Checking file: $relfile"
-  set +e
-  readelf -a $absfile > $tmp_dir/$file.elf 2>/dev/null
-  if test $? != 0; then
+  if ! readelf -a $absfile > $tmp_dir/$file.elf 2>/dev/null; then
     debug "readelf failed, ignoring file"
     continue
   fi
-  objdump -f $absfile > $tmp_dir/$file.objdump 2>/dev/null
-  if test $? != 0; then
+  if ! objdump -f $absfile > $tmp_dir/$file.objdump 2>/dev/null; then
     debug "objdump failed, ignoring file"
     continue
   fi
-  set -e
   file $absfile > $tmp_dir/$file.file
     
   arch=$(grep ^architecture $tmp_dir/$file.objdump | sed 's/^architecture: //g' | cut -f 1 -d ,)
