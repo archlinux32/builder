@@ -4,7 +4,7 @@
 
 # investigate, why a certain operation is not done with certain packages
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: reintrocude "keep", "stubbornly_keep", "stabilize" and "unstage"

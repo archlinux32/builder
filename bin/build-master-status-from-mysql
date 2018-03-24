@@ -2,7 +2,7 @@
 
 # report about status of build master - according to mysql database
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: add all (necessary) features from build-master-status

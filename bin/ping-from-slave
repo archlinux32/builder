@@ -5,7 +5,7 @@
 #  - show that the build is still running
 #  - get notified by the build master if the build is not necessary anymore
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: receive/save some statistics about current build

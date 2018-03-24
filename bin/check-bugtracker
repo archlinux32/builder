@@ -5,7 +5,7 @@
 # and vice versa
 
 # shellcheck disable=SC2039
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 bug_list=$(

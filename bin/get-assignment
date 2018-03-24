@@ -12,7 +12,7 @@
 #  3: come back after the next run of get-package-updates - currently
 #     there are no pending packages
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: honor manual build order of tool-chain:

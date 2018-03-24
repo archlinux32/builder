@@ -2,7 +2,7 @@
 
 # do some basic sanity checks
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 usage() {

@@ -6,7 +6,7 @@
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
-  . 'conf/default.conf'
+  . '../conf/default.conf'
 fi
 
 if [ ! -s "${work_dir}/build-master-sanity" ]; then

@@ -13,7 +13,7 @@
 # where we move to (think of [extra] -> [community])
 
 # shellcheck disable=SC2039
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # shellcheck disable=SC2016

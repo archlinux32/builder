@@ -16,7 +16,7 @@
 
 # TODO: sign database
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 if [ -s "${work_dir}/build-master-sanity" ]; then

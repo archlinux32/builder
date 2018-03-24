@@ -4,7 +4,7 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#build-packages
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: build other 'architectures', too (pentium4, i486)

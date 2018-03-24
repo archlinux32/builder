@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: this should become some sort of mysql dump to bootstrap the

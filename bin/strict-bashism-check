@@ -89,9 +89,10 @@ if which shellcheck >/dev/null 2>&1; then
   errors=$(
     find bin conf lib \
       -type f \
+      -not -name 'opcode' \
       -not -name 'opcode_list' \
       -not -name '.*' \
-      -exec shellcheck -x '{}' \; 2>&1
+      -execdir shellcheck -x '{}' \; 2>&1
   )
 
   if [ -n "${errors}" ]; then

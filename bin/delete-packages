@@ -10,7 +10,7 @@
 # is provided by y and no other package which will not be deleted.
 
 # shellcheck disable=SC2039
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 # TODO: delete other to-be-deleted packages if asked to do so

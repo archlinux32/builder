@@ -6,7 +6,7 @@
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
-  . 'conf/default.conf'
+  . '../conf/default.conf'
 fi
 
 # base64_encode_each encode each line of stdin with base64

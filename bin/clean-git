@@ -2,7 +2,7 @@
 
 # clean git repositories
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 for repo in ${repo_names}; do

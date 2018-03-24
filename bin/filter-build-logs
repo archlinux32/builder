@@ -2,7 +2,7 @@
 
 # filter content of build-logs for display on the webserver
 
-# shellcheck source=conf/default.conf
+# shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
 {
