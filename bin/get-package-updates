@@ -306,7 +306,9 @@ done | \
       } | \
         mysql_run_query
       # shellcheck disable=SC2154
+      printf '%s ' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}" >&2
       mysql_generate_package_metadata 'to-be-decided' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
+      printf '\n' >&2
       continue
     fi
 
