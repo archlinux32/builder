@@ -561,6 +561,12 @@ mangle_pkgbuild() {
     sub_pkgrel=".${sub_pkgrel}"
   fi
 
+  if grep -q '^\s*pkgname=["'"'"']\?lib32-' "${PKGBUILD}"; then
+    sed -i '
+      s/^\(\s*pkgrel=\)['"'"'"]\?\([0-9]\+\)\.[0-9]*['"'"'"]\?\s*\(#.*\)\?$/\1"\2"/
+    ' "${PKGBUILD}"
+  fi
+
   sed -i '
     /^arch=[^#]*any/!{
       /^arch=(/s/(/(i686 /
