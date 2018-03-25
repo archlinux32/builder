@@ -180,7 +180,7 @@ if [ ! "$1" = 'slim' ]; then
     printf '%s\n' \
       '/*!40014 SET UNIQUE_CHECKS=0 */;' \
       '/*!40014 SET FOREIGN_KEY_CHECKS=0 */;'
-    for turn in 'drop' 'create'; do # 'link'; do
+    for turn in 'drop' 'create' 'link'; do
       echo "${tables}" | \
         sed -n '
           /^\S/p
