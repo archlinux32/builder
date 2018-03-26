@@ -414,12 +414,102 @@ if [ -n "${package_errors}" ]; then
   exit 4
 fi
 
+# generate checksums
+find . -maxdepth 1 -name '*.pkg.tar.xz' \
+  -exec sha512sum {} \; | \
+  sed '
+    s,\s*\./,\t,
+  ' > \
+  "${tmp_dir}/sha512sums"
+
+# generate file lists
+find . -maxdepth 1 -name '*.pkg.tar.xz' \
+  -exec pacman -Qlp {} \; | \
+  sed '
+    s,/$,,
+    s,\s\+,\t,
+    s,\t\(\S*/\)\([^/]\+\),\t\1\t\2,
+  ' > \
+  "${tmp_dir}/files"
+
 # move namcap.logs
 find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
 
-# insert provided libraries into database
+# move packages
+destination=$(official_or_community "$1.$2.$3.$4" 'staging')
+
+${master_mirror_rsync_command} \
+  "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
+  "${master_mirror_rsync_directory}/i686/${destination}/${destination}.files."* \
+  .
+# shellcheck disable=SC2086
+repo-add "${destination}.db.tar.gz" ${packages}
+# repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
+
+${master_mirror_rsync_command} \
+  "${destination}.db."* \
+  "${destination}.files."* \
+  ./*".pkg.tar.xz" \
+  ./*".pkg.tar.xz.sig" \
+  "${master_mirror_rsync_directory}/i686/${destination}/"
+
+trigger_mirror_refreshs
+
 # shellcheck disable=SC2016
 {
+  # insert file lists into database
+  printf 'CREATE TEMPORARY TABLE `pkg_files` ('
+  printf '`pkgname` VARCHAR(64),'
+  printf '`path` TEXT,'
+  printf '`name` TEXT,'
+  printf '`name_hash` VARCHAR(128),'
+  printf '`absolute_name_hash` VARCHAR(128)'
+  printf ');\n'
+  printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_files` (`pkgname`,`path`,`name`);\n' \
+    "${tmp_dir}/files"
+  printf 'UPDATE `pkg_files`'
+  printf ' SET `pkg_files`.`name_hash`=sha2(`pkg_files`.`name`,512),'
+  printf ' `pkg_files`.`absolute_name_hash`=sha2(concat(`pkg_files`.`path`,`pkg_files`.`name`),512);\n'
+  printf 'ALTER TABLE `pkg_files` ADD UNIQUE INDEX `absolute_name_hash` (`absolute_name_hash`);\n'
+  printf 'INSERT IGNORE INTO `files` (`path`,`name`,`name_hash`,`absolute_name_hash`)'
+  printf ' SELECT '
+  printf '`pkg_files`.`%s`,' \
+    'path' 'name' 'name_hash' 'absolute_name_hash' | \
+    sed 's/,$//'
+  printf ' FROM `pkg_files`;\n'
+  printf 'INSERT IGNORE INTO `file_providers` (`package`,`file`)'
+  printf ' SELECT `binary_packages`.`id`,`files`.`id`'
+  printf ' FROM `pkg_files`'
+  printf ' JOIN `files` ON `files`.`absolute_name_hash`=`pkg_files`.`absolute_name_hash`'
+  printf ' JOIN `binary_packages` ON `binary_packages`.`pkgname`=`pkg_files`.`pkgname`'
+  mysql_join_binary_packages_build_slaves
+  mysql_join_binary_packages_repositories
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+    "$(
+      printf '%s' "${slave}" | \
+        base64 -w0
+    )"
+  printf ' AND `repositories`.`name`="build-list";\n'
+
+  # insert checksums into database
+  printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`sha512sum` VARCHAR(128), `pkgfile` VARCHAR(128));\n'
+  printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_hashes`;\n' \
+    "${tmp_dir}/sha512sums"
+  printf 'UPDATE `binary_packages`'
+  mysql_join_binary_packages_architectures
+  mysql_join_binary_packages_build_slaves
+  mysql_join_binary_packages_repositories
+  printf ' JOIN `pkg_hashes` ON `pkg_hashes`.`pkgfile`='
+  mysql_package_name_query
+  printf ' SET `binary_packages`.`sha512sum`=`pkg_hashes`.`sha512sum`'
+  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+    "$(
+      printf '%s' "${slave}" | \
+        base64 -w0
+    )"
+  printf ' AND `repositories`.`name`="build-list";\n'
+
+  # insert provided/needed libraries into database
   for lib_link in 'pl:provides' 'nl:needs'; do
     printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(128));\n' \
       "${lib_link%:*}"
@@ -470,35 +560,8 @@ find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_
       "${lib_link%:*}"
     printf ';\n'
   done
-} | \
-  mysql_run_query
 
-# move packages
-destination=$(official_or_community "$1.$2.$3.$4" 'staging')
-
-${master_mirror_rsync_command} \
-  "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
-  "${master_mirror_rsync_directory}/i686/${destination}/${destination}.files."* \
-  .
-# shellcheck disable=SC2086
-repo-add "${destination}.db.tar.gz" ${packages}
-# repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
-
-${master_mirror_rsync_command} \
-  "${destination}.db."* \
-  "${destination}.files."* \
-  ./*".pkg.tar.xz" \
-  ./*".pkg.tar.xz.sig" \
-  "${master_mirror_rsync_directory}/i686/${destination}/"
-
-trigger_mirror_refreshs
-
-for package in ${packages}; do
-  remove_old_package_versions 'i686' "${destination}" "${package}"
-done
-
-# shellcheck disable=SC2016
-{
+  # remove from build-list
   printf 'UPDATE `build_assignments`'
   mysql_join_build_assignments_build_slaves
   mysql_join_build_assignments_binary_packages
@@ -519,6 +582,7 @@ done
         base64 -w0
     )"
   printf ' AND `old_repo`.`name`="build-list";\n'
+  # remove from build slave's `currently_building`
   printf 'UPDATE `build_slaves` AS `to_update`'
   printf ' JOIN `build_slaves` AS `current_slave`'
   printf ' ON `to_update`.`currently_building`=`current_slave`.`currently_building`'
@@ -528,6 +592,7 @@ done
       printf '%s' "${slave}" | \
         base64 -w0
     )"
+  # remove broken loops
   printf 'CREATE TEMPORARY TABLE `loops_to_delete` (`loop` MEDIUMINT);\n'
   printf 'INSERT INTO `loops_to_delete`'
   printf ' SELECT `build_dependency_loops`.`loop` FROM `build_dependency_loops`'
@@ -540,3 +605,7 @@ done
   printf 'DROP TABLE `loops_to_delete`;\n'
 } | \
   mysql_run_query
+
+for package in ${packages}; do
+  remove_old_package_versions 'i686' "${destination}" "${package}"
+done
