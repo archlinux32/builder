@@ -1091,6 +1091,9 @@ for link in \
   'failed_builds:build_assignment:build_assignments' \
   'failed_builds:build_slave:build_slaves' \
  \
+  'file_providers:package:binary_packages' \
+  'file_providers:file:files' \
+ \
   'install_target_providers:package:binary_packages' \
   'install_target_providers:install_target:install_targets' \
   'install_target_providers:install_target depending_on:dependencies' \
@@ -1100,6 +1103,7 @@ for link in \
   'repositories:stability:repository_stabilities' \
  \
   'repository_moves:upstream_package_repository:upstream_repositories' \
+  'repository_moves:upstream_package_repository upstream_package_repository:package_sources' \
  \
   'upstream_repositories:git_repository:git_repositories'; do
 # A join for these cannot be done, because it's not clear on what to join:
