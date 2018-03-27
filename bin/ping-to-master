@@ -29,7 +29,8 @@ while kill -0 "${parent_pid}" && \
       -i "${master_build_server_identity}" \
       -p "${master_build_server_port}" \
       "${master_build_server_user}@${master_build_server}" \
-      'ping-from-slave' "$(cat "${parent_tmp_dir}/.ping-build-master")"
+      'ping-from-slave' "$(cat "${parent_tmp_dir}/.ping-build-master")" || \
+      true
 
   # we wait upto 60 seconds to get the lock - if we get it, the parent
   # must have released it and we're finished
