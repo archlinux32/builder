@@ -862,19 +862,36 @@ mysql_cleanup() {
       printf 'SELECT * FROM `build_assignments` '
       printf 'WHERE `build_assignments`.`package_source`=`package_sources`.`id`'
     printf ');\n'
-    printf 'UPDATE `build_slaves`'
+    # remove jobs from build slaves that are not on the build-list
+    if [ "${operator}" = 'DELETE' ]; then
+      printf 'UPDATE `build_slaves`'
+    else
+      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `build_slaves`'
+    fi
     mysql_join_build_slaves_binary_packages
     mysql_join_binary_packages_repositories
-    printf ' SET `currently_building`=NULL'
+    if [ "${operator}" = 'DELETE' ]; then
+      printf ' SET `build_slaves`.`currently_building`=NULL'
+    fi
     printf ' WHERE `repositories`.`name`!="build-list";\n'
     # remove build orders from build slaves which have not connected within 1h
     if [ "${operator}" = 'DELETE' ]; then
-      printf 'UPDATE `build_slaves` SET `build_slaves`.`currently_building`=NULL'
+      printf 'UPDATE `build_slaves`'
+      printf ' SET `build_slaves`.`currently_building`=NULL'
     else
       printf 'SELECT COUNT(*) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
     printf ' AND TIMEDIFF(NOW(),`build_slaves`.`last_connection`) > "1:00:00";\n'
+    # remove `logged_lines` from buildslaves without an assignment
+    if [ "${operator}" = 'DELETE' ]; then
+      printf 'UPDATE `build_slaves`'
+      printf ' SET `build_slaves`.`logged_lines`=NULL'
+    else
+      printf 'SELECT COUNT(*) FROM `build_slaves`'
+    fi
+    printf ' WHERE `build_slaves`.`currently_building` IS NULL'
+    printf ' AND `build_slaves`.`logged_lines` IS NOT NULL;\n'
     # remove obsolete file_providers
     printf '%s FROM `file_providers`' \
       "${operator}"
