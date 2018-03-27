@@ -150,7 +150,9 @@ if [ "$5" = 'ERROR' ]; then
     fi
     printf 'UPDATE `build_assignments`'
     mysql_join_build_assignments_build_slaves
-    printf ' SET `build_assignments`.`is_broken`=1, `build_slaves`.`currently_building`=NULL'
+    printf ' SET `build_assignments`.`is_broken`=1,'
+    printf ' `build_slaves`.`currently_building`=NULL,'
+    printf ' `build_slaves`.`logged_lines`=NULL'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(
         printf '%s' "${slave}" | \
@@ -586,7 +588,8 @@ trigger_mirror_refreshs
   printf 'UPDATE `build_slaves` AS `to_update`'
   printf ' JOIN `build_slaves` AS `current_slave`'
   printf ' ON `to_update`.`currently_building`=`current_slave`.`currently_building`'
-  printf ' SET `to_update`.`currently_building`=NULL'
+  printf ' SET `to_update`.`currently_building`=NULL,'
+  printf ' `to_update`.`logged_lines`=NULL'
   printf ' WHERE `current_slave`.`name`=from_base64("%s");\n' \
     "$(
       printf '%s' "${slave}" | \
