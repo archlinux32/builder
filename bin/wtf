@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# usage: wtf $file
+
+# Find out what package provides the given file.
+# $file may be a single file name or an absolute path.
+
+# shellcheck source=../conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+hash=$(
+  printf '%s' "$*" | \
+    sha512sum | \
+    awk '{print $1}'
+)
+
+result=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT CONCAT(`repositories`.`name`,"/",'
+    mysql_package_name_query
+    printf ')'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_architectures
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_file_providers
+    mysql_join_file_providers_files
+    printf ' WHERE `files`.`absolute_name_hash`="%s"' \
+      "${hash}"
+    printf ' OR `files`.`name_hash`="%s"' \
+      "${hash}"
+  } | \
+    mysql_run_query
+)
+
+if [ -z "${result}" ]; then
+  printf 'Huh, I don'"'"'t know that one.\n'
+else
+  printf '%s' "${result}"
+fi
