@@ -470,7 +470,7 @@ trigger_mirror_refreshs
   printf 'UPDATE `pkg_files`'
   printf ' SET `pkg_files`.`name_hash`=sha2(`pkg_files`.`name`,512),'
   printf ' `pkg_files`.`absolute_name_hash`=sha2(concat(`pkg_files`.`path`,`pkg_files`.`name`),512);\n'
-  printf 'ALTER TABLE `pkg_files` ADD UNIQUE INDEX `absolute_name_hash` (`absolute_name_hash`);\n'
+  printf 'ALTER IGNORE TABLE `pkg_files` ADD UNIQUE INDEX `absolute_name_hash` (`absolute_name_hash`);\n'
   printf 'INSERT IGNORE INTO `files` (`path`,`name`,`name_hash`,`absolute_name_hash`)'
   printf ' SELECT '
   printf '`pkg_files`.`%s`,' \
