@@ -37,7 +37,18 @@ fi
 
 # watch if asked to
 if [ "$1" = 'watch' ]; then
+  done_something=false
   while pgrep -x 'ii' > /dev/null; do
+    # this avoids missing modifications during our last execution
+    if ! ${done_something}; then
+      # shellcheck disable=SC2046
+      inotifywait -e 'CLOSE_WRITE,CLOSE' $(
+        find "${irc_dir}" \
+          -type f \
+          -name 'out'
+        )
+    fi
+    done_something=false
     find "${irc_dir}" \
       -type f \
       -name 'out' \
@@ -52,6 +63,7 @@ if [ "$1" = 'watch' ]; then
         fi
         regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
         if grep -q "${regex}" "${out_file}"; then
+          done_something=true
           sed -n '
             s/'"${regex}"'/\2 /
             T
@@ -61,6 +73,30 @@ if [ "$1" = 'watch' ]; then
               reason=$(
                 echo "${line}" | \
                   xargs "${base_dir}/bin/why-dont-you" 2>&1
+              )
+              if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
+                echo "${reason}"
+              else
+                echo "${reason}" | \
+                  head -n5
+                printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
+              fi | \
+                sponge "${out_file%/out}/in"
+            done
+          sed -i "/${regex}/d" "${out_file}"
+        fi
+        regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'wtf '
+        if grep -q "${regex}" "${out_file}"; then
+          done_something=true
+          sed -n '
+            s/'"${regex}"'//
+            T
+            p
+          ' "${out_file}" | \
+            while read -r line; do
+              reason=$(
+                echo "${line}" | \
+                  xargs "${base_dir}/bin/wtf" 2>&1
               )
               if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
                 echo "${reason}"
