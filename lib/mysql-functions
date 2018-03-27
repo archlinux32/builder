@@ -875,6 +875,23 @@ mysql_cleanup() {
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
     printf ' AND TIMEDIFF(NOW(),`build_slaves`.`last_connection`) > "1:00:00";\n'
+    # remove obsolete file_providers
+    printf '%s FROM `file_providers`' \
+      "${operator}"
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `binary_packages`'
+      printf ' WHERE `binary_packages`.`id`=`file_providers`.`package`'
+    printf ') OR NOT EXISTS ('
+      printf 'SELECT * FROM `files`'
+      printf ' WHERE `files`.`id`=`file_providers`.`file`'
+    printf ');\n'
+    # remove obsolete files
+    printf '%s FROM `files`' \
+      "${operator}"
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT * FROM `file_providers`'
+      printf ' WHERE `files`.`id`=`file_providers`.`file`'
+    printf ');\n'
   } | \
     mysql_run_query
 }
