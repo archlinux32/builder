@@ -103,6 +103,7 @@ if [ ! "$1" = 'slim' ]; then
       ' operator VARCHAR(32)' \
       ' currently_building BIGINT NULL :build_assignments' \
       ' last_connection DATETIME' \
+      ' logged_lines BIGINT NULL' \
       ' UNIQUE name' \
       'package_sources BIGINT' \
       ' pkgbase VARCHAR(64)' \
