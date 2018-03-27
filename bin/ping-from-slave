@@ -23,3 +23,31 @@ if [ "$(
   >&2 echo 'You do not build anything currently - abort whatever you are doing.'
   exit 2
 fi
+
+log_lines=$(cat)
+
+if [ -n "${log_lines}" ]; then
+
+  # shellcheck disable=SC2016
+  {
+    printf 'UPDATE `build_slaves`'
+    printf ' SET `build_slaves`.`logged_lines`=from_base64("%s")' \
+      "$(
+        printf '%s' "$((
+          $(
+            printf '%s' "${log_lines}" | \
+              cut -d' ' -f1 | \
+              tr '\n' '+'
+          )0))" | \
+          base64 -w0
+      )"
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+      "$(
+        printf '%s' "${slave}" | \
+          base64 -w0
+      )"
+  } | \
+    tee /tmp/ping-from-slave.query | \
+    mysql_run_query
+
+fi
