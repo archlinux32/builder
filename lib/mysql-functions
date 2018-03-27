@@ -867,6 +867,14 @@ mysql_cleanup() {
     mysql_join_binary_packages_repositories
     printf ' SET `currently_building`=NULL'
     printf ' WHERE `repositories`.`name`!="build-list";\n'
+    # remove build orders from build slaves which have not connected within 1h
+    if [ "${operator}" = 'DELETE' ]; then
+      printf 'UPDATE `build_slaves` SET `build_slaves`.`currently_building`=NULL'
+    else
+      printf 'SELECT COUNT(*) FROM `build_slaves`'
+    fi
+    printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
+    printf ' AND TIMEDIFF(NOW(),`build_slaves`.`last_connection`) > "1:00:00";\n'
   } | \
     mysql_run_query
 }
