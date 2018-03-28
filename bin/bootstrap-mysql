@@ -234,10 +234,17 @@ if [ ! "$1" = 'slim' ]; then
                           tr ' ' '\n' | \
                           sed -n 's/^://;T;p' | \
                           while read -r link; do
-                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`) ON UPDATE CASCADE ON DELETE CASCADE;\n' \
+                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`) ON UPDATE CASCADE ON DELETE ' \
                               "${table}" \
                               "${column}" \
                               "${link}"
+                            if echo "${rest}" | \
+                              grep -qwF 'NULL'; then
+                              printf 'SET NULL'
+                            else
+                              printf 'CASCADE'
+                            fi
+                            printf ';\n'
                           done
                       fi
                     ;;
