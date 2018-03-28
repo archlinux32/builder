@@ -139,7 +139,7 @@ if [ ! "$1" = 'slim' ]; then
       'todos MEDIUMINT' \
       ' file VARCHAR(64)' \
       ' line MEDIUMINT' \
-      ' description VARCHAR(512)'
+      ' description VARCHAR(512)' \
       'todo_links MEDIUMINT' \
       ' dependent MEDIUMINT' \
       ' depending_on MEDIUMINT' \
