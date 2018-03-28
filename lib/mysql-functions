@@ -1115,38 +1115,38 @@ for link in \
   'binary_packages:architecture:architectures' \
   'binary_packages:repository:repositories' \
   'binary_packages:build_assignment:build_assignments' \
- \
+  \
   'build_assignments:architecture:architectures' \
   'build_assignments:package_source:package_sources' \
- \
+  \
   'build_dependency_loops:build_assignment:build_assignments' \
   'build_dependency_loops:build_assignment build_assignment:binary_packages' \
- \
+  \
   'build_slaves:currently_building:build_assignments' \
   'build_slaves:currently_building build_assignment:binary_packages' \
- \
+  \
   'dependencies:depending_on:install_targets' \
   'dependencies:dependent:binary_packages' \
   'dependencies:dependency_type:dependency_types' \
- \
+  \
   'failed_builds:reason:fail_reason' \
   'failed_builds:build_assignment:build_assignments' \
   'failed_builds:build_slave:build_slaves' \
- \
+  \
   'file_providers:package:binary_packages' \
   'file_providers:file:files' \
- \
+  \
   'install_target_providers:package:binary_packages' \
   'install_target_providers:install_target:install_targets' \
   'install_target_providers:install_target depending_on:dependencies' \
- \
+  \
   'package_sources:upstream_package_repository:upstream_repositories' \
- \
+  \
   'repositories:stability:repository_stabilities' \
- \
+  \
   'repository_moves:upstream_package_repository:upstream_repositories' \
   'repository_moves:upstream_package_repository upstream_package_repository:package_sources' \
- \
+  \
   'upstream_repositories:git_repository:git_repositories'; do
 # A join for these cannot be done, because it's not clear on what to join:
 #  'repository_stability_relations:more_stable:repository_stabilities'

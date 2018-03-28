@@ -188,7 +188,7 @@ if [ ! "$1" = 'slim' ]; then
         ' | \
         while read -r table size; do
           case "${turn}" in
-           'drop')
+            'drop')
               printf 'DROP TABLE IF EXISTS `%s`;\n' "${table}"
             ;;
             'create'|'link')

@@ -406,7 +406,7 @@ black_listed=$(
   while read -r line; do
     printf '%s' \
       "${line}" | \
-       base64 -d
+      base64 -d
     printf '\n'
   done
 )
