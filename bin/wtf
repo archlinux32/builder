@@ -9,15 +9,22 @@
 . "${0%/*}/../conf/default.conf"
 
 hash=$(
-  printf '%s' "$*" | \
-    sha512sum | \
-    awk '{print $1}'
+  printf '%d' "0x$(
+    printf '%s' "$*" | \
+      sed '
+        s,/$,,
+        s,.*/,,
+      ' | \
+      sha224sum | \
+      awk '{print $1}' | \
+      cut -c 1-4
+  )"
 )
 
 result=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT CONCAT(`repositories`.`name`,"/",'
+    printf 'SELECT DISTINCT CONCAT(`repositories`.`name`,"/",'
     mysql_package_name_query
     printf ')'
     printf ' FROM `binary_packages`'
@@ -25,10 +32,18 @@ result=$(
     mysql_join_binary_packages_repositories
     mysql_join_binary_packages_file_providers
     mysql_join_file_providers_files
-    printf ' WHERE `files`.`absolute_name_hash`="%s"' \
+    printf ' WHERE `files`.`name_hash`=%s' \
       "${hash}"
-    printf ' OR `files`.`name_hash`="%s"' \
-      "${hash}"
+    printf ' AND (`files`.`name`=from_base64("%s")' \
+      "$(
+        printf '%s' "$*" | \
+          base64 -w0
+      )"
+    printf ' OR CONCAT(`files`.`path`,`files`.`name`)=from_base64("%s"))' \
+      "$(
+        printf '%s' "$*" | \
+          base64 -w0
+      )"
   } | \
     mysql_run_query
 )
@@ -36,5 +51,5 @@ result=$(
 if [ -z "${result}" ]; then
   printf 'Huh, I don'"'"'t know that one.\n'
 else
-  printf '%s' "${result}"
+  printf '%s\n' "${result}"
 fi
