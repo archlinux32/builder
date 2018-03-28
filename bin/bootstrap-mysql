@@ -234,7 +234,7 @@ if [ ! "$1" = 'slim' ]; then
                           tr ' ' '\n' | \
                           sed -n 's/^://;T;p' | \
                           while read -r link; do
-                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`);\n' \
+                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`) ON UPDATE CASCADE ON DELETE CASCADE;\n' \
                               "${table}" \
                               "${column}" \
                               "${link}"
