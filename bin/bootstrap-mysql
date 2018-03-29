@@ -174,8 +174,8 @@ if [ ! "$1" = 'slim' ]; then
       'file_providers BIGINT' \
       ' package BIGINT :binary_packages' \
       ' file BIGINT :files'
-      # TODO: files is currently not represented correctly, because
-      # it is not representable in this form
+      # TODO: files and file_providers is currently not represented
+      # correctly, because they are not representable in this form
   )
 
   # shellcheck disable=SC2016
