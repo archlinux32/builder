@@ -32,11 +32,9 @@ result=$(
     printf ' FROM `binary_packages`'
     mysql_join_binary_packages_architectures
     mysql_join_binary_packages_repositories
-    mysql_join_binary_packages_file_providers
-    printf ' PARTITION (p%s)' \
+    printf ' JOIN `file_providers` PARTITION (p%s) ON `file_providers`.`package`=`binary_packages`.`id`' \
       "${partition}"
-    mysql_join_file_providers_files
-    printf ' PARTITION (p%s)' \
+    printf ' JOIN `files` PARTITION (p%s) ON `files`.`id`=`file_providers`.`file` AND `files`.`name_hash`=`file_providers`.`file_name_hash`' \
       "${partition}"
     printf ' WHERE `files`.`name_hash`=%s' \
       "${hash}"
