@@ -18,7 +18,7 @@ if [ "$(
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"
   } | \
-    mysql_run_query
+    mysql_run_query 'unimportant'
   )" -ne 1 ]; then
   >&2 echo 'You do not build anything currently - abort whatever you are doing.'
   exit 2
@@ -48,6 +48,6 @@ if [ -n "${log_lines}" ]; then
       )"
   } | \
     tee /tmp/ping-from-slave.query | \
-    mysql_run_query
+    mysql_run_query 'unimportant'
 
 fi
