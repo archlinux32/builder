@@ -426,11 +426,20 @@ find . -maxdepth 1 -name '*.pkg.tar.xz' \
 
 # generate file lists
 find . -maxdepth 1 -name '*.pkg.tar.xz' \
-  -exec pacman -Qlp {} \; | \
-  sed '
+  -printf '%f %p\n' | \
+  while read -r pkgfile path; do \
+    pacman -Qqlp "${path}" | \
+      sed '
+        s/^/'"${pkgfile}"'\t/
+      '
+  done | \
+  sed -n '
+    s/-\(\([^-:]\+\):\)\?\([^-:]\+\)-\([^-.]\+\)\(\.\([^-.]\+\)\)\?-\([^-]\+\)\.pkg\.tar\.xz\t/\t\2\t\3\t\4\t\6\t\7\t/
+    T
+    s/\t\t/\t0\t/g
     s,/$,,
-    s,\s\+,\t,
-    s,\t\(\S*/\)\([^/]\+\),\t\1\t\2,
+    s,/\([^\t/]\+\)$,/\t\1,
+    p
   ' > \
   "${tmp_dir}/files"
 
@@ -460,38 +469,7 @@ trigger_mirror_refreshs
 # shellcheck disable=SC2016
 {
   # insert file lists into database
-  printf 'CREATE TEMPORARY TABLE `pkg_files` ('
-  printf '`pkgname` VARCHAR(64),'
-  printf '`path` TEXT,'
-  printf '`name` TEXT,'
-  printf '`name_hash` VARCHAR(128),'
-  printf '`absolute_name_hash` VARCHAR(128)'
-  printf ');\n'
-  printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_files` (`pkgname`,`path`,`name`);\n' \
-    "${tmp_dir}/files"
-  printf 'UPDATE `pkg_files`'
-  printf ' SET `pkg_files`.`name_hash`=sha2(`pkg_files`.`name`,512),'
-  printf ' `pkg_files`.`absolute_name_hash`=sha2(concat(`pkg_files`.`path`,`pkg_files`.`name`),512);\n'
-  printf 'ALTER IGNORE TABLE `pkg_files` ADD UNIQUE INDEX `absolute_name_hash` (`absolute_name_hash`);\n'
-  printf 'INSERT IGNORE INTO `files` (`path`,`name`,`name_hash`,`absolute_name_hash`)'
-  printf ' SELECT '
-  printf '`pkg_files`.`%s`,' \
-    'path' 'name' 'name_hash' 'absolute_name_hash' | \
-    sed 's/,$//'
-  printf ' FROM `pkg_files`;\n'
-  printf 'INSERT IGNORE INTO `file_providers` (`package`,`file`)'
-  printf ' SELECT `binary_packages`.`id`,`files`.`id`'
-  printf ' FROM `pkg_files`'
-  printf ' JOIN `files` ON `files`.`absolute_name_hash`=`pkg_files`.`absolute_name_hash`'
-  printf ' JOIN `binary_packages` ON `binary_packages`.`pkgname`=`pkg_files`.`pkgname`'
-  mysql_join_binary_packages_build_slaves
-  mysql_join_binary_packages_repositories
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
-    "$(
-      printf '%s' "${slave}" | \
-        base64 -w0
-    )"
-  printf ' AND `repositories`.`name`="build-list";\n'
+  mysql_insert_package_files_query "${tmp_dir}/files"
 
   # insert checksums into database
   printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`sha512sum` VARCHAR(128), `pkgfile` VARCHAR(128));\n'
