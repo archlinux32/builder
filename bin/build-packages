@@ -273,8 +273,21 @@ while [ "${count}" -ne 0 ]; do
       extract_source_directory "${git_repo}" "${git_revision}" "${mod_git_revision}" "${tmp_dir}" "${sub_pkgrel}"
 
       cd "${tmp_dir}"
+      echo 'nothing' > "${tmp_dir}/.ping-build-master"
+      if [ -z "${forced_package}" ]; then
+        # we get a lock on "${work_dir}/ping-build-master.lock",
+        # if we release that lock, ping-to-master should stop _immediately_
+        exec 9> "${work_dir}/ping-build-master.lock"
+        if ! flock -n 9; then
+          >&2 echo 'ERROR: Cannot lock ping-to-master - this should not happen.'
+          exit 2
+        fi
+        "${base_dir}/bin/ping-to-master" "$$" "${tmp_dir}" &
+      fi
       success=false
       for straw in ${straws_that_might_repair_failing_builds}; do
+
+        echo 'preparing' > "${tmp_dir}/.ping-build-master"
 
         if echo "${straw}" | \
           grep -qF ':mirrored_source:'; then
@@ -370,16 +383,6 @@ while [ "${count}" -ne 0 ]; do
           rm {} \;
 
         echo 'building' > "${tmp_dir}/.ping-build-master"
-        if [ -z "${forced_package}" ]; then
-          # we get a lock on "${work_dir}/ping-build-master.lock",
-          # if we release that lock, ping-to-master should stop _immediately_
-          exec 9> "${work_dir}/ping-build-master.lock"
-          if ! flock -n 9; then
-            >&2 echo 'ERROR: Cannot lock ping-to-master - this should not happen.'
-            exit 2
-          fi
-          "${base_dir}/bin/ping-to-master" "$$" "${tmp_dir}" &
-        fi
         >&2 printf '%s: building package "%s" (revisions %s %s, repository %s, straw %s) ...' \
           "$(date +'%Y-%m-%d %T')" \
           "${package}" \
