@@ -67,6 +67,7 @@ mysql_run_query() {
       "${work_dir}/build-master-sanity"
     return 2
   fi
+  cat "${query_stdout}"
 }
 
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
