@@ -469,7 +469,7 @@ trigger_mirror_refreshs
 # shellcheck disable=SC2016
 {
   # insert file lists into database
-  mysql_insert_package_files_query "${tmp_dir}/files"
+#  mysql_insert_package_files_query "${tmp_dir}/files"
 
   # insert checksums into database
   printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`sha512sum` VARCHAR(128), `pkgfile` VARCHAR(128));\n'
