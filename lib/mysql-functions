@@ -872,7 +872,7 @@ mysql_cleanup() {
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NULL'
     printf ' AND `build_slaves`.`logged_lines` IS NOT NULL;\n'
-    for partition in $(seq 0 15); do
+    for partition in $(seq 0 $((mysql_files_table_partitions-1))); do
       # remove obsolete file_providers
       printf '%s FROM `file_providers` PARTITION (p%s)' \
         "${operator}" "${partition}"
@@ -1160,9 +1160,6 @@ done
 mysql_insert_package_files_query() {
 
   local partition
-  local partitions_count
-
-  partitions_count=16
 
   if [ ! -r "$1" ]; then
     >&2 printf 'mysql_insert_package_files: File "%s" is not readable.\n' \
@@ -1189,7 +1186,7 @@ mysql_insert_package_files_query() {
   printf 'UPDATE `pkg_files` SET'
   printf ' `pkg_files`.`name_hash`=CAST(CONV(SUBSTR(SHA2(`pkg_files`.`name`,224),1,2),16,10) AS INT),'
   printf ' `pkg_files`.`absolute_name_hash`=SHA2(CONCAT(`pkg_files`.`path`,`pkg_files`.`name`),224);\n'
-  for partition in $(seq 0 $((partitions_count-1))); do
+  for partition in $(seq 0 $((mysql_files_table_partitions-1))); do
     printf 'INSERT IGNORE INTO `files` PARTITION (p%s) (`path`,`name`,`name_hash`,`absolute_name_hash`)' \
       "${partition}"
     printf ' SELECT '
@@ -1198,7 +1195,7 @@ mysql_insert_package_files_query() {
       sed 's/,$//'
     printf ' FROM `pkg_files`'
     printf ' WHERE `pkg_files`.`name_hash` MOD %s = %s;\n' \
-      "${partitions_count}" "${partition}"
+      "${mysql_files_table_partitions}" "${partition}"
     printf 'INSERT IGNORE INTO `file_providers` PARTITION (p%s) (`package`,`file`,`file_name_hash`)' \
       "${partition}"
     printf ' SELECT `binary_packages`.`id`,`files`.`id`,`files`.`name_hash` FROM `pkg_files`'
@@ -1231,7 +1228,7 @@ mysql_insert_package_files_query() {
     printf ' ON `files`.`name_hash`=`pkg_files`.`name_hash`'
     printf ' AND `files`.`absolute_name_hash`=`pkg_files`.`absolute_name_hash`'
     printf ' WHERE `pkg_files`.`name_hash` MOD %s = %s;\n' \
-      "${partitions_count}" "${partition}"
+      "${mysql_files_table_partitions}" "${partition}"
   done
 
 }
