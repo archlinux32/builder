@@ -416,7 +416,9 @@ while [ $# -gt 0 ]; do
 
       errors=$(
         find "${work_dir}" -mindepth 1 -maxdepth 1 \
-          -name 'tmp.mysql-functions.query.*'
+          -name 'tmp.mysql-functions.query.*' \
+          -printf '%f\n' \
+          -execdir sed 's/^/>> ' '{}' \;
       )
       if [ -n "${errors}" ]; then
         if [ ${silence} -le 1 ]; then
