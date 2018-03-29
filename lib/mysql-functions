@@ -904,7 +904,7 @@ mysql_cleanup() {
         printf 'SELECT * FROM `files` PARTITION (p%s)' \
           "${partition}"
         printf ' WHERE `files`.`id`=`file_providers`.`file`'
-        printf ' AND `files`.`name_hash`=`file_providers`.`name_hash`'
+        printf ' AND `files`.`name_hash`=`file_providers`.`file_name_hash`'
       printf ');\n'
       # remove obsolete files
       printf '%s FROM `files` PARTITION (p%s)' \
@@ -913,7 +913,7 @@ mysql_cleanup() {
         printf 'SELECT * FROM `file_providers` PARTITION (p%s)' \
           "${partition}"
         printf ' WHERE `files`.`id`=`file_providers`.`file`'
-        printf ' AND `files`.`name_hash`=`file_providers`.`name_hash`'
+        printf ' AND `files`.`name_hash`=`file_providers`.`file_name_hash`'
       printf ');\n'
     done
   } | \
