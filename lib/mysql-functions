@@ -1232,3 +1232,13 @@ mysql_insert_package_files_query() {
   done
 
 }
+
+mysql_files_table_partitions=$(
+  printf 'SHOW CREATE TABLE `files`;\n' | \
+    mysql_run_query | \
+    sed -n '
+      s/^.*PARTITIONS \([0-9]\+\) .*$/\1/
+      T
+      p
+    '
+)
