@@ -25,70 +25,47 @@ base64_encode_each() {
 # mysql_run_query
 # wrapper function to query mysql
 mysql_run_query() {
-  local query_file
-  if [ -s "${work_dir}/build-master-sanity" ]; then
-  # If the build master is insane, the calling command should only check
-  # if the build master is still insane - we do not want to log that.
-    ${mysql_command} -N --raw --batch "$@"
-  else
-    # we save the query in a file and delete that file if the query succeeded
-    query_file=$(mktemp "${work_dir}/tmp.mysql-functions.query.$(date +'%Y-%m-%dT%T').XXXXXX")
-    cat > "${query_file}"
-    for _ in {1..10}; do
-      {
-        printf '%s %s: ' "$0" "${mysql_command} -N --raw --batch $*"
-        date
-      } \
-        | tee -a "${work_dir}/mysql.stdin" \
-        | tee -a "${work_dir}/mysql.stdout" \
-        >> "${work_dir}/mysql.stderr"
-      cat "${query_file}" \
-        >> "${work_dir}/mysql.stdin"
-      {
-        ${mysql_command} -N --raw --batch "$@" \
-          < "${query_file}" \
-          2>> "${work_dir}/mysql.stderr" \
-          && rm "${query_file}"
-      } \
-        | tee -a "${work_dir}/mysql.stdout"
-      if ! [ -f "${query_file}" ]; then
-        # success!
-        for s in \
-          "${work_dir}/mysql.stdin" \
-          "${work_dir}/mysql.stdout" \
-          "${work_dir}/mysql.stderr"; do
-          {
-            tail -n 10000 "$s"
-            printf '%s %s done: ' "$0" "${mysql_command} $*"
-            date
-          } \
-            | sponge "$s"
-        done
-        break
-      fi
-      for s in \
-        "${work_dir}/mysql.stdin" \
-        "${work_dir}/mysql.stdout" \
-        "${work_dir}/mysql.stderr"; do
-        {
-          printf '%s %s FAILED: ' "$0" "${mysql_command} $*"
-          date
-        } \
-          >> "$s"
-      done
-    done
-    # a present query_file means there was an error
-    if [ -f "${query_file}" ]; then
-      >&2 printf 'I could not complete a mysql query!\n'
-      if [ ! -s "${work_dir}/build-master-sanity" ]; then
-        printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
-          "${query_file##*/}" \
-          | irc_say
-      fi
-      echo 'A mysql query failed.' > \
-        "${work_dir}/build-master-sanity"
-      return 2
+  local query_stdin
+  local query_stdout
+  local query_stderr
+
+  local file_name_extra
+
+  file_name_extra=''
+  if [ "x$1" = 'xunimportant' ]; then
+    shift
+    file_name_extra='unimportant_'
+  elif [ -s "${work_dir}/build-master-sanity" ]; then
+    file_name_extra='was_insane_'
+  fi
+
+  # we save the query in a file and delete that file if the query succeeded
+  query_stdin=$(mktemp "${work_dir}/tmp.mysql-functions.${file_name_extra}query.stdin.$(date +'%Y-%m-%dT%T').XXXXXX")
+  query_stdout=$(mktemp "${work_dir}/tmp.mysql-functions.${file_name_extra}query.stdout.$(date +'%Y-%m-%dT%T').XXXXXX")
+  query_stderr=$(mktemp "${work_dir}/tmp.mysql-functions.${file_name_extra}query.stderr.$(date +'%Y-%m-%dT%T').XXXXXX")
+  cat > "${query_stdin}"
+  for _ in {1..10}; do
+    ${mysql_command} -N --raw --batch "$@" \
+      < "${query_stdin}" \
+      > "${query_stdout}" \
+      2>> "${query_stderr}" \
+      && rm "${query_stdin}" "${query_stderr}" "${query_stdout}"
+    if ! [ -f "${query_stdin}" ]; then
+      # success!
+      break
     fi
+  done
+  # a present query_file means there was an error
+  if [ -f "${query_stdin}" ]; then
+    >&2 printf 'I could not complete a mysql query!\n'
+    if [ ! -s "${work_dir}/build-master-sanity" ]; then
+      printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
+        "${query_file##*/}" \
+        | irc_say
+    fi
+    echo 'A mysql query failed.' > \
+      "${work_dir}/build-master-sanity"
+    return 2
   fi
 }
 
