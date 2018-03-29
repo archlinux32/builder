@@ -49,7 +49,7 @@ mysql_run_query() {
       < "${query_stdin}" \
       > "${query_stdout}" \
       2>> "${query_stderr}" \
-      && rm "${query_stdin}" "${query_stderr}" "${query_stdout}"
+      && rm "${query_stdin}" "${query_stderr}"
     if ! [ -f "${query_stdin}" ]; then
       # success!
       break
@@ -68,6 +68,7 @@ mysql_run_query() {
     return 2
   fi
   cat "${query_stdout}"
+  rm "${query_stdout}"
 }
 
 # mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
