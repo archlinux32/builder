@@ -102,6 +102,7 @@ if [ ! "$1" = 'slim' ]; then
       ' currently_building BIGINT NULL :build_assignments' \
       ' last_connection DATETIME' \
       ' logged_lines BIGINT NULL' \
+      ' last_action VARCHAR(32) NULL' \
       ' UNIQUE name' \
       'package_sources BIGINT' \
       ' pkgbase VARCHAR(64)' \
