@@ -863,15 +863,17 @@ mysql_cleanup() {
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
     printf ' AND TIMEDIFF(NOW(),`build_slaves`.`last_connection`) > "1:00:00";\n'
-    # remove `logged_lines` from buildslaves without an assignment
+    # remove `last_action` and `logged_lines` from buildslaves without an assignment
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `build_slaves`'
-      printf ' SET `build_slaves`.`logged_lines`=NULL'
+      printf ' SET `build_slaves`.`last_action`=NULL,'
+      printf ' `build_slaves`.`logged_lines`=NULL'
     else
       printf 'SELECT COUNT(*) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NULL'
-    printf ' AND `build_slaves`.`logged_lines` IS NOT NULL;\n'
+    printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
+    printf ' OR `build_slaves`.`logged_lines` IS NOT NULL);\n'
     for partition in $(seq 0 $((mysql_files_table_partitions-1))); do
       # remove obsolete file_providers
       printf '%s FROM `file_providers` PARTITION (p%s)' \
