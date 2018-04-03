@@ -14,7 +14,8 @@ This includes scripts to be run on the build master as well as scripts to be run
 * some mysql-server
 * `nginx` or equivalent
 * `php-gd`
-* `php-fpm` or quivalent
+* `php-fpm` or equivalent
+* `pkgfile`
 * `rsync`
 * `screen`
 * some ssh-server
