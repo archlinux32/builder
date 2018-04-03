@@ -740,7 +740,7 @@ download_sources_by_hash() {
   fi
 
   for arch_suffix in '' '_i686'; do
-    for sum_type in 'sha256sum' 'sha512sum'; do
+    for sum_type in 'sha1sum' 'sha256sum' 'sha512sum'; do
       grep '^\s*'"${sum_type}s${arch_suffix}"' = ' "${tmp_dir}/.SRCINFO" | \
         sed 's|^.* = ||' | \
         cat -n > \
