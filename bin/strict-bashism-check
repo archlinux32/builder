@@ -55,11 +55,11 @@ if ! cd "${tmp_dir}"; then
 fi
 
 errors=$(
-  find bin conf lib -type f -not -executable -not -name '.gitignore'
+  find bin lib -type f -not -executable -not -name '.gitignore'
 )
 
 if [ -n "${errors}" ]; then
-  >&2 echo 'Non-executable files found in bin/, conf/ or lib/:'
+  >&2 echo 'Non-executable files found in bin/ or lib/:'
   >&2 echo "${errors}"
   exit 1
 fi
