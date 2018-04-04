@@ -111,6 +111,7 @@ if [ ! "$1" = 'slim' ]; then
       ' upstream_package_repository SMALLINT :upstream_repositories' \
       ' uses_upstream BIT' \
       ' uses_modification BIT' \
+      ' commit_time DATETIME' \
       ' UNIQUE content pkgbase git_revision mod_git_revision' \
       'upstream_repositories SMALLINT' \
       ' name VARCHAR(64)' \
