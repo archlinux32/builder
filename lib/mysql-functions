@@ -80,6 +80,8 @@ mysql_add_package_source() {
   local uses_upstream
   local uses_modification
   local repo
+  local repo_path
+  local commit_time
 
   if git -C "${repo_paths__archlinux32}" archive "$3" -- "$4/$1" >/dev/null 2>&1; then
     uses_modification=1
@@ -87,15 +89,20 @@ mysql_add_package_source() {
     uses_modification=0
   fi
   uses_upstream=0
+  commit_time=$(date '+%s')
   for repo in ${repo_names}; do
     if [ "${repo}" = 'archlinux32' ]; then
       continue
     fi
-    if eval 'git -C "${repo_paths__'"${repo}"'}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null' | \
+    eval 'repo_path="${repo_paths__'"${repo}"'}"'
+    if git -C "${repo_path}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null | \
       tar -t 2>/dev/null | \
       sed 's,-x86_64/,-any/,' | \
       grep -qFx "$1/repos/$4-any/PKGBUILD"; then
       uses_upstream=1
+      commit_time=$(
+        git -C "${repo_path}" log -n 1 --pretty=format:%ct "$2" -- "$1/repos/$4-*/PKGBUILD"
+      )
     fi
   done
 
@@ -112,11 +119,11 @@ mysql_add_package_source() {
     printf 'INSERT IGNORE INTO package_sources'
     printf ' ('
     printf '`%s`, ' ${names}
-    printf '`uses_upstream`,`uses_modification`'
+    printf '`uses_upstream`,`uses_modification`,`commit_time`'
     printf ') SELECT'
     printf ' from_base64("%s"), ' ${values% *}
-    printf ' `upstream_repositories`.`id`,%s,%s' \
-      ${uses_upstream} ${uses_modification}
+    printf ' `upstream_repositories`.`id`,%s,%s,from_unixtime(%s)' \
+      "${uses_upstream}" "${uses_modification}" "${commit_time}"
     printf ' FROM `upstream_repositories`'
     printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
       "${values##* }"
