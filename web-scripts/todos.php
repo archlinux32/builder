@@ -18,7 +18,7 @@ if ($result -> num_rows > 0) {
 
   while ($row = $result->fetch_assoc())
     $knot_rows[$row["id"]] =
-      $row["file"]. " (line ".$row["line"]."):\\n".$row["description"];
+      $row["file"]. " (line ".$row["line"]."):\\n".str_replace("\"","\\\"",$row["description"]);
 
   unset($knots);
   foreach ($knot_rows as $knot)
