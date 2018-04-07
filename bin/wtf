@@ -1,0 +1,36 @@
+#!/bin/sh
+
+wget -qO- 'https://pkgapi.arch32.tyzoid.com/esearch/'"$*"'.xml' | \
+  awk '
+    BEGIN {
+      package="";
+      version="";
+      repo="";
+      filelen=0;
+    }
+    {
+      if ($1 == "</package>") {
+        printf "[" repo "] " package " (" version "):";
+        for (i=1; i <= filelen; i++) {
+          printf " " file[i];
+        }
+        print "";
+        package="";
+        version="";
+        repo="";
+        filelen=0;
+      }
+      if ($1 ~ /^<name>/) {
+        package = gensub(/<[^>]+>/, " ", "g", $1);
+      }
+      if ($1 ~ /^<version>/) {
+        version = gensub(/<[^>]+>/, "", "g", $1);
+      }
+      if ($1 ~ /^<repo>/) {
+        repo = gensub(/<[^>]+>/, "", "g", $1);
+      }
+      if ($1 ~ /^<file>/) {
+        file[++filelen] = gensub(/<[^>]+>/, "", "g", $1);
+      }
+    }
+  '

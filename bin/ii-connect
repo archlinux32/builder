@@ -94,7 +94,8 @@ if [ "$1" = 'watch' ]; then
             p
           ' "${out_file}" | \
             while read -r line; do
-              if ! reason=$(pkgfile -C "${base_dir}/conf/pkgfile.pacman32.conf" "${line}"); then
+              reason=$("${base_dir}/bin/wtf" "${line}");
+              if [ -z "${reason}" ] then
                 reason="Huh, I don't know that one."
               fi
               if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
