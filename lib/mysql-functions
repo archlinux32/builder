@@ -71,11 +71,13 @@ mysql_run_query() {
   rm "${query_stdout}"
 }
 
-# mysql_add_package_source $pkgbase $git_revision $mod_git_revision $upstream_package_repository
+# mysql_add_package_source $pkgbase $git_revision $old_git_revision $mod_git_revision $upstream_package_repository
+# $old_git_revision may be empty, in which case the whole history will be searched (slower)
 
 # shellcheck disable=SC2086
 mysql_add_package_source() {
-  local names='pkgbase git_revision mod_git_revision upstream_package_repository'
+  local names='pkgbase git_revision old_git_revision mod_git_revision upstream_package_repository'
+  local name
   local values
   local uses_upstream
   local uses_modification
@@ -101,19 +103,23 @@ mysql_add_package_source() {
       grep -qFx "$1/repos/$4-any/PKGBUILD"; then
       uses_upstream=1
       commit_time=$(
-        git -C "${repo_path}" log -n 1 --pretty=format:%ct "$2" -- "$1/repos/$4-*/PKGBUILD"
+        git -C "${repo_path}" log -n 1 --pretty=format:%ct "${3:+$3..}$2" -- "$1/repos/$4-*/PKGBUILD"
       )
+      break
     fi
   done
 
-  for _ in ${names}; do
-    values="${values}$(
-      printf '%s' "$1" | \
-        base64 -w0
-    ) "
+  for name in ${names}; do
+    if [ ! "${name}" = 'old_git_revision' ]; then
+      values="${values}$(
+        printf '%s' "$1" | \
+          base64 -w0
+      ) "
+    fi
     shift
   done
-  values="${values% }"
+  values="${values% * }"
+  names="${names% *}"
 
   {
     printf 'INSERT IGNORE INTO package_sources'
@@ -180,17 +186,14 @@ mysql_show_binary_package() {
     mysql_run_query --html --column-names
 }
 
-# mysql_generate_package_metadata $current_repository $package $git_revision $mod_git_revision $repository
-# or
-# mysql_generate_package_metadata $current_repository $package.$git_revision.$mod_git_revision.$repository
+# mysql_generate_package_metadata $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
 # if sub_pkgrel should be determined automatically
 # and
-# mysql_generate_package_metadata $sub_pkgrel $current_repository $package $git_revision $mod_git_revision $repository
-# or
-# mysql_generate_package_metadata $sub_pkgrel $current_repository $package.$git_revision.$mod_git_revision.$repository
+# mysql_generate_package_metadata $sub_pkgrel $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
 # if $sub_pkgrel should be forced
 
 # generate the meta data of a package (dependencies, built packages, ...) in the database
+# $old_git_revision may be empty, in which case the whole history will be searched (slower)
 
 mysql_generate_package_metadata() {
 
@@ -209,20 +212,10 @@ mysql_generate_package_metadata() {
     esac
     current_repository="$1"
     package="$2"
-
-    if [ $# -eq 2 ]; then
-      # second form
-      repository="${package##*.}"
-      package="${package%.*}"
-      mod_git_revision="${package##*.}"
-      package="${package%.*}"
-      git_revision="${package##*.}"
-      package="${package%.*}"
-    else
-      git_revision="$3"
-      mod_git_revision="$4"
-      repository="$5"
-    fi
+    git_revision="$3"
+    old_git_revision="$4"
+    mod_git_revision="$5"
+    repository="$6"
 
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
@@ -257,7 +250,7 @@ mysql_generate_package_metadata() {
     fi
 
     # add the package source
-    mysql_add_package_source "${pkgbase}" "${git_revision}" "${mod_git_revision}" "${repository}"
+    mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}"
     printf '.' >&2
 
     # now we encode everything in base64
