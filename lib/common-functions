@@ -36,9 +36,9 @@ find_pkgbuilds() {
   eval 'repo_path="${repo_paths__'"${git_repository}"'}"'
 
   PKGBUILD=$(
-    git -C "${repo_path}" archive "${git_revision}" -- "${package}/repos/" 2> /dev/null | \
+    git -C "${repo_path}" archive "${git_revision}" -- "${package}/repos/${repository}-*/PKGBUILD" 2> /dev/null | \
       tar -t 2> /dev/null | \
-      grep "$(printf '^%s-.*/PKGBUILD' "$(str_to_regex "${package}/repos/${repository}")")" | \
+      grep -- '/PKGBUILD$' | \
       grep -v -- '-i686/PKGBUILD$' | \
       grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
       sort | \
@@ -46,7 +46,7 @@ find_pkgbuilds() {
   )
 
   PKGBUILD_mod=$(
-    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" 2> /dev/null | \
+    git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${repository}/${package}/PKGBUILD" 2> /dev/null | \
       tar -t "${repository}/${package}/PKGBUILD" 2> /dev/null
   ) || true
 
