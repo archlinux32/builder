@@ -251,6 +251,7 @@ mysql_generate_package_metadata() {
       >&2 printf '"make_source_info" did not return a "pkgbase" - eh, what?\n'
       exit 2
     fi
+    printf '.' >&2
 
     # add the package source
     mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}"
