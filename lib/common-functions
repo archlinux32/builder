@@ -528,7 +528,8 @@ make_source_info() {
       makepkg --printsrcinfo
       cd ..
     } > \
-      "${output}"
+      "${output}" || \
+      rm -f "${output}"
 
   )
 
