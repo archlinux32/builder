@@ -520,10 +520,12 @@ make_source_info() {
       if [ "${package%-i18n}-i18n" = "${package}" ]; then
         # *-i18n packages should have this dependency
         printf '\tdepends = %s\n' "${package%-i18n}"
-      fi
-      if [ "${package%-doc}-doc" = "${package}" ]; then
+      elif [ "${package%-doc}-doc" = "${package}" ]; then
         # *-doc packages should have this dependency
         printf '\tdepends = %s\n' "${package%-doc}"
+      elif [ "${package%-docs}-docs" = "${package}" ]; then
+        # *-doc packages should have this dependency
+        printf '\tdepends = %s\n' "${package%-docs}"
       fi
       makepkg --printsrcinfo
       cd ..
