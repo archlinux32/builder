@@ -55,46 +55,24 @@ fi
 tmp_dir=$(mktemp -d 'tmp.build-master-status.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-{
-  printf '%s\n' \
-    '<html>' \
-    '<head>' \
-    '<title>Todos in the build scripts</title>' \
-    '</head>' \
-    '<body>'
-  find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
-    -exec grep -nHF '' '{}' \; | \
-    awk '
-      { print $0 }
-      /^[^:]+:[0-9]+:\s*#\s*TODO:/{print ++i}
-    ' | \
-    sed -n '
-      s/^\([^:]\+\):\([0-9]\+\):\s*#\s*TODO:\s*/\1\n\2\n/
-      T
+find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
+  -exec grep -nHF '' '{}' \; | \
+  awk '
+    { print $0 }
+    /^[^:]+:[0-9]+:\s*#\s*TODO:/{print ++i}
+  ' | \
+  sed -n '
+    s/^\([^:]\+\):\([0-9]\+\):\s*#\s*TODO:\s*/\1\n\2\n/
+    T
+    N
+    s/\n\(.*\)\n\([0-9]\+\)$/\n\2\n\1/
+    :a
       N
-      s/\n\(.*\)\n\([0-9]\+\)$/\n\2\n\1/
-      :a
-        N
-        s/\n[^:\n]\+:[0-9]\+:[ \t]*#[ \t]*\(\S[^\n]*\)$/\n\1/
-        ta
-      s/\n[^:\n]\+:[0-9]\+:[^\n]*$/\n/
-      p
-    ' | \
-    tee "${tmp_dir}/todos" | \
-    sed '
-      :a
-      N
-      /\n$/!ba
-      s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n\([0-9]\+\)\n|<a href="#TODO\2" name="TODO\2">TODO #\2</a> - <a href="https://github.com/archlinux32/builder/blob/master/\1#L\3">\1 (line \3)</a>:\n|
-    ' | \
-    sed '
-      s|$|<br>|
-    '
-  printf '%s\n' \
-    '</body>' \
-    '</html>'
-} > \
-  "${tmp_dir}/todos.html"
+      s/\n[^:\n]\+:[0-9]\+:[ \t]*#[ \t]*\(\S[^\n]*\)$/\n\1/
+      ta
+    s/\n[^:\n]\+:[0-9]\+:[^\n]*$/\n/
+    p
+  ' > "${tmp_dir}/todos"
 
 if [ -s "${tmp_dir}/todos" ]; then
   sed '
