@@ -514,9 +514,9 @@ make_source_info() {
     {
       cd "${tmp_dir}"
       # some additional info
-      printf '\tupstream_git_repository = %s\n' "${git_repo}"
-      printf '\tPKGBUILD = %s\n' "${PKGBUILD}"
-      printf '\tPKGBUILD_mod = %s\n' "${PKGBUILD_mod}"
+      printf 'upstream_git_repository = %s\n' "${git_repo}"
+      printf 'PKGBUILD = %s\n' "${PKGBUILD}"
+      printf 'PKGBUILD_mod = %s\n' "${PKGBUILD_mod}"
       if [ "${package%-i18n}-i18n" = "${package}" ]; then
         # *-i18n packages should have this dependency
         printf '\tdepends = %s\n' "${package%-i18n}"
