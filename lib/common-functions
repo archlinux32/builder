@@ -513,16 +513,21 @@ make_source_info() {
 
     {
       cd "${tmp_dir}"
+      # some additional info
+      printf '\tupstream_git_repository = %s\n' "${git_repo}"
+      printf '\tPKGBUILD = %s\n' "${PKGBUILD}"
+      printf '\tPKGBUILD_mod = %s\n' "${PKGBUILD_mod}"
+      if [ "${package%-i18n}-i18n" = "${package}" ]; then
+        # *-i18n packages should have this dependency
+        printf '\tdepends = %s\n' "${package%-i18n}"
+      fi
+      if [ "${package%-doc}-doc" = "${package}" ]; then
+        # *-doc packages should have this dependency
+        printf '\tdepends = %s\n' "${package%-doc}"
+      fi
       makepkg --printsrcinfo
       cd ..
-    } |
-    if [ "${package%-i18n}-i18n" = "${package}" ]; then
-      sed '
-        1 a \\tdepends = '"${package%-i18n}"'
-      '
-    else
-      cat
-    fi > \
+    } > \
       "${output}"
 
   )
