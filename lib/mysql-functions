@@ -76,16 +76,25 @@ mysql_run_query() {
 
 # shellcheck disable=SC2086
 mysql_add_package_source() {
-  local names='pkgbase git_revision old_git_revision mod_git_revision upstream_package_repository'
-  local name
-  local values
+  local pkgbase
+  local git_revision
+  local old_git_revision
+  local mod_git_revision
+  local upstream_package_repository
+
+  pkgbase="$1"
+  git_revision="$2"
+  old_git_revision="${3:+$3..}"
+  mod_git_revision="$4"
+  upstream_package_repository="$5"
+
   local uses_upstream
   local uses_modification
   local repo
   local repo_path
   local commit_time
 
-  if git -C "${repo_paths__archlinux32}" archive "$3" -- "$4/$1" >/dev/null 2>&1; then
+  if git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${upstream_package_repository}/${pkgbase}" >/dev/null 2>&1; then
     uses_modification=1
   else
     uses_modification=0
@@ -97,45 +106,43 @@ mysql_add_package_source() {
       continue
     fi
     eval 'repo_path="${repo_paths__'"${repo}"'}"'
-    if git -C "${repo_path}" archive "$2" -- "$1/repos/$4-*/PKGBUILD" 2>/dev/null | \
+    if git -C "${repo_path}" archive "${git_revision}" -- "${pkgbase}/repos/${upstream_package_repository}-*/PKGBUILD" 2>/dev/null | \
       tar -t 2>/dev/null | \
       sed 's,-x86_64/,-any/,' | \
-      grep -qFx "$1/repos/$4-any/PKGBUILD"; then
+      grep -qFx "${pkgbase}/repos/${upstream_package_repository}-any/PKGBUILD"; then
       uses_upstream=1
       commit_time=$(
-        git -C "${repo_path}" log -n 1 --pretty=format:%ct "${3:+$3..}$2" -- "$1/repos/$4-*/PKGBUILD"
+        git -C "${repo_path}" log -n 1 --pretty=format:%ct "${old_git_revision}${git_revision}" -- "${pkgbase}/repos/${upstream_package_repository}-*/PKGBUILD"
       )
       break
     fi
   done
 
-  for name in ${names}; do
-    if [ ! "${name}" = 'old_git_revision' ]; then
-      values="${values}$(
-        printf '%s' "$1" | \
-          base64 -w0
-      ) "
-    fi
-    shift
-  done
-  values="${values% * }"
-  names=$(
-    printf '%s\n' "${names% *}" | \
-      sed 's/ old_git_revision / /'
-  )
-
   {
     printf 'INSERT IGNORE INTO package_sources'
-    printf ' ('
-    printf '`%s`, ' ${names}
-    printf '`uses_upstream`,`uses_modification`,`commit_time`'
-    printf ') SELECT'
-    printf ' from_base64("%s"), ' ${values% *}
+    printf ' (`pkgbase`,`git_revision`,`mod_git_revision`,`upstream_package_repository`,`uses_upstream`,`uses_modification`,`commit_time`)'
+    printf ' SELECT'
+    printf ' from_base64("%s"),' \
+      "$(
+        printf '%s' "${pkgbase}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${git_revision}" | \
+          base64 -w0
+      )" \
+      "$(
+        printf '%s' "${mod_git_revision}" | \
+          base64 -w0
+      )"
     printf ' `upstream_repositories`.`id`,%s,%s,from_unixtime(%s)' \
       "${uses_upstream}" "${uses_modification}" "${commit_time}"
     printf ' FROM `upstream_repositories`'
     printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
-      "${values##* }"
+      "$(
+        printf '%s' "${upstream_package_repository}" | \
+          base64 -w0
+      )"
   } | \
     mysql_run_query
 }
