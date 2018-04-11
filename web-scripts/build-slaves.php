@@ -1,7 +1,7 @@
 <html><head><title>list of build slaves</title></head><body>
 <?php
 
-  $conn = new mysqli("localhost","http","http","buildmaster");
+  $conn = new mysqli("localhost","webserver","empty","buildmaster");
   if ($conn->connect_error) {
     die("Connection to mysql database failed: " . $conn->connect_error);
   }
