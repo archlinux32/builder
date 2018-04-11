@@ -370,11 +370,9 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   tr '\t' ' ' | \
   if ${update}; then
     while read -r pkgbase git_rev mod_git_rev repo; do
-      printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" >&2
       printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" | \
         sed 's/ $/\n/'
       mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_rev}" '' "${mod_git_rev}" "${repo}"
-      printf '\n' >&2
     done
 
     rm -f "${build_list_lock_file}"
