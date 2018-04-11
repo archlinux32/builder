@@ -115,6 +115,12 @@ mysql_add_package_source() {
     commit_time=$(
       git -C "${repo_path}" log -n 1 --pretty=format:%ct "${old_git_revision}${git_revision}" -- "${pkgbuild}"
     )
+    if [ -z "${commit_time}" ]; then
+      # We may have modified git_mod_revision!
+      commit_time=$(
+        git -C "${repo_path}" log -n 1 --pretty=format:%ct "${git_revision}" -- "${pkgbuild}"
+      )
+    fi
   else
     uses_upstream=0
     commit_time=$(date '+%s')
