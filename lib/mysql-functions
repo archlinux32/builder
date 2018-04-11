@@ -95,7 +95,7 @@ mysql_add_package_source() {
   local repo
   local repo_path
   local commit_time
-  loacl pkgbuild
+  local pkgbuild
 
   if grep -qx 'PKGBUILD_mod = \S\+' "${srcinfo_file}"; then
     uses_modification=1
