@@ -71,7 +71,7 @@ mysql_run_query() {
   rm "${query_stdout}"
 }
 
-# mysql_add_package_source $pkgbase $git_revision $old_git_revision $mod_git_revision $upstream_package_repository
+# mysql_add_package_source $pkgbase $git_revision $old_git_revision $mod_git_revision $upstream_package_repository $srcinfo_file
 # $old_git_revision may be empty, in which case the whole history will be searched (slower)
 
 # shellcheck disable=SC2086
@@ -81,42 +81,44 @@ mysql_add_package_source() {
   local old_git_revision
   local mod_git_revision
   local upstream_package_repository
+  local srcinfo_file
 
   pkgbase="$1"
   git_revision="$2"
   old_git_revision="${3:+$3..}"
   mod_git_revision="$4"
   upstream_package_repository="$5"
+  srcinfo_file="$6"
 
   local uses_upstream
   local uses_modification
   local repo
   local repo_path
   local commit_time
+  loacl pkgbuild
 
-  if git -C "${repo_paths__archlinux32}" archive "${mod_git_revision}" -- "${upstream_package_repository}/${pkgbase}" >/dev/null 2>&1; then
+  if grep -qx 'PKGBUILD_mod = \S\+' "${srcinfo_file}"; then
     uses_modification=1
   else
     uses_modification=0
   fi
-  uses_upstream=0
-  commit_time=$(date '+%s')
-  for repo in ${repo_names}; do
-    if [ "${repo}" = 'archlinux32' ]; then
-      continue
-    fi
-    eval 'repo_path="${repo_paths__'"${repo}"'}"'
-    if git -C "${repo_path}" archive "${git_revision}" -- "${pkgbase}/repos/${upstream_package_repository}-*/PKGBUILD" 2>/dev/null | \
-      tar -t 2>/dev/null | \
-      sed 's,-x86_64/,-any/,' | \
-      grep -qFx "${pkgbase}/repos/${upstream_package_repository}-any/PKGBUILD"; then
-      uses_upstream=1
-      commit_time=$(
-        git -C "${repo_path}" log -n 1 --pretty=format:%ct "${old_git_revision}${git_revision}" -- "${pkgbase}/repos/${upstream_package_repository}-*/PKGBUILD"
-      )
-      break
-    fi
-  done
+  if grep -qx 'PKGBUILD = \S\+' "${srcinfo_file}"; then
+    uses_upstream=1
+    eval 'repo_path="${repo_paths__'"$(sed -n 's/^upstream_git_repository = //;T;p' "${srcinfo_file}")"'}"'
+    pkgbuild=$(
+      sed -n '
+        s/^PKGBUILD = //
+        T
+        p
+      ' "${srcinfo_file}"
+    )
+    commit_time=$(
+      git -C "${repo_path}" log -n 1 --pretty=format:%ct "${old_git_revision}${git_revision}" -- "${pkgbuild}"
+    )
+  else
+    uses_upstream=0
+    commit_time=$(date '+%s')
+  fi
 
   {
     printf 'INSERT IGNORE INTO package_sources'
@@ -261,7 +263,7 @@ mysql_generate_package_metadata() {
     printf '.' >&2
 
     # add the package source
-    mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}"
+    mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}" "${temp_dir}/SRCINFO"
     printf '.' >&2
 
     # now we encode everything in base64
