@@ -417,6 +417,8 @@ while [ $# -gt 0 ]; do
       errors=$(
         find "${work_dir}" -mindepth 1 -maxdepth 1 \
           -name 'tmp.mysql-functions.query.*' \
+          -exec sleep 5 \; \
+          -exec test -s {} \; \
           -printf '%f\n' \
           -execdir sed 's/^/>> /' '{}' \;
       )
