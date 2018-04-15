@@ -64,6 +64,8 @@ flock ${wait_for_lock} 8
 tmp_dir=$(mktemp -d "${work_dir}/tmp.copy-to-build-support.0.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+export TMPDIR="${tmp_dir}"
+
 to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
 sed -n '
   s/.\+/\0 \0/

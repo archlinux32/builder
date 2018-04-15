@@ -263,6 +263,8 @@ tmp_dir=$(mktemp -d "${work_dir}/tmp.return-assignment.XXXXXXXXXX")
 cd "${tmp_dir}"
 trap clean_up_tmp_dir EXIT
 
+export TMPDIR="${tmp_dir}"
+
 # extract package(s)
 tar -x \
   --wildcards \

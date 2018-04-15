@@ -96,6 +96,8 @@ fi
 tmp_dir=$(mktemp -d "${work_dir}/tmp.delete-packages.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+export TMPDIR="${tmp_dir}"
+
 # shellcheck disable=SC2016
 {
   printf 'CREATE TEMPORARY TABLE `to_deletes` (`id` BIGINT, UNIQUE KEY (`id`));\n'
