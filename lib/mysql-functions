@@ -238,7 +238,7 @@ mysql_generate_package_metadata() {
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
-    printf '.' >&2
+    printf '.a' >&2
     if ! make_source_info "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${temp_dir}/SRCINFO"; then
       printf '"make_source_info %s %s %s %s %s" failed.\n' "${package}" "${repository}" "${git_revision}" "${mod_git_revision}" "${temp_dir}/SRCINFO"
       exit 2
@@ -257,7 +257,7 @@ mysql_generate_package_metadata() {
     fi
     printf '\n\n' >> "${temp_dir}/SRCINFO"
 
-    printf '.' >&2
+    printf '.b' >&2
     pkgbase=$(
       grep '^pkgbase = ' "${temp_dir}/SRCINFO" | \
         cut -d' ' -f3
@@ -266,11 +266,11 @@ mysql_generate_package_metadata() {
       >&2 printf '"make_source_info" did not return a "pkgbase" - eh, what?\n'
       exit 2
     fi
-    printf '.' >&2
+    printf '.c' >&2
 
     # add the package source
     mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}" "${temp_dir}/SRCINFO"
-    printf '.' >&2
+    printf '.d' >&2
 
     # now we encode everything in base64
     current_repository=$(
@@ -640,7 +640,7 @@ mysql_generate_package_metadata() {
         } >> \
           "${temp_dir}/add-install-targets-command"
       done
-    printf '.' >&2
+    printf '.e' >&2
 
     {
       if [ -s "${temp_dir}/add-build-assignments-command" ]; then
@@ -654,7 +654,7 @@ mysql_generate_package_metadata() {
       fi
     } | \
       mysql_run_query
-    printf '.' >&2
+    printf '.f' >&2
 
   )
 }
