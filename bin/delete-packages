@@ -100,21 +100,37 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 {
   printf 'CREATE TEMPORARY TABLE `to_deletes` (`id` BIGINT, UNIQUE KEY (`id`));\n'
   printf 'INSERT IGNORE INTO `to_deletes`'
-  printf ' SELECT `binary_packages`.`id`'
+  printf ' SELECT DISTINCT `binary_packages`.`id`'
   printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_dependencies
-  mysql_join_dependencies_dependency_types
-  printf ' AND `dependency_types`.`relevant_for_binary_packages`'
   mysql_join_binary_packages_repositories
-  printf ' AND `repositories`.`is_on_master_mirror`'
+  printf ' LEFT' # should not be necessary, but is formally more correct
+  mysql_join_binary_packages_install_target_providers
   printf ' WHERE `binary_packages`.`is_to_be_deleted`'
+  printf ' AND `repositories`.`is_on_master_mirror`'
   printf ' AND NOT EXISTS ('
-    printf 'SELECT * FROM `install_target_providers`'
-    mysql_join_install_target_providers_binary_packages '' 'prov_bp'
-    mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
-    mysql_join_repositories_repository_stabilities 'prov_r'
+    # no packages depending on that one exist
+    printf 'SELECT 1 FROM `dependencies`'
+    mysql_join_dependencies_dependency_types
+    printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+    mysql_join_dependencies_binary_packages '' 'd_bp'
+    # deliberately break dependencies of deletion-list packages
+    printf ' AND NOT `d_bp`.`is_to_be_deleted`'
+    mysql_join_binary_packages_repositories 'd_bp' 'd_r'
+    mysql_join_repositories_repository_stabilities 'd_r' 'd_rs'
+    # this is deliberately less restrict than `d_r`.`is_on_master_mirror`
+    printf ' AND `d_rs`.`name` NOT IN ("forbidden","virtual")'
     printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-    printf ' AND `repository_stabilities`.`name` NOT IN ("forbidden","virtual")'
+    printf ' AND NOT EXISTS ('
+      printf 'SELECT 1 FROM `binary_packages` AS `s_bp`'
+      mysql_join_binary_packages_install_target_providers 's_bp' 's_itp'
+      printf ' AND NOT `s_bp`.`is_to_be_deleted`'
+      mysql_join_binary_packages_repositories 's_bp' 's_r'
+      printf ' AND `s_r`.`is_on_master_mirror`'
+      printf ' JOIN `repository_stability_relations`'
+        printf ' ON `repository_stability_relations`.`more_stable`=`s_r`.`stability`'
+      printf ' WHERE `s_itp`.`install_target`=`install_target_providers`.`install_target`'
+      printf ' AND `repository_stability_relations`.`less_stable`=`d_r`.`stability`'
+    printf ')'
   printf ');\n'
 
   printf ' SELECT DISTINCT "repo",`repositories`.`name`'
