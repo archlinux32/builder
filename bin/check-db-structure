@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# shellcheck source=../conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# shellcheck disable=SC2016
+{
+  printf 'SELECT `proc`.`name` FROM `mysql`.`proc` WHERE `proc`.`Db`="buildmaster"' | \
+    mysql_run_query | \
+    while read -r procedure; do
+      printf 'SHOW CREATE PROCEDURE `%s`;\n' "${procedure}"
+    done
+  printf 'SHOW TABLES' | \
+    mysql_run_query | \
+    while read -r table; do
+      printf 'SHOW CREATE TABLE `%s`;\n' "${table}"
+    done
+} | \
+  mysql_run_query
