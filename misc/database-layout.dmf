@@ -152,84 +152,6 @@
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{457d2e44-2570-45c8-b93e-7b335efd0483}">
-      <position>
-        <x>796</x>
-        <y>131</y>
-      </position>
-      <table>
-        <name>file_providers</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>package</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>file</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>file_name_hash</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{f24a3299-870d-4312-8dbe-50b3bf1953d3}">
-      <position>
-        <x>785</x>
-        <y>6</y>
-      </position>
-      <table>
-        <name>files</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>path</name>
-            <data-type>TEXT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>TEXT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>name_hash</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>absolute_name_hash</name>
-            <data-type>VARCHAR(54)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
     <item type="database-table" id="{92f54126-a433-458e-80b7-67235e560334}">
       <position>
         <x>754</x>
@@ -550,8 +472,8 @@
     </item>
     <item type="database-table" id="{f8caa2d5-11ba-485c-b273-8183713896bf}">
       <position>
-        <x>611</x>
-        <y>89</y>
+        <x>669</x>
+        <y>128</y>
       </position>
       <table>
         <name>install_target_providers</name>
@@ -772,8 +694,8 @@
     </item>
     <item type="database-table" id="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}">
       <position>
-        <x>680</x>
-        <y>3</y>
+        <x>721</x>
+        <y>23</y>
       </position>
       <table>
         <name>install_targets</name>
@@ -796,7 +718,7 @@
     </item>
     <item type="database-table" id="{caab4a73-46dc-49dc-ac51-d8ae916827c5}">
       <position>
-        <x>496</x>
+        <x>537</x>
         <y>-6</y>
       </position>
       <table>
@@ -1024,72 +946,6 @@
         </modality>
         <columns>
           <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{4a844898-e05d-4919-8c83-cf90f28edf42}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>796</x>
-              <y>169.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{457d2e44-2570-45c8-b93e-7b335efd0483}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>480.719</x>
-              <y>168.288</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToMany</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{e64f4d17-ff78-45f2-ab9b-281bf8fc5fb6}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>864</x>
-              <y>131</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{457d2e44-2570-45c8-b93e-7b335efd0483}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>871.711</x>
-              <y>97.8125</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{f24a3299-870d-4312-8dbe-50b3bf1953d3}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToMany</cardinality>
-        <modality>
-          <child>Optional</child>
-          <parent>Optional</parent>
-        </modality>
-        <columns>
-          <child>2</child>
           <parent>0</parent>
         </columns>
       </relationship>
@@ -1463,7 +1319,7 @@
           <connector>
             <position>
               <x>480.719</x>
-              <y>209.05</y>
+              <y>198.859</y>
             </position>
             <angle>0</angle>
             <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
@@ -1528,8 +1384,8 @@
         <connector-list>
           <connector>
             <position>
-              <x>611</x>
-              <y>120.906</y>
+              <x>669</x>
+              <y>159.906</y>
             </position>
             <angle>180</angle>
             <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
@@ -1537,7 +1393,7 @@
           <connector>
             <position>
               <x>480.719</x>
-              <y>127.525</y>
+              <y>147.906</y>
             </position>
             <angle>0</angle>
             <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
@@ -1561,7 +1417,7 @@
         <connector-list>
           <connector>
             <position>
-              <x>571.836</x>
+              <x>612.836</x>
               <y>71.8125</y>
             </position>
             <angle>270</angle>
@@ -1570,7 +1426,7 @@
           <connector>
             <position>
               <x>480.719</x>
-              <y>86.7625</y>
+              <y>96.9531</y>
             </position>
             <angle>0</angle>
             <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
@@ -1594,16 +1450,16 @@
         <connector-list>
           <connector>
             <position>
-              <x>689.109</x>
-              <y>89</y>
+              <x>747.109</x>
+              <y>128</y>
             </position>
             <angle>90</angle>
             <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
           </connector>
           <connector>
             <position>
-              <x>730.016</x>
-              <y>52.8125</y>
+              <x>771.016</x>
+              <y>72.8125</y>
             </position>
             <angle>270</angle>
             <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
@@ -1627,7 +1483,7 @@
         <connector-list>
           <connector>
             <position>
-              <x>647.672</x>
+              <x>688.672</x>
               <y>32.9062</y>
             </position>
             <angle>0</angle>
@@ -1635,8 +1491,8 @@
           </connector>
           <connector>
             <position>
-              <x>680</x>
-              <y>27.9062</y>
+              <x>721</x>
+              <y>47.9062</y>
             </position>
             <angle>180</angle>
             <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
@@ -1693,7 +1549,7 @@
         <connector-list>
           <connector>
             <position>
-              <x>496</x>
+              <x>537</x>
               <y>32.9062</y>
             </position>
             <angle>180</angle>

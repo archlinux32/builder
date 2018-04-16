@@ -783,7 +783,6 @@ mysql_find_build_assignment_loops() {
 # clean up left overs from mysql database
 mysql_cleanup() {
   local operator
-  local partition
   if [ "$#" = '0' ]; then
     operator='DELETE'
   elif [ "$#" = '1' ] && [ "x$1" = 'xdry' ]; then
@@ -893,29 +892,6 @@ mysql_cleanup() {
     printf ' WHERE `build_slaves`.`currently_building` IS NULL'
     printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
     printf ' OR `build_slaves`.`logged_lines` IS NOT NULL);\n'
-    for partition in $(seq 0 $((mysql_files_table_partitions-1))); do
-      # remove obsolete file_providers
-      printf '%s FROM `file_providers` PARTITION (p%s)' \
-        "${operator}" "${partition}"
-      printf ' WHERE NOT EXISTS ('
-        printf 'SELECT * FROM `binary_packages`'
-        printf ' WHERE `binary_packages`.`id`=`file_providers`.`package`'
-      printf ') OR NOT EXISTS ('
-        printf 'SELECT * FROM `files` PARTITION (p%s)' \
-          "${partition}"
-        printf ' WHERE `files`.`id`=`file_providers`.`file`'
-        printf ' AND `files`.`name_hash`=`file_providers`.`file_name_hash`'
-      printf ');\n'
-      # remove obsolete files
-      printf '%s FROM `files` PARTITION (p%s)' \
-        "${operator}" "${partition}"
-      printf ' WHERE NOT EXISTS ('
-        printf 'SELECT * FROM `file_providers` PARTITION (p%s)' \
-          "${partition}"
-        printf ' WHERE `files`.`id`=`file_providers`.`file`'
-        printf ' AND `files`.`name_hash`=`file_providers`.`file_name_hash`'
-      printf ');\n'
-    done
   } | \
     mysql_run_query
 }
@@ -1140,9 +1116,6 @@ for link in \
   'failed_builds:build_assignment:build_assignments' \
   'failed_builds:build_slave:build_slaves' \
   \
-  'file_providers:package:binary_packages' \
-  'file_providers:file:files' \
-  \
   'install_target_providers:package:binary_packages' \
   'install_target_providers:install_target:install_targets' \
   'install_target_providers:install_target depending_on:dependencies' \
@@ -1173,83 +1146,3 @@ for link in \
   mysql_join__generic "${table_a}" "${column_a}" "${table_b}" "${column_b}"
   mysql_join__generic "${table_b}" "${column_b}" "${table_a}" "${column_a}"
 done
-
-# mysql_insert_package_files_query $file_list_file
-# Writes a query, inserting files listed in $file_list_file into database.
-# The file is expected to have the following \t separated columns:
-# pkgname epoch pkgver pkgrel sub_pkgrel arch path name
-mysql_insert_package_files_query() {
-
-  local partition
-
-  if [ ! -r "$1" ]; then
-    >&2 printf 'mysql_insert_package_files: File "%s" is not readable.\n' \
-      "$1"
-    return 2
-  fi
-
-  printf 'DROP TEMPORARY TABLE IF EXISTS `pkg_files`;\n'
-  printf 'CREATE TEMPORARY TABLE `pkg_files` ('
-  printf '`pkgname` VARCHAR(64),'
-  printf '`epoch` MEDIUMINT,'
-  printf '`pkgver` VARCHAR(64),'
-  printf '`pkgrel` MEDIUMINT,'
-  printf '`sub_pkgrel` MEDIUMINT,'
-  printf '`arch` VARCHAR(16),'
-  printf '`path` TEXT,'
-  printf '`name` TEXT,'
-  printf '`absolute_name_hash` VARCHAR(56),'
-  printf '`name_hash` MEDIUMINT'
-  printf ');\n'
-  printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_files`' \
-    "${1}"
-  printf ' (`pkgname`, `epoch`, `pkgver`, `pkgrel`, `sub_pkgrel`, `arch`, `path`, `name`);\n'
-  printf 'UPDATE `pkg_files` SET'
-  printf ' `pkg_files`.`name_hash`=CAST(CONV(SUBSTR(SHA2(`pkg_files`.`name`,224),1,2),16,10) AS INT),'
-  printf ' `pkg_files`.`absolute_name_hash`=SHA2(CONCAT(`pkg_files`.`path`,`pkg_files`.`name`),224);\n'
-  for partition in $(seq 0 $((mysql_files_table_partitions-1))); do
-    printf 'INSERT IGNORE INTO `files` PARTITION (p%s) (`path`,`name`,`name_hash`,`absolute_name_hash`)' \
-      "${partition}"
-    printf ' SELECT '
-    printf '`pkg_files`.`%s`,' \
-      'path' 'name' 'name_hash' 'absolute_name_hash' | \
-      sed 's/,$//'
-    printf ' FROM `pkg_files`'
-    printf ' WHERE `pkg_files`.`name_hash` MOD %s = %s;\n' \
-      "${mysql_files_table_partitions}" "${partition}"
-    printf 'INSERT IGNORE INTO `file_providers` PARTITION (p%s) (`package`,`file`,`file_name_hash`)' \
-      "${partition}"
-    printf ' SELECT `binary_packages`.`id`,`files`.`id`,`files`.`name_hash` FROM `pkg_files`'
-    printf ' JOIN `binary_packages` ON'
-    printf ' `binary_packages`.`%s`=`pkg_files`.`%s` AND' \
-      'pkgname' 'pkgname' \
-      'epoch' 'epoch' \
-      'pkgver' 'pkgver' \
-      'pkgrel' 'pkgrel' \
-      'sub_pkgrel' 'sub_pkgrel' | \
-      sed 's/ AND$//'
-    if [ -n "${slave}" ]; then
-      mysql_join_binary_packages_build_slaves
-      printf ' AND `build_slaves`.`name`=from_base64("%s")' \
-        "$(
-          printf '%s' "${slave}" | \
-            base64 -w0
-        )"
-    fi
-    mysql_join_binary_packages_architectures
-    printf ' AND `pkg_files`.`arch`=`architectures`.`name`'
-    mysql_join_binary_packages_repositories
-    if [ -n "${slave}" ]; then
-      printf ' AND `repositories`.`name`="build-list"'
-    else
-      printf ' AND `repositories`.`is_on_master_mirror`'
-    fi
-    printf ' JOIN `files` PARTITION (p%s)' \
-      "${partition}"
-    printf ' ON `files`.`name_hash`=`pkg_files`.`name_hash`'
-    printf ' AND `files`.`absolute_name_hash`=`pkg_files`.`absolute_name_hash`'
-    printf ' WHERE `pkg_files`.`name_hash` MOD %s = %s;\n' \
-      "${mysql_files_table_partitions}" "${partition}"
-  done
-
-}

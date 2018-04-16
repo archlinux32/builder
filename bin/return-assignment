@@ -426,25 +426,6 @@ find . -maxdepth 1 -name '*.pkg.tar.xz' \
   ' > \
   "${tmp_dir}/sha512sums"
 
-# generate file lists
-find . -maxdepth 1 -name '*.pkg.tar.xz' \
-  -printf '%f %p\n' | \
-  while read -r pkgfile path; do \
-    pacman -Qqlp "${path}" | \
-      sed '
-        s/^/'"${pkgfile}"'\t/
-      '
-  done | \
-  sed -n '
-    s/-\(\([^-:]\+\):\)\?\([^-:]\+\)-\([^-.]\+\)\(\.\([^-.]\+\)\)\?-\([^-]\+\)\.pkg\.tar\.xz\t/\t\2\t\3\t\4\t\6\t\7\t/
-    T
-    s/\t\t/\t0\t/g
-    s,/$,,
-    s,/\([^\t/]\+\)$,/\t\1,
-    p
-  ' > \
-  "${tmp_dir}/files"
-
 # move namcap.logs
 find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
 
@@ -470,9 +451,6 @@ trigger_mirror_refreshs
 
 # shellcheck disable=SC2016
 {
-  # insert file lists into database
-#  mysql_insert_package_files_query "${tmp_dir}/files"
-
   # insert checksums into database
   printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`sha512sum` VARCHAR(128), `pkgfile` VARCHAR(128));\n'
   printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_hashes`;\n' \

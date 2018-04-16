@@ -165,17 +165,7 @@ if [ ! "$1" = 'slim' ]; then
       ' locked_tasks_count MEDIUMINT' \
       ' blocked_tasks_count MEDIUMINT' \
       ' next_tasks_count MEDIUMINT' \
-      ' UNIQUE date' \
-      'files BIGINT' \
-      ' path TEXT' \
-      ' name TEXT' \
-      ' name_hash VARCHAR(128)' \
-      ' absolute_name_hash VARCHAR(128)' \
-      'file_providers BIGINT' \
-      ' package BIGINT :binary_packages' \
-      ' file BIGINT :files'
-      # TODO: files and file_providers is currently not represented
-      # correctly, because they are not representable in this form
+      ' UNIQUE date'
   )
 
   # shellcheck disable=SC2016
