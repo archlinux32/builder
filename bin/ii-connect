@@ -49,6 +49,27 @@ if [ "$1" = 'watch' ]; then
         )
     fi
     done_something=false
+    welcome_user_regex='^\S\+ -!- \(abaumann\|deep42thought\|tyzoid\)(.* has joined \S\+$'
+    new_users=$(
+      sed -n '
+        s/'"${welcome_user_regex}"'/\1/
+        T
+        p
+      ' "${irc_dir}/#archlinux32/out" | \
+        sort -u
+    )
+    if [ -n "${new_users}" ]; then
+      sed -i '
+        /'"${welcome_user_regex}"'/ d
+      ' "${irc_dir}/#archlinux32/out"
+      done_something=true
+      printf '%s\n' "${new_users}" | \
+        sed '
+          s/^/Hi /
+          s/$/!/
+        ' | \
+        irc_say
+    fi
     find "${irc_dir}" \
       -type f \
       -name 'out' \
