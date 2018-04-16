@@ -44,19 +44,19 @@
           <column>
             <name>file</name>
             <data-type>VARCHAR(64)</data-type>
-            <required>False</required>
+            <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
             <name>line</name>
             <data-type>MEDIUMINT</data-type>
-            <required>False</required>
+            <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
             <name>description</name>
-            <data-type>VARCHAR(512)</data-type>
-            <required>False</required>
+            <data-type>TEXT</data-type>
+            <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
