@@ -22,11 +22,11 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
     printf ' SELECT NOW(),`build_slaves`.`id`'
     printf ',from_base64("%s")' \
       "$(
-        print '%s' "${SSH_ORIGINAL_COMMAND%% *}" | \
+        printf '%s' "${SSH_ORIGINAL_COMMAND%% *}" | \
           base64 -w0
       )" \
       "$(
-        print '%s' "${#* }" | \
+        printf '%s' "${#* }" | \
           base64 -w0
       )"
     printf ' FROM `build_slaves`'
