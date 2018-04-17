@@ -5,8 +5,6 @@
 
 # TODO: enable email interface to delete packages
 
-# TODO: read information from database (?)
-
 if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo 'usage: interpret-mail'
@@ -41,47 +39,72 @@ if [ $# -ne 0 ]; then
   exit 1
 fi
 
+# log $success $action $count [$comment_file]
+
+# shellcheck disable=SC2039
 log() {
-  # shellcheck disable=SC2059
-  >&2 printf "$@"
+  local success
+  local action
+  local count
+  local comment
+  success="$1"
+  action="$2"
+  count="$3"
+  if [ -z "$4" ]; then
+    comment=''
+  else
+    comment=$(
+      base64 -w0 "$4"
+    )
+  fi
+  # shellcheck disable=SC2016
   {
-    cat "${webserver_directory}/mail-log.html"
-    # shellcheck disable=SC2059
-    printf "$@" | \
-      sed '
-        s|$|<br>|
-        s|^|'"$(date)"': |
-      '
+    printf 'INSERT INTO `email_log` (`success`,`action`,`count`,`gpg_key`,`comment`)'
+    printf ' SELECT '
+    if [ "${success}" = '1' ]; then
+      printf '1,'
+    else
+      printf '0,'
+    fi
+    printf '`email_actions`.`id`,from_base64("%s"),`gpg_keys`.`id`,from_base64("%s")' \
+      "$(
+        printf '%s' "${count}" | \
+          base64 -w0
+      )" \
+      "${comment}"
+    printf ' FROM `email_actions` JOIN `gpg_keys`'
+    printf '%s' "${gpg_keys_filter}"
+    printf ' AND `email_actions`.`name`=from_base64("%s");\n' "$(
+      printf '%s' "${action}" | \
+        base64 -w0
+    )"
   } | \
-    tail -n "${max_mail_log_lines}" | \
-    sponge "${webserver_directory}/mail-log.html"
+    mysql_run_query
 }
 
-log_from_file() {
-  >&2 cat "$@"
-  {
-    cat "${webserver_directory}/mail-log.html"
-    sed '
-      s|$|<br>|
-      s|^|'"$(date)"': |
-    ' "$@"
-  } | \
-    tail -n "${max_mail_log_lines}" | \
-    sponge "${webserver_directory}/mail-log.html"
-}
+# run_and_log_on_error $action
 
+# shellcheck disable=SC2039
 run_and_log_on_error() {
   # shellcheck disable=SC2039
   local err
+  local action
+  action="$1"
+  shift
   err=0
   "$@" 2> "${tmp_dir}/stderr" > "${tmp_dir}/stdout" || \
     err=$?
   if [ "${err}" -eq 0 ]; then
     return 0
   fi
-  log_from_file "${tmp_dir}/stderr" "${tmp_dir}/stdout"
+  cat "${tmp_dir}/stdout" >> "${tmp_dir}/stderr"
   if [ "${err}" -eq 1 ]; then
-    log '^ temporary error - I keep the message.\n'
+    printf '^ temporary error - I keep the message.\n' >> \
+      "${tmp_dir}/stderr"
+  fi
+  log '0' "${action}" '0' "${tmp_dir}/stderr"
+
+  if [ "${err}" -eq 1 ]; then
     exit 1
   else
     return 1
@@ -99,7 +122,12 @@ if ! hashcash -qXc -b 20 \
   -r 'archlinux32-buildmaster@eckner.net' \
   -r 'buildmaster@archlinux32.org' < \
   "${tmp_dir}/mail"; then
-  log 'Invalid stamp - ignoring this message.\n'
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT INTO `email_log` (`success`,`comment`)'
+    printf ' VALUES 0,"Invalid stamp - ignoring this message.";\n'
+  } | \
+    mysql_run_query
   exit
 fi
 
@@ -114,40 +142,76 @@ if ! sed -n '
     }
   ' "${tmp_dir}/mail" | \
     gpg --batch --status-file "${tmp_dir}/gpg-status" -q -d -o "${tmp_dir}/plain-content" > /dev/null 2>&1; then
-  log 'Invalid encryption/signature - ignoring this message.\n'
-  log_from_file "${tmp_dir}/gpg-status"
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT INTO `email_log` (`success`,`comment`)'
+    printf ' VALUES 0,from_base64("%s");\n' \
+      "$(
+        {
+          printf 'Invalid encryption/signature - ignoring this message.\n'
+          cat "${tmp_dir}/gpg-status"
+        } | \
+          base64 -w0
+      )"
+  } | \
+    mysql_run_query
   exit
 fi
 
-grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
-  cut -d' ' -f3 | \
-  sort -u > \
-  "${tmp_dir}/found-keys"
+gpg_keys_filter=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT DISTINCT `gpg_keys`.`id` FROM `gpg_keys`'
+    printf ' WHERE `gpg_keys`.`fingerprint` IN ('
+    grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
+      cut -d' ' -f3 | \
+      sort -u | \
+      base64_encode_each | \
+      sed '
+        s/^/from_base64("/
+        s/$/"),/
+      '
+    printf '"");\n'
+  } | \
+    mysql_run_query | \
+    sed '
+      $! s/$/,/
+      1  s/^/ WHERE `gpg_keys`.`id` IN (/
+      $  s/$/)/
+    '
+)
 
-printf '%s\n' "${admin_gpg_keys}" | \
-  sort -k1,1 -u > \
-  "${tmp_dir}/admin-gpg-keys"
+if [ -z "${gpg_keys_filter}" ]; then
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT INTO `email_log` (`success`,`comment`)'
+    printf ' VALUES 0,from_base64("%s");\n' \
+      "$(
+        {
+          printf 'No known signature found - I found:\n'
+          grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
+            cut -d' ' -f3 | \
+            sort -u | \
+            sed 's|^|> |'
+          printf 'Ignoring this message.\n'
+        } | \
+          base64 -w0
+      )"
+  } | \
+    mysql_run_query
+  exit
+fi
 
-join -j 1 -o 2.2 \
-  "${tmp_dir}/found-keys" \
-  "${tmp_dir}/admin-gpg-keys" | \
-  tr ',' '\n' | \
-  sed 's|^ALL$|'"${possible_email_actions}"'|' | \
-  tr ' ,' '\n' | \
-  sort -u > \
+# shellcheck disable=SC2016
+{
+  printf 'SELECT DISTINCT `email_actions`.`name` FROM `email_actions`'
+  mysql_join_email_actions_allowed_email_actions
+  mysql_join_allowed_email_actions_gpg_keys
+  printf '%s\n' "${gpg_keys_filter}"
+} | \
+  mysql_run_query > \
   "${tmp_dir}/allowed-actions"
 
-if [ ! -s "${tmp_dir}/allowed-actions" ]; then
-  log 'No known signature found - I found:\n'
-  grep '^\[GNUPG:] VALIDSIG ' "${tmp_dir}/gpg-status" | \
-    cut -d' ' -f3 | \
-    sort -u | \
-    sed 's|^|> |' > \
-    "${tmp_dir}/log"
-  log_from_file "${tmp_dir}/log"
-  log 'ignoring this message.\n'
-  exit
-fi
 
 printf '\n\n' >> "${tmp_dir}/plain-content"
 
@@ -190,10 +254,10 @@ sed -n "$(
 )" "${tmp_dir}/raw-content"
 
 if [ -s "${tmp_dir}/block" ]; then
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --block "${tmp_dir}/block"; then
-    log 'Successfully blocked %s packages.\n' "$(wc -l < "${tmp_dir}/block")"
+  if run_and_log_on_error 'block' "${base_dir}/bin/modify-package-state" --wait --block "${tmp_dir}/block"; then
+    log 1 'block' "$(wc -l < "${tmp_dir}/block")"
   else
-    log 'There was an error while blocking the packages - ignoring this message.\n'
+    log 0 'block' 0
   fi
 fi
 
@@ -201,18 +265,18 @@ if [ -s "${tmp_dir}/stabilize" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/stabilize"
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --tested "${tmp_dir}/stabilize"; then
-    log 'Successfully marked %s packages as tested.\n' "$(wc -l < "${tmp_dir}/stabilize")"
+  if run_and_log_on_error 'stabilize' "${base_dir}/bin/modify-package-state" --wait --tested "${tmp_dir}/stabilize"; then
+    log 1 'stabilize' "$(wc -l < "${tmp_dir}/stabilize")"
   else
-    log 'There was an error while marking the packages as tested - ignoring this message.\n'
+    log 0 'stabilize' 0
   fi
 fi
 
 if [ -s "${tmp_dir}/unblock" ]; then
-  if run_and_log_on_error "${base_dir}/bin/modify-package-state" --wait --unblock "${tmp_dir}/unblock"; then
-    log 'Successfully unblocked %s packages.\n' "$(wc -l < "${tmp_dir}/unblock")"
+  if run_and_log_on_error 'unblock' "${base_dir}/bin/modify-package-state" --wait --unblock "${tmp_dir}/unblock"; then
+    log 1 'unblock' "$(wc -l < "${tmp_dir}/unblock")"
   else
-    log 'There was an error while unblocking the packages - ignoring this message.\n'
+    log 0 'unblock' 0
   fi
 fi
 
@@ -227,16 +291,16 @@ if [ -s "${tmp_dir}/schedule" ]; then
       done
   ) | \
     sponge "${tmp_dir}/schedule"
-  log 'Successfully (re)scheduled %s packages.\n' "$(wc -l < "${tmp_dir}/schedule")"
+  log 1 'schedule' "$(wc -l < "${tmp_dir}/schedule")"
 fi
 
 if [ -s "${tmp_dir}/copy-to-build-support" ]; then
   sed -i '
     /\.pkg\.tar\.xz$/!s/$/.pkg.tar.xz/
   ' "${tmp_dir}/copy-to-build-support"
-  if run_and_log_on_error "${base_dir}/bin/copy-to-build-support" --wait "${tmp_dir}/copy-to-build-support"; then
-    log 'Successfully copied %s packages to [build-support].\n' "$(wc -l < "${tmp_dir}/copy-to-build-support")"
+  if run_and_log_on_error 'copy-to-build-support' "${base_dir}/bin/copy-to-build-support" --wait "${tmp_dir}/copy-to-build-support"; then
+    log 1 'copy-to-build-support' "$(wc -l < "${tmp_dir}/copy-to-build-support")"
   else
-    log 'There was an error while copying the packages to [build-support] - ignoring this message.\n'
+    log 0 'copy-to-build-support' 0
   fi
 fi
