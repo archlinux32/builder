@@ -18,8 +18,8 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
 
   # shellcheck disable=SC2016
   {
-    printf 'INSERT INTO `ssh_log` (`date`,`build_slave`,`action`,`parameters`)'
-    printf ' SELECT NOW(),`build_slaves`.`id`'
+    printf 'INSERT INTO `ssh_log` (`build_slave`,`action`,`parameters`)'
+    printf ' SELECT `build_slaves`.`id`'
     printf ',from_base64("%s")' \
       "$(
         printf '%s' "${SSH_ORIGINAL_COMMAND%% *}" | \
@@ -30,13 +30,6 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
           base64 -w0
       )"
     printf ' FROM `build_slaves`'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-      "$(
-        printf '%s' "$1" | \
-          base64 -w0
-      )"
-    printf 'UPDATE `build_slaves`'
-    printf ' SET `build_slaves`.`last_connection`=NOW()'
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(
         printf '%s' "$1" | \
