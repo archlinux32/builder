@@ -880,7 +880,10 @@ mysql_cleanup() {
       printf 'SELECT COUNT(*) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
-    printf ' AND TIMEDIFF(NOW(),`build_slaves`.`last_connection`) > "1:00:00";\n'
+    printf ' AND TIMEDIFF(NOW(),('
+      printf 'SELECT MAX(`ssh_log`.`date`) FROM `ssh_log`'
+      printf ' WHERE `ssh_log`.`build_slave`=`build_slaves`.`id`'
+    printf ')) > "1:00:00";\n'
     # remove `last_action` and `logged_lines` from buildslaves without an assignment
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `build_slaves`'
@@ -1095,6 +1098,9 @@ mysql_join__generic() {
 }
 
 for link in \
+  'allowed_email_actions:action:email_actions' \
+  'allowed_email_actions:gpg_key:gpg_keys' \
+  \
   'binary_packages:architecture:architectures' \
   'binary_packages:repository:repositories' \
   'binary_packages:build_assignment:build_assignments' \
@@ -1107,14 +1113,20 @@ for link in \
   \
   'build_slaves:currently_building:build_assignments' \
   'build_slaves:currently_building build_assignment:binary_packages' \
+  'build_slaves:ssh_key:ssh_keys' \
   \
   'dependencies:depending_on:install_targets' \
   'dependencies:dependent:binary_packages' \
   'dependencies:dependency_type:dependency_types' \
   \
+  'email_log:action:email_actions' \
+  'email_log:gpg_key:gpg_keys' \
+  \
   'failed_builds:reason:fail_reason' \
   'failed_builds:build_assignment:build_assignments' \
   'failed_builds:build_slave:build_slaves' \
+  \
+  'gpg_keys:owner:persons' \
   \
   'install_target_providers:package:binary_packages' \
   'install_target_providers:install_target:install_targets' \
@@ -1126,6 +1138,10 @@ for link in \
   \
   'repository_moves:upstream_package_repository:upstream_repositories' \
   'repository_moves:upstream_package_repository upstream_package_repository:package_sources' \
+  \
+  'ssh_keys:owner:persons' \
+  \
+  'ssh_log:build_slave:build_slaves' \
   \
   'upstream_repositories:git_repository:git_repositories'; do
 # A join for these cannot be done, because it's not clear on what to join:
