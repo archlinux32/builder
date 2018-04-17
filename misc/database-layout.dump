@@ -1,0 +1,357 @@
+calculate_dependencies_of_package_upto_first_built_one	NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION	CREATE DEFINER=`root`@`localhost` PROCEDURE `calculate_dependencies_of_package_upto_first_built_one`(IN `target_pkgbase` VARCHAR(64))
+BEGIN
+INSERT IGNORE INTO `relevant_binary_packages` (`id`) SELECT `binary_packages`.`id` FROM `binary_packages` JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list" JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id` JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id` WHERE `package_sources`.`pkgbase`=`target_pkgbase`;
+REPEAT
+INSERT IGNORE INTO `relevant_binary_packages_copy` (`id`) SELECT `relevant_binary_packages`.`id` FROM `relevant_binary_packages`;
+INSERT IGNORE INTO `relevant_binary_packages` (`id`) SELECT `install_target_providers`.`package` FROM `relevant_binary_packages_copy` JOIN `binary_packages` ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id` JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list" JOIN `dependencies` ON `binary_packages`.`id`=`dependencies`.`dependent` JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_building` JOIN `install_target_providers` ON `dependencies`.`depending_on`=`install_target_providers`.`install_target`;
+UNTIL ROW_COUNT()=0
+END REPEAT;
+END	utf8mb4	utf8mb4_unicode_ci	utf8mb4_unicode_ci
+calculate_maximal_moveable_set	NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION	CREATE DEFINER=`root`@`localhost` PROCEDURE `calculate_maximal_moveable_set`(IN `from_stability` VARCHAR(32))
+BEGIN
+DECLARE row_count_saved INT DEFAULT 0;
+DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages`;
+CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+CREATE TEMPORARY TABLE `moveable_binary_packages` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages_copy`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages_copy`;
+CREATE TEMPORARY TABLE `replaced_binary_packages_copy` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+CREATE TEMPORARY TABLE `moveable_binary_packages_copy` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages_copy2`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages_copy2`;
+CREATE TEMPORARY TABLE `replaced_binary_packages_copy2` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`) SELECT `binary_packages`.`id`,`repository_moves`.`to_repository` FROM `binary_packages` JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id` JOIN `repository_stabilities` ON `repositories`.`stability`=`repository_stabilities`.`id` JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id` JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id` JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id` JOIN `repository_moves` ON `upstream_repositories`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`binary_packages`.`repository` WHERE `repository_stabilities`.`name` = `from_stability` AND (`from_stability`="staging" OR `binary_packages`.`is_tested`) AND NOT `binary_packages`.`has_issues`;
+INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`) SELECT `r_bp`.`id`,`m_bp`.`id` FROM `moveable_binary_packages` JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id` JOIN `repositories` AS `m_r` ON `m_bp`.`repository`=`m_r`.`id` JOIN `build_assignments` AS `m_ba` ON `m_bp`.`build_assignment`=`m_ba`.`id` JOIN `package_sources` AS `m_ps` ON `m_ba`.`package_source`=`m_ps`.`id` JOIN `upstream_repositories` AS `m_ur` ON `m_ps`.`upstream_package_repository`=`m_ur`.`id` JOIN `repository_moves` ON `m_ur`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`m_r`.`id` JOIN `repositories` AS `r_r` ON `repository_moves`.`to_repository`=`r_r`.`id` JOIN `binary_packages` AS `r_bp` ON `r_r`.`id`=`r_bp`.`repository` AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;
+REPEAT
+DELETE FROM `replaced_binary_packages_copy`;
+INSERT IGNORE INTO `replaced_binary_packages_copy` SELECT `replaced_binary_packages`.* FROM `replaced_binary_packages`;
+DELETE FROM `replaced_binary_packages_copy2`;
+INSERT IGNORE INTO `replaced_binary_packages_copy2` SELECT `replaced_binary_packages`.* FROM `replaced_binary_packages`;
+DELETE FROM `moveable_binary_packages_copy`;
+INSERT IGNORE INTO `moveable_binary_packages_copy` SELECT `moveable_binary_packages`.* FROM `moveable_binary_packages`;
+DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages` RIGHT JOIN `moveable_binary_packages` ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by` JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id` JOIN `repositories` AS `target_repositories` ON `moveable_binary_packages`.`to_repository`=`target_repositories`.`id` JOIN `dependencies` ON `binary_packages`.`id`=`dependencies`.`dependent` JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_binary_packages` WHERE NOT EXISTS (SELECT * FROM `install_target_providers` JOIN `binary_packages` AS `prov_bp` ON `install_target_providers`.`package`=`prov_bp`.`id` JOIN `repositories` AS `prov_r` ON `prov_bp`.`repository`=`prov_r`.`id` JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable` WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable` AND NOT EXISTS (SELECT * FROM `replaced_binary_packages_copy` WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`)) AND NOT EXISTS (SELECT * FROM `install_target_providers` JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package` WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`);
+SET @row_count_saved = ROW_COUNT();
+DELETE FROM `replaced_binary_packages_copy`;
+INSERT IGNORE INTO `replaced_binary_packages_copy` SELECT `replaced_binary_packages`.* FROM `replaced_binary_packages`;
+DELETE FROM `replaced_binary_packages_copy2`;
+INSERT IGNORE INTO `replaced_binary_packages_copy2` SELECT `replaced_binary_packages`.* FROM `replaced_binary_packages`;
+DELETE FROM `moveable_binary_packages_copy`;
+INSERT IGNORE INTO `moveable_binary_packages_copy` SELECT `moveable_binary_packages`.* FROM `moveable_binary_packages`;
+DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages` JOIN `moveable_binary_packages` ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id` JOIN `binary_packages` AS `repl_bp` ON `repl_bp`.`id`=`replaced_binary_packages`.`id` JOIN `install_target_providers` ON `repl_bp`.`id`=`install_target_providers`.`package` JOIN `dependencies` ON `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND NOT EXISTS (SELECT * FROM `replaced_binary_packages_copy` WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`) JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_binary_packages` JOIN `binary_packages` AS `req_bp` ON `dependencies`.`dependent`=`req_bp`.`id` JOIN `repositories` AS `repl_r` ON `repl_bp`.`repository`=`repl_r`.`id` JOIN `repositories` AS `req_r` ON `req_bp`.`repository`=`req_r`.`id` JOIN `repository_stability_relations` AS `repl_rr` ON `repl_rr`.`more_stable`=`repl_r`.`stability` AND `repl_rr`.`less_stable`=`req_r`.`stability` WHERE NOT EXISTS (SELECT * FROM `moveable_binary_packages_copy` JOIN `install_target_providers` AS `subst_itp` ON `moveable_binary_packages_copy`.`id`=`subst_itp`.`package` WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`) AND NOT EXISTS (SELECT * FROM `binary_packages` AS `subst_bp` JOIN `install_target_providers` AS `subst_itp` ON `subst_bp`.`id`=`subst_itp`.`package` JOIN `repositories` AS `subst_r` ON `subst_bp`.`repository`=`subst_r`.`id` JOIN `repository_stability_relations` AS `subst_rr` ON `subst_rr`.`more_stable`=`subst_r`.`stability` WHERE `subst_rr`.`less_stable`=`repl_r`.`stability` AND NOT EXISTS (SELECT * FROM `replaced_binary_packages_copy2` WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
+UNTIL row_count_saved=0 AND ROW_COUNT()=0
+END REPEAT;
+DROP TEMPORARY TABLE `moveable_binary_packages_copy`;
+DROP TEMPORARY TABLE `replaced_binary_packages_copy`;
+DROP TEMPORARY TABLE `replaced_binary_packages_copy2`;
+END	utf8mb4	utf8mb4_unicode_ci	utf8mb4_unicode_ci
+show_broken_packages_and_dependencies	NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION	CREATE DEFINER=`root`@`localhost` PROCEDURE `show_broken_packages_and_dependencies`()
+BEGIN
+CREATE TEMPORARY TABLE `broken_packages_and_dependencies` (`id` BIGINT, UNIQUE KEY (`id`));
+CREATE TEMPORARY TABLE `broken_packages_and_dependencies_old` (`id` BIGINT, UNIQUE KEY (`id`));
+INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`) SELECT `build_assignments`.`id` FROM `binary_packages` JOIN `build_assignments` ON `binary_packages`.`build_assignment`=`build_assignments`.`id` AND `build_assignments`.`is_broken` JOIN `repositories` ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list";
+REPEAT
+INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`) SELECT `broken_packages_and_dependencies`.`id` FROM `broken_packages_and_dependencies`;
+INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`) SELECT `new_bp`.`build_assignment` FROM `broken_packages_and_dependencies_old` JOIN `binary_packages` AS `old_bp` ON `broken_packages_and_dependencies_old`.`id`=`old_bp`.`build_assignment` JOIN `dependencies` ON `old_bp`.`id`=`dependencies`.`dependent` JOIN `dependency_types` ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_building` JOIN `install_target_providers` ON `dependencies`.`depending_on`=`install_target_providers`.`install_target` JOIN `binary_packages` AS `new_bp` ON `install_target_providers`.`package`=`new_bp`.`id` JOIN `repositories` AS `new_repo` ON `new_bp`.`repository`=`new_repo`.`id` AND `new_repo`.`name` IN ("build-list","deletion-list");
+UNTIL ROW_COUNT()=0
+END REPEAT;
+SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name` FROM `build_assignments` JOIN `package_sources` ON `build_assignments`.`package_source`=`package_sources`.`id` JOIN `upstream_repositories` ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id` JOIN `broken_packages_and_dependencies` ON `broken_packages_and_dependencies`.`id`=`build_assignments`.`id`;
+END	utf8mb4	utf8mb4_unicode_ci	utf8mb4_unicode_ci
+allowed_email_actions	CREATE TABLE `allowed_email_actions` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `gpg_key` bigint(20) NOT NULL,
+  `action` mediumint(9) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`gpg_key`,`action`),
+  KEY `action` (`action`),
+  CONSTRAINT `allowed_email_actions_ibfk_1` FOREIGN KEY (`action`) REFERENCES `email_actions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `allowed_email_actions_ibfk_2` FOREIGN KEY (`gpg_key`) REFERENCES `gpg_keys` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+architectures	CREATE TABLE `architectures` (
+  `id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `name` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+binary_packages	CREATE TABLE `binary_packages` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `build_assignment` bigint(20) NOT NULL,
+  `repository` mediumint(9) NOT NULL,
+  `epoch` mediumint(9) NOT NULL,
+  `pkgver` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `pkgrel` mediumint(9) NOT NULL,
+  `sub_pkgrel` mediumint(9) NOT NULL,
+  `has_issues` bit(1) NOT NULL,
+  `is_tested` bit(1) NOT NULL,
+  `pkgname` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `architecture` smallint(6) NOT NULL,
+  `is_to_be_deleted` bit(1) NOT NULL,
+  `sha512sum` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `file_name` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`),
+  UNIQUE KEY `content` (`build_assignment`,`sub_pkgrel`,`pkgname`,`architecture`,`repository`),
+  KEY `repository` (`repository`),
+  KEY `architecture` (`architecture`),
+  CONSTRAINT `binary_packages_ibfk_1` FOREIGN KEY (`repository`) REFERENCES `repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `binary_packages_ibfk_2` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `binary_packages_ibfk_3` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+build_assignments	CREATE TABLE `build_assignments` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `package_source` bigint(20) NOT NULL,
+  `architecture` smallint(6) NOT NULL,
+  `is_blocked` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_broken` bit(1) NOT NULL,
+  `priority` smallint(6) NOT NULL,
+  `is_black_listed` text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`package_source`,`architecture`),
+  KEY `architecture` (`architecture`),
+  CONSTRAINT `build_assignments_ibfk_1` FOREIGN KEY (`package_source`) REFERENCES `package_sources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `build_assignments_ibfk_2` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+build_dependency_loops	CREATE TABLE `build_dependency_loops` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `loop` mediumint(9) NOT NULL,
+  `build_assignment` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`loop`,`build_assignment`),
+  KEY `build_assignment` (`build_assignment`),
+  CONSTRAINT `build_dependency_loops_ibfk_1` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+build_slaves	CREATE TABLE `build_slaves` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `currently_building` bigint(20) DEFAULT NULL,
+  `last_connection` datetime NOT NULL,
+  `logged_lines` bigint(20) DEFAULT NULL,
+  `last_action` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ssh_key` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  KEY `currently_building` (`currently_building`),
+  KEY `ssh_key` (`ssh_key`),
+  CONSTRAINT `build_slaves_ibfk_1` FOREIGN KEY (`currently_building`) REFERENCES `build_assignments` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `build_slaves_ibfk_2` FOREIGN KEY (`ssh_key`) REFERENCES `ssh_keys` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+dependencies	CREATE TABLE `dependencies` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `dependent` bigint(20) NOT NULL,
+  `depending_on` bigint(20) NOT NULL,
+  `dependency_type` smallint(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`dependent`,`depending_on`,`dependency_type`),
+  KEY `depending_on` (`depending_on`),
+  KEY `dependency_type` (`dependency_type`),
+  CONSTRAINT `dependencies_ibfk_1` FOREIGN KEY (`dependent`) REFERENCES `binary_packages` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `dependencies_ibfk_2` FOREIGN KEY (`depending_on`) REFERENCES `install_targets` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `dependencies_ibfk_3` FOREIGN KEY (`dependency_type`) REFERENCES `dependency_types` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+dependency_types	CREATE TABLE `dependency_types` (
+  `id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `relevant_for_building` bit(1) NOT NULL,
+  `relevant_for_binary_packages` bit(1) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+email_actions	CREATE TABLE `email_actions` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+email_log	CREATE TABLE `email_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `success` bit(1) NOT NULL,
+  `action` mediumint(9) DEFAULT NULL,
+  `count` mediumint(9) DEFAULT NULL,
+  `gpg_key` bigint(20) DEFAULT NULL,
+  `comment` text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`id`),
+  KEY `action` (`action`),
+  KEY `gpg_key` (`gpg_key`),
+  CONSTRAINT `email_log_ibfk_1` FOREIGN KEY (`action`) REFERENCES `email_actions` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `email_log_ibfk_2` FOREIGN KEY (`gpg_key`) REFERENCES `gpg_keys` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+fail_reasons	CREATE TABLE `fail_reasons` (
+  `id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `identifier` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `severity` smallint(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+failed_builds	CREATE TABLE `failed_builds` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `build_slave` mediumint(9) NOT NULL,
+  `build_assignment` bigint(20) NOT NULL,
+  `date` datetime NOT NULL,
+  `reason` smallint(6) NOT NULL,
+  `log_file` varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `build_slave` (`build_slave`),
+  KEY `build_assignment` (`build_assignment`),
+  KEY `reason` (`reason`),
+  CONSTRAINT `failed_builds_ibfk_1` FOREIGN KEY (`build_slave`) REFERENCES `build_slaves` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `failed_builds_ibfk_2` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `failed_builds_ibfk_3` FOREIGN KEY (`reason`) REFERENCES `fail_reasons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+git_repositories	CREATE TABLE `git_repositories` (
+  `id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `url` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `directory` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `head` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  UNIQUE KEY `url` (`url`),
+  UNIQUE KEY `directory` (`directory`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+gpg_keys	CREATE TABLE `gpg_keys` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `owner` mediumint(9) NOT NULL,
+  `fingerprint` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `fingerprint` (`fingerprint`),
+  KEY `owner` (`owner`),
+  CONSTRAINT `gpg_keys_ibfk_1` FOREIGN KEY (`owner`) REFERENCES `persons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+install_target_providers	CREATE TABLE `install_target_providers` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `package` bigint(20) NOT NULL,
+  `install_target` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`package`,`install_target`),
+  KEY `install_target` (`install_target`),
+  CONSTRAINT `install_target_providers_ibfk_1` FOREIGN KEY (`package`) REFERENCES `binary_packages` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `install_target_providers_ibfk_2` FOREIGN KEY (`install_target`) REFERENCES `install_targets` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+install_targets	CREATE TABLE `install_targets` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+package_sources	CREATE TABLE `package_sources` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `pkgbase` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `git_revision` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mod_git_revision` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `upstream_package_repository` smallint(6) NOT NULL,
+  `uses_upstream` bit(1) NOT NULL,
+  `uses_modification` bit(1) NOT NULL,
+  `commit_time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`pkgbase`,`git_revision`,`mod_git_revision`),
+  KEY `upstream_package_repository` (`upstream_package_repository`),
+  CONSTRAINT `package_sources_ibfk_1` FOREIGN KEY (`upstream_package_repository`) REFERENCES `upstream_repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+persons	CREATE TABLE `persons` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+repositories	CREATE TABLE `repositories` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stability` mediumint(9) NOT NULL,
+  `is_on_master_mirror` bit(1) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  KEY `stability` (`stability`),
+  CONSTRAINT `repositories_ibfk_1` FOREIGN KEY (`stability`) REFERENCES `repository_stabilities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+repository_moves	CREATE TABLE `repository_moves` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `from_repository` mediumint(9) NOT NULL,
+  `to_repository` mediumint(9) NOT NULL,
+  `upstream_package_repository` smallint(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `source` (`from_repository`,`upstream_package_repository`),
+  KEY `to_repository` (`to_repository`),
+  KEY `upstream_package_repository` (`upstream_package_repository`),
+  CONSTRAINT `repository_moves_ibfk_1` FOREIGN KEY (`from_repository`) REFERENCES `repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `repository_moves_ibfk_2` FOREIGN KEY (`to_repository`) REFERENCES `repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `repository_moves_ibfk_3` FOREIGN KEY (`upstream_package_repository`) REFERENCES `upstream_repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+repository_stabilities	CREATE TABLE `repository_stabilities` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `bugtracker_category` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+repository_stability_relations	CREATE TABLE `repository_stability_relations` (
+  `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `more_stable` mediumint(9) NOT NULL,
+  `less_stable` mediumint(9) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`more_stable`,`less_stable`),
+  KEY `less_stable` (`less_stable`),
+  CONSTRAINT `repository_stability_relations_ibfk_1` FOREIGN KEY (`more_stable`) REFERENCES `repository_stabilities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `repository_stability_relations_ibfk_2` FOREIGN KEY (`less_stable`) REFERENCES `repository_stabilities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+ssh_keys	CREATE TABLE `ssh_keys` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `owner` mediumint(9) NOT NULL,
+  `fingerprint` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `owner` (`owner`),
+  CONSTRAINT `ssh_keys_ibfk_1` FOREIGN KEY (`owner`) REFERENCES `persons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+ssh_log	CREATE TABLE `ssh_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `build_slave` mediumint(9) DEFAULT NULL,
+  `action` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `parameters` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `build_slave` (`build_slave`),
+  CONSTRAINT `ssh_log_ibfk_1` FOREIGN KEY (`build_slave`) REFERENCES `build_slaves` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+statistics	CREATE TABLE `statistics` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `stable_packages_count` mediumint(9) NOT NULL,
+  `pending_tasks_count` mediumint(9) NOT NULL,
+  `pending_packages_count` mediumint(9) NOT NULL,
+  `staging_packages_count` mediumint(9) NOT NULL,
+  `testing_packages_count` mediumint(9) NOT NULL,
+  `tested_packages_count` mediumint(9) NOT NULL,
+  `broken_tasks_count` mediumint(9) NOT NULL,
+  `dependency_loops_count` mediumint(9) NOT NULL,
+  `dependency_looped_tasks_count` mediumint(9) NOT NULL,
+  `locked_tasks_count` mediumint(9) NOT NULL,
+  `blocked_tasks_count` mediumint(9) NOT NULL,
+  `next_tasks_count` mediumint(9) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+todo_links	CREATE TABLE `todo_links` (
+  `dependent` bigint(20) NOT NULL,
+  `depending_on` bigint(20) NOT NULL,
+  UNIQUE KEY `content` (`dependent`,`depending_on`),
+  KEY `depending_on` (`depending_on`),
+  CONSTRAINT `todo_links_ibfk_1` FOREIGN KEY (`dependent`) REFERENCES `todos` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `todo_links_ibfk_2` FOREIGN KEY (`depending_on`) REFERENCES `todos` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+todos	CREATE TABLE `todos` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `file` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line` mediumint(9) NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `importance` smallint(6) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+upstream_repositories	CREATE TABLE `upstream_repositories` (
+  `id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `git_repository` smallint(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `content` (`name`,`git_repository`),
+  KEY `git_repository` (`git_repository`),
+  CONSTRAINT `upstream_repositories_ibfk_1` FOREIGN KEY (`git_repository`) REFERENCES `git_repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
