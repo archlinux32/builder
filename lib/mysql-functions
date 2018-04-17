@@ -62,7 +62,11 @@ mysql_run_query() {
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say
-      cp "${query_stdin}" "${webserver_directory}/mysql-queries/"
+      cp \
+        "${query_stdin}" \
+        "${query_stdout}" \
+        "${query_stderr}" \
+        "${webserver_directory}/mysql-queries/"
     fi
     echo 'A mysql query failed.' > \
       "${work_dir}/build-master-sanity"
