@@ -36,7 +36,7 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
           base64 -w0
       )"
   } | \
-    mysql_run_query
+    mysql_run_query 'unimportant'
 
   slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
 
