@@ -67,6 +67,8 @@ mysql_run_query() {
         "${query_stdout}" \
         "${query_stderr}" \
         "${webserver_directory}/mysql-queries/"
+      find "${webserver_directory}/mysql-queries/" -type f \
+        -exec chmod go+r {} \;
     fi
     echo 'A mysql query failed.' > \
       "${work_dir}/build-master-sanity"
