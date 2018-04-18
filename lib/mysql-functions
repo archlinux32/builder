@@ -70,8 +70,10 @@ mysql_run_query() {
       find "${webserver_directory}/mysql-queries/" -type f \
         -exec chmod go+r {} \;
     fi
-    echo 'A mysql query failed.' > \
-      "${work_dir}/build-master-sanity"
+    if [ -z "${file_name_extra}" ]; then
+      echo 'A mysql query failed.' > \
+        "${work_dir}/build-master-sanity"
+    fi
     return 2
   fi
   cat "${query_stdout}"
