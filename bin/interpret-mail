@@ -5,6 +5,7 @@
 
 # TODO: enable email interface to delete packages
 
+# shellcheck disable=SC2016
 if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo 'usage: interpret-mail'
@@ -12,8 +13,8 @@ if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo ' The email needs a valid hashcash-stamp (>=20 bits)'
   >&2 echo ' and valid encryption to buildmaster@archlinux32.org,'
-  >&2 echo ' as well as a valid gpg-signature from anyone on the'
-  >&2 echo ' list in "conf/admin-gpg-keys". This entry also'
+  >&2 echo ' as well as a valid gpg-signature from anyone in the'
+  >&2 echo ' list in `gpg_keys`. `allowed_email_actions`'
   >&2 echo ' determines what instructions are allowed.'
   >&2 echo ''
   >&2 echo ' Possible instructions are:'
@@ -32,9 +33,6 @@ if [ $# -ne 0 ]; then
   >&2 echo ''
   >&2 echo '  - "unblock: <state-file>":'
   >&2 echo '    Unblock the given packge.'
-  >&2 echo ''
-  >&2 echo '  - ALL: all of the above (only valid in'
-  >&2 echo '    "conf/admin-gpg-keys")'
   >&2 echo ''
   exit 1
 fi
