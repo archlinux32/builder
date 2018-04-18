@@ -5,147 +5,76 @@
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: replace by build-master-status-from-mysql
-
-usage() {
-  >&2 echo ''
-  >&2 echo 'build-master-status: report about status of build master'
-  >&2 echo ''
-  >&2 echo 'possible options:'
-  >&2 echo '  -h|--help:'
-  >&2 echo '    Show this help and exit.'
-  [ -z "$1" ] && exit 1 || exit "$1"
-}
-
-eval set -- "$(
-  getopt -o h \
-    --long help \
-    -n "$(basename "$0")" -- "$@" || \
-  echo usage
-)"
-
-while true
-do
-  case "$1" in
-    -h|--help)
-      usage 0
-    ;;
-    --)
-      shift
-      break
-    ;;
-    *)
-      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
-      exit 42
-    ;;
-  esac
-  shift
-done
-
-if [ $# -ne 0 ]; then
-  >&2 echo 'Too many arguments.'
-  usage
-fi
-
-if [ -s "${work_dir}/build-master-sanity" ]; then
-  >&2 echo 'Build master is not sane.'
-  exit
-fi
-
 tmp_dir=$(mktemp -d 'tmp.build-master-status.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
+# do not block if locked
+exec 9> "${sanity_check_lock_file}"
+if ! flock -n 9; then
+  >&2 echo 'Mysql-Sanity check skipped, cannot acquire lock.'
+  exit
+fi
+
+# shellcheck disable=SC2119
+mysql_cleanup
+
+# update todos
 find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
   -exec grep -nHF '' '{}' \; | \
-  awk '
-    { print $0 }
-    /^[^:]+:[0-9]+:\s*#\s*TODO:/{print ++i}
-  ' | \
+  sed 's,^'"$(str_to_regex "${base_dir}")"'/,,' | \
   sed -n '
-    s/^\([^:]\+\):\([0-9]\+\):\s*#\s*TODO:\s*/\1\n\2\n/
-    T
-    N
-    s/\n\(.*\)\n\([0-9]\+\)$/\n\2\n\1/
-    :a
-      N
-      s/\n[^:\n]\+:[0-9]\+:[ \t]*#[ \t]*\(\S[^\n]*\)$/\n\1/
-      ta
-    s/\n[^:\n]\+:[0-9]\+:[^\n]*$/\n/
-    p
+    /^[^:]\+:[0-9]\+:\s*#\s*TODO:/ {
+      :a
+      $! {
+        N
+        s/\n[^:[:space:]]\+:[0-9]\+:\s*\([^#[:space:]].*\)\?$//
+        Ta
+      }
+      s/\n[^:[:space:]]\+:[0-9]\+:\s*#\s*/\\\\n/g
+      s/^\([^:]\+\):\([0-9]\+\):\s*#\s*TODO:\s*/\1\t\2\t/
+      p
+    }
   ' > "${tmp_dir}/todos"
 
 if [ -s "${tmp_dir}/todos" ]; then
-  sed '
-    :a
-    N
-    /\n$/!ba
-    s|^[^\n]*/\([^/\n]\+/[^/\n]\+\)\n\([0-9]\+\)\n\([0-9]\+\)\n|\1 \3 |
-    s/\n$//
-    s/\n/\\n/g
-  ' -i "${tmp_dir}/todos"
-  while read -r file line desc; do
-    printf '%s %s %s\n' \
-      "$(printf '%s' "${file}" | base64 -w0)" \
-      "$(printf '%s' "${line}" | base64 -w0)" \
-      "$(printf '%s' "${desc}" | base64 -w0)"
-  done < \
-    "${tmp_dir}/todos" | \
-    sponge "${tmp_dir}/todos"
-  # update todos
-  # shellcheck disable=SC2016
-  while read -r file line desc; do
-    printf 'UPDATE IGNORE `todos`'
-    printf ' SET `todos`.`line`=from_base64("%s")' \
-      "${line}"
-    printf ' WHERE `todos`.`file`=from_base64("%s")' \
-      "${file}"
-    printf ' AND `todos`.`description`=from_base64("%s");\n' \
-      "${desc}"
-
-    printf 'UPDATE IGNORE `todos`'
-    printf ' SET `todos`.`description`=from_base64("%s")' \
-      "${desc}"
-    printf ' WHERE `todos`.`file`=from_base64("%s")' \
-      "${file}"
-    printf ' AND `todos`.`line`=from_base64("%s");\n' \
-      "${line}"
-  done < \
-    "${tmp_dir}/todos" | \
-    mysql_run_query
-  # insert unfound todos
   # shellcheck disable=SC2016
   {
     printf 'SHOW CREATE TABLE `todos`' | \
       mysql_run_query | \
       sed '
         1s/^\S\+\s\+CREATE TABLE `todos` /CREATE TEMPORARY TABLE `td` /
+        s/ NOT NULL AUTO_INCREMENT/ NULL/
+        s/PRIMARY KEY/INDEX/
       '
     printf ';\n'
-    printf 'INSERT INTO `td` (`file`,`line`,`description`) VALUES '
-    while read -r file line desc; do
-      printf '('
-      printf 'from_base64("%s"),' \
-        "${file}" \
-        "${line}" \
-        "${desc}" | \
-        sed 's/,$/),/'
-    done < \
-      "${tmp_dir}/todos" | \
-      sed '
-        s/,$//
-      '
-    printf ';\n'
-    printf 'INSERT IGNORE INTO `todos` (`file`,`line`,`description`) '
-    printf 'SELECT `td`.`file`,`td`.`line`,`td`.`description` '
-    printf 'FROM `td` '
-    printf 'WHERE NOT EXISTS ('
-    printf 'SELECT * FROM `todos`'
-    printf ' AND `td`.`%s`=`todos`.`%s`' \
+    printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `td` (`file`,`line`,`description`);\n' \
+      "${tmp_dir}/todos"
+
+    for matches in 'file line description' 'file description' 'file line' 'description'; do
+      printf 'UPDATE `td`'
+      printf ' JOIN `todos`'
+      for match in ${matches}; do
+        printf ' AND `td`.`%s`=`todos`.`%s`' \
+          "${match}" "${match}"
+      done | \
+        sed 's/^ AND / ON /'
+      printf ' SET `td`.`id`=`todos`.`id`'
+      printf ' WHERE `td`.`id` IS NULL;\n'
+    done
+
+    printf 'UPDATE `todos`'
+    printf ' JOIN `td` ON `todos`.`id`=`td`.`id`'
+    printf ',`todos`.`%s`=`td`.`%s`' \
       'file' 'file' \
       'line' 'line' \
       'description' 'description' | \
-      sed 's/^ AND / WHERE /'
-    printf ');\n'
+      sed 's/^,/ SET /'
+    printf ';\n'
+
+    printf 'INSERT IGNORE INTO `todos` (`file`,`line`,`description`)'
+    printf ' SELECT `td`.`file`,`td`.`line`,`td`.`description`'
+    printf ' FROM `td`'
+    printf ' WHERE `td`.`id` IS NULL;\n'
 
     printf 'DELETE FROM `todos` WHERE NOT EXISTS ('
     printf 'SELECT * FROM `td`'
@@ -154,22 +83,140 @@ if [ -s "${tmp_dir}/todos" ]; then
       'line' 'line' \
       'description' 'description' | \
       sed 's/^ AND / WHERE /'
-    printf ');'
-    printf 'DROP TABLE `td`;\n'
+    printf ');\n'
+    printf 'DROP TEMPORARY TABLE `td`;\n'
     printf 'DELETE FROM `todo_links` WHERE NOT EXISTS ('
-    printf 'SELECT * FROM `todos` '
-    printf 'WHERE `todos`.`id`=`todo_links`.`depending_on`'
+      printf 'SELECT * FROM `todos` '
+      printf 'WHERE `todos`.`id`=`todo_links`.`depending_on`'
     printf ') OR NOT EXISTS ('
-    printf 'SELECT * FROM `todos` '
-    printf 'WHERE `todos`.`id`=`todo_links`.`dependent`'
+      printf 'SELECT * FROM `todos` '
+      printf 'WHERE `todos`.`id`=`todo_links`.`dependent`'
     printf ');\n'
   } | \
     mysql_run_query
-  rm -f "${tmp_dir}/todos"
+fi
+rm -f "${tmp_dir}/todos"
+
+{
+  mysql_sanity_check || true
+} | \
+  sed '
+    s,^-.*$,<font color="#FF0000">\0</font>,
+    s,^+.*$,<font color="#00FF00">\0</font>,
+    s/$/<br>/
+    1 i <html><head><title>sanity of the buildmaster'"'"'s mysql database</title></head><body>
+    $ a </body></html>
+  ' | \
+  sponge "${webserver_directory}/mysql-sanity.html"
+
+if [ -s "${webserver_directory}/mysql-sanity.html" ] && \
+  [ ! -s "${work_dir}/build-master-sanity" ]; then
+  printf 'girls, my database is dirty again ...\n' | \
+    irc_say
+  echo 'build master is insane' > \
+    "${work_dir}/build-master-sanity"
 fi
 
-find "${tmp_dir}" -maxdepth 1 -type f | \
-  while read -r file; do
-    cat "${file}" > \
-      "${webserver_directory}/${file##*/}"
-  done
+if [ ! -s "${work_dir}/build-master-sanity" ]; then
+  # shellcheck disable=SC2016
+  {
+    printf 'INSERT IGNORE INTO `statistics` ('
+    printf '`%s`,' \
+      'stable_packages_count' \
+      'pending_tasks_count' \
+      'pending_packages_count' \
+      'staging_packages_count' \
+      'testing_packages_count' \
+      'tested_packages_count' \
+      'broken_tasks_count' \
+      'dependency_loops_count' \
+      'dependency_looped_tasks_count' \
+      'locked_tasks_count' \
+      'blocked_tasks_count' \
+      'next_tasks_count' | \
+      sed 's/,$//'
+    printf ') VALUES ('
+    # stable_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="stable"),'
+    # pending_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # pending_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # staging_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="staging"),'
+    # testing_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND NOT `binary_packages`.`is_tested`),'
+    # tested_packages_count
+    printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
+    printf ' `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' AND `binary_packages`.`is_tested`),'
+    # broken_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_broken`),'
+    # dependency_loops_count
+    printf '(SELECT COUNT(DISTINCT `build_dependency_loops`.`loop`) FROM'
+    printf ' `build_dependency_loops`),'
+    # dependency_looped_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_dependency_loops`.`build_assignment`) FROM'
+    printf ' `build_dependency_loops`),'
+    # locked_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_slaves`.`currently_building`) FROM'
+    printf ' `build_slaves`'
+    mysql_join_build_slaves_build_assignments
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"),'
+    # blocked_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND `build_assignments`.`is_blocked` IS NOT NULL),'
+    # next_tasks_count
+    printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
+    printf ' `build_assignments`'
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' AND NOT EXISTS ('
+      printf 'SELECT * FROM `dependencies`'
+      mysql_join_dependencies_dependency_types
+      printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+      mysql_join_dependencies_install_target_providers
+      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+      printf ' WHERE `prov_r`.`name`="build-list"'
+      printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
+    printf '))'
+    printf ');\n'
+  } | \
+    mysql_run_query
+fi
