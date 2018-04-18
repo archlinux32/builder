@@ -30,6 +30,7 @@ mysql_run_query() {
   local query_stderr
 
   local file_name_extra
+  local file
 
   file_name_extra=''
   if [ "x$1" = 'xunimportant' ]; then
@@ -62,13 +63,13 @@ mysql_run_query() {
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say
-      cp \
+      for file in \
         "${query_stdin}" \
         "${query_stdout}" \
-        "${query_stderr}" \
-        "${webserver_directory}/mysql-queries/"
-      find "${webserver_directory}/mysql-queries/" -type f \
-        -exec chmod go+r {} \;
+        "${query_stderr}"; do
+        cp "${file}" "${webserver_directory}/mysql-queries/${file}.txt"
+        chmod go+r "${webserver_directory}/mysql-queries/${file}.txt"
+      done
     fi
     if [ -z "${file_name_extra}" ]; then
       echo 'A mysql query failed.' > \
