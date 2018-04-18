@@ -123,7 +123,6 @@ build_slaves	CREATE TABLE `build_slaves` (
   `id` mediumint(9) NOT NULL AUTO_INCREMENT,
   `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `currently_building` bigint(20) DEFAULT NULL,
-  `last_connection` datetime NOT NULL,
   `logged_lines` bigint(20) DEFAULT NULL,
   `last_action` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ssh_key` bigint(20) NOT NULL,
@@ -163,7 +162,7 @@ email_actions	CREATE TABLE `email_actions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 email_log	CREATE TABLE `email_log` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `date` datetime NOT NULL,
+  `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `success` bit(1) NOT NULL,
   `action` mediumint(9) DEFAULT NULL,
   `count` mediumint(9) DEFAULT NULL,
@@ -304,7 +303,7 @@ ssh_keys	CREATE TABLE `ssh_keys` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ssh_log	CREATE TABLE `ssh_log` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `date` datetime NOT NULL,
+  `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `build_slave` mediumint(9) DEFAULT NULL,
   `action` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `parameters` text COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -314,7 +313,7 @@ ssh_log	CREATE TABLE `ssh_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 statistics	CREATE TABLE `statistics` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `date` datetime NOT NULL,
+  `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `stable_packages_count` mediumint(9) NOT NULL,
   `pending_tasks_count` mediumint(9) NOT NULL,
   `pending_packages_count` mediumint(9) NOT NULL,
