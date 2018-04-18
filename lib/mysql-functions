@@ -109,8 +109,10 @@ mysql_add_package_source() {
   else
     uses_modification=0
   fi
+  printf 'A' >&2
   if grep -qx 'PKGBUILD = \S\+' "${srcinfo_file}"; then
     uses_upstream=1
+  printf 'B' >&2
     eval 'repo_path="${repo_paths__'"$(sed -n 's/^upstream_git_repository = //;T;p' "${srcinfo_file}")"'}"'
     pkgbuild=$(
       sed -n '
@@ -119,19 +121,26 @@ mysql_add_package_source() {
         p
       ' "${srcinfo_file}"
     )
+  printf 'C' >&2
     commit_time=$(
       git -C "${repo_path}" log -n 1 --pretty=format:%ct "${old_git_revision}${git_revision}" -- "${pkgbuild}"
     )
+  printf 'D' >&2
     if [ -z "${commit_time}" ]; then
       # We may have modified git_mod_revision!
+  printf 'E' >&2
       commit_time=$(
         git -C "${repo_path}" log -n 1 --pretty=format:%ct "${git_revision}" -- "${pkgbuild}"
       )
+  printf 'F' >&2
     fi
   else
+  printf 'G' >&2
     uses_upstream=0
     commit_time=$(date '+%s')
+  printf 'H' >&2
   fi
+  printf 'I' >&2
 
   {
     printf 'INSERT IGNORE INTO package_sources'
@@ -160,6 +169,7 @@ mysql_add_package_source() {
       )"
   } | \
     mysql_run_query
+  printf 'J' >&2
 }
 
 # mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
