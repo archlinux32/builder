@@ -10,6 +10,14 @@
     while read -r procedure; do
       printf 'SHOW CREATE PROCEDURE `%s`;\n' "${procedure}"
     done
+} | \
+  mysql_run_query | \
+  sed '
+    s/ \(SELECT\|FROM\|\(LEFT \|RIGHT \)\?JOIN\|ON\|WHERE\) /\n\t\1 /g
+    s/(SELECT/(\nSELECT/g
+  '
+# shellcheck disable=SC2016
+{
   printf 'SHOW TABLES' | \
     mysql_run_query | \
     while read -r table; do
@@ -19,4 +27,5 @@
   mysql_run_query | \
   sed '
     s/ AUTO_INCREMENT=[0-9]\+ / /g
+    s/^ /\t/
   '
