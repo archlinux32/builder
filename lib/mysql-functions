@@ -67,8 +67,8 @@ mysql_run_query() {
         "${query_stdin}" \
         "${query_stdout}" \
         "${query_stderr}"; do
-        cp "${file}" "${webserver_directory}/mysql-queries/${file}.txt"
-        chmod go+r "${webserver_directory}/mysql-queries/${file}.txt"
+        cp "${file}" "${webserver_directory}/mysql-queries/${file##*/}.txt"
+        chmod go+r "${webserver_directory}/mysql-queries/${file##*/}.txt"
       done
     fi
     if [ -z "${file_name_extra}" ]; then
