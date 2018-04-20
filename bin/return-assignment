@@ -529,6 +529,7 @@ trigger_mirror_refreshs
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
   printf ' `build_assignments`.`priority`=0,'
+  printf ' `build_assignments`.`return_date`=NOW(),'
   printf ' `binary_packages`.`repository`=(SELECT `new_repo`.`id` FROM `repositories` AS `new_repo` WHERE `new_repo`.`name`=from_base64("%s")),' \
     "$(
       printf '%s' "${destination}" | \
