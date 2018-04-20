@@ -713,7 +713,7 @@ extract_source_directory() {
 
   # we don't want write permissions on the PKGBUILD - otherwise pkgver()
   # will change the version! (**HACK**)
-  chmod -w "${output}/PKGBUILD"
+  chmod oga-w "${output}/PKGBUILD"
 
 }
 
