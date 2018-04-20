@@ -276,6 +276,7 @@ build_assignments	CREATE TABLE `build_assignments` (
 	 `is_broken` bit(1) NOT NULL,
 	 `priority` smallint(6) NOT NULL,
 	 `is_black_listed` text COLLATE utf8mb4_unicode_ci,
+	 `return_date` datetime DEFAULT NULL,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `content` (`package_source`,`architecture`),
 	 KEY `architecture` (`architecture`),
