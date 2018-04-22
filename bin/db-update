@@ -392,7 +392,9 @@ for source_stability in 'testing' 'staging'; do
     printf ' JOIN `replaced_binary_packages` ON `binary_packages`.`id`=`replaced_binary_packages`.`id`;\n'
     printf 'UPDATE `binary_packages`'
     printf ' JOIN `moved_binary_packages` ON `binary_packages`.`id`=`moved_binary_packages`.`id`'
-    printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`;\n'
+    printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`,'
+    printf ' `binary_packages`.`last_moved`=NOW()'
+    printf ' WHERE `binary_packages`.`repository`!=`moved_binary_packages`.`new_repository`;\n'
   } | \
     mysql_run_query
 done

@@ -536,7 +536,8 @@ trigger_mirror_refreshs
         base64 -w0
     )"
   printf ' `binary_packages`.`has_issues`=0,'
-  printf ' `binary_packages`.`is_tested`=0'
+  printf ' `binary_packages`.`is_tested`=0,'
+  printf ' `binary_packages`.`last_moved`=NOW()'
   printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
     "$(
       printf '%s' "${slave}" | \
