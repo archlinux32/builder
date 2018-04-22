@@ -259,6 +259,7 @@ binary_packages	CREATE TABLE `binary_packages` (
 	 `architecture` smallint(6) NOT NULL,
 	 `is_to_be_deleted` bit(1) NOT NULL,
 	 `sha512sum` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+	 `last_moved` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `file_name` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`),
 	 UNIQUE KEY `content` (`build_assignment`,`sub_pkgrel`,`pkgname`,`architecture`,`repository`),
