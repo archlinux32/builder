@@ -190,6 +190,7 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a new package is added, then ensure that it's not on the deletion list.
 
 trigger_rebuild_on_any_file_sed_expression=$(
+  # note: This only works for upstream sources!
   # shellcheck disable=SC2016
   {
     printf 'SELECT DISTINCT CONCAT('
