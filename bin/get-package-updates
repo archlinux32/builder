@@ -233,9 +233,8 @@ trigger_rebuild_on_any_file_sed_expression=$(
         s/^/from_base64("/
         s/$/")/
       ' | \
-      tr '\n' ',' | \
-      sed 's/,$//'
-    printf ');\n'
+      tr '\n' ','
+    printf '"");\n'
   } | \
     mysql_run_query | \
     while read -r pkgbase repository git_repository; do
