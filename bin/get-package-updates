@@ -225,8 +225,9 @@ for repo in ${repo_names}; do
       git -C "${repo_path}" diff --no-renames --name-status "${old_repo_revision}" "${new_repo_revision}"
     fi
   } | \
-    # only track changes in PKGBUILDs
+    # rename any file to "PKGBUILD" for packages on the build-list
     sed "${trigger_rebuild_on_any_file_sed_expression}" | \
+    # only track changes in PKGBUILDs
     grep '/PKGBUILD$' | \
     if [ "${repo}" = "archlinux32" ]; then
     # modify the directory structure from the modifiaction-repository
