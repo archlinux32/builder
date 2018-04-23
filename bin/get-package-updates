@@ -211,11 +211,45 @@ trigger_rebuild_on_any_file_sed_expression=$(
     '
 )
 
-for repo in ${repo_names}; do
-  eval repo_path='"${repo_paths__'"${repo}"'}"'
-  eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
-  eval new_repo_revision='"${new_repo_revisions__'"${repo}"'}"'
+{
+  # trigger rebuild of packages removed from blacklist
+  # shellcheck disable=SC2016
   {
+    printf 'SELECT `package_sources`.`pkgbase`,`upstream_repositories`.`name`,`git_repositories`.`name`'
+    printf ' FROM `package_sources`'
+    mysql_join_package_sources_upstream_repositories
+    mysql_join_upstream_repositories_git_repositories
+    printf ' WHERE `package_sources`.`pkgbase` IN ('
+    # shellcheck disable=SC2154
+    git -C "${repo_paths__archlinux32}" diff "${old_repo_revisions__archlinux32}" "${new_repo_revisions__archlinux32}" -- blacklist | \
+      sed -n '
+        s/^-\([^-]\)/\1/
+        T
+        s/\s*#.*$//
+        p
+      ' | \
+      base64_encode_each | \
+      sed '
+        s/^/from_base64("/
+        s/$/")/
+      ' | \
+      tr '\n' ',' | \
+      sed 's/,$//'
+    printf ');\n'
+  } | \
+    mysql_run_query | \
+    while read -r pkgbase repository git_repository; do
+      printf 'A %s ' \
+        "${pkgbase}"
+      eval 'printf '"'"'%s'"'"' "${new_repo_revisions__'"${git_repository}"'}"'
+      printf ' empty %s\n' \
+        "${repository}"
+    done
+  # actual updates/removes
+  for repo in ${repo_names}; do
+    eval repo_path='"${repo_paths__'"${repo}"'}"'
+    eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
+    eval new_repo_revision='"${new_repo_revisions__'"${repo}"'}"'
     # if old revision unknown, mimic "git diff"-output
     # shellcheck disable=SC2154
     if [ "${old_repo_revision}" = "NONE" ]; then
@@ -224,45 +258,48 @@ for repo in ${repo_names}; do
         sed 's|^|A\t|'
     else
       git -C "${repo_path}" diff --no-renames --name-status "${old_repo_revision}" "${new_repo_revision}"
-    fi
-  } | \
-    # rename any file to "PKGBUILD" for packages on the build-list
-    sed "${trigger_rebuild_on_any_file_sed_expression}" | \
-    # only track changes in PKGBUILDs
-    grep '/PKGBUILD$' | \
-    if [ "${repo}" = "archlinux32" ]; then
-    # modify the directory structure from the modifiaction-repository
-    # to the one of an original source repository
-      # shellcheck disable=SC2016
-      sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
-        while read -r pkg_repo rest; do
-          repo=$(find_git_repository_to_package_repository "${pkg_repo}")
-          eval 'printf '"'"'%s %s %s\n'"'" \
-            "$(printf '"${new_repo_revisions__%s}"' "${repo}")" \
-            "$(printf '"${old_repo_revisions__%s}"' "${repo}")" \
-            "'${rest}'"
-        done
-    else
-      sed "s|^|${new_repo_revision} ${old_repo_revision} |"
     fi | \
-    grep '^\S\+ \S\+ .\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
-    # ignore i686
-    grep -v -- '-i686/PKGBUILD$' | \
-    # ignore staging and testing
-    grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
-    sed 's|^\(\S\+ \S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|'
-done | \
-  sort -u | \
-  sed '
-    s|^D\s|0 \0|
-    t
-    s|^[AM]\s|1 \0|
-    t
-    s|^|2 |
-  ' | \
-  sort -k1,1 | \
-  sed 's|^[012] ||' | \
+      # rename any file to "PKGBUILD" for packages on the build-list
+      sed "${trigger_rebuild_on_any_file_sed_expression}" | \
+      # only track changes in PKGBUILDs
+      grep '/PKGBUILD$' | \
+      if [ "${repo}" = "archlinux32" ]; then
+      # modify the directory structure from the modifiaction-repository
+      # to the one of an original source repository
+        # shellcheck disable=SC2016
+        sed 's|^\(.\t\)\([^/]\+\)/\([^/]\+\)/\(.\+\)$|\2 \1\3/repos/\2-x86_64/\4|' | \
+          while read -r pkg_repo rest; do
+            repo=$(find_git_repository_to_package_repository "${pkg_repo}")
+            eval 'printf '"'"'%s %s %s\n'"'" \
+              "$(printf '"${new_repo_revisions__%s}"' "${repo}")" \
+              "$(printf '"${old_repo_revisions__%s}"' "${repo}")" \
+              "'${rest}'"
+          done
+      else
+        sed "s|^|${new_repo_revision} ${old_repo_revision} |"
+      fi | \
+      grep '^\S\+ \S\+ .\s[^/]\+/repos/[^/]\+/PKGBUILD$' | \
+      # ignore i686
+      grep -v -- '-i686/PKGBUILD$' | \
+      # ignore staging and testing
+      grep -v -- '[-/]\(staging\|testing\|unstable\)-[^/]\+/PKGBUILD$' | \
+      sed 's|^\(\S\+ \S\+\) \(.\)\t\([^/]\+\)/repos/\([^/]\+\)-[^/-]\+/PKGBUILD$|\2 \3 \1 \4|'
+  done | \
+    sort -u | \
+    sed '
+      s|^D\s|0 \0|
+      t
+      s|^[AM]\s|1 \0|
+      t
+      s|^|2 |
+    ' | \
+    sort -k1,1 | \
+    sed 's|^[012] ||'
+} | \
   while read -r mode package git_revision old_git_revision repository; do
+    if [ "${old_git_revision}" = 'empty' ]; then
+      old_git_revision=''
+    fi
     if [ "${mode}" = 'D' ]; then
       # deleted PKGBUILD
       # shellcheck disable=SC2154
