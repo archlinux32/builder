@@ -189,6 +189,27 @@ echo 'Check modified packages from the last update, and put them to the build li
 # If a package is deleted, remove from the rebuild list, and add it to the deletion list.
 # If a new package is added, then ensure that it's not on the deletion list.
 
+trigger_rebuild_on_any_file_sed_expression=$(
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT DISTINCT CONCAT('
+    printf '`package_sources`.`pkgbase`,"/repos/",'
+    printf '`upstream_repositories`.`name`,"-",'
+    printf 'IF(`architectures`.`name`="any","any","x86_64"))'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_build_assignments
+    mysql_join_build_assignments_architectures
+    mysql_join_build_assignments_package_sources
+    mysql_join_package_sources_upstream_repositories
+    printf ' WHERE `repositories`.`name`="build-list";\n'
+  } | \
+    mysql_run_query | \
+    sed '
+      s@.*@s,^\\(.\\t\0/\\)[^/]\\+,\\1PKGBUILD,@
+    '
+)
+
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   eval old_repo_revision='"${old_repo_revisions__'"${repo}"'}"'
@@ -205,8 +226,7 @@ for repo in ${repo_names}; do
     fi
   } | \
     # only track changes in PKGBUILDs
-    # TODO: However, packages which are already on the build list should
-    # receive a git_revision bump if _any_ file changed.
+    sed "${trigger_rebuild_on_any_file_sed_expression}" | \
     grep '/PKGBUILD$' | \
     if [ "${repo}" = "archlinux32" ]; then
     # modify the directory structure from the modifiaction-repository
