@@ -133,7 +133,7 @@ DELETE `replaced_binary_packages`,`moveable_binary_packages`
 	JOIN `dependency_types`
 	ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_binary_packages`
 	WHERE NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `install_target_providers`
 	JOIN `binary_packages` AS `prov_bp`
 	ON `install_target_providers`.`package`=`prov_bp`.`id`
@@ -142,10 +142,10 @@ SELECT *
 	JOIN `repository_stability_relations`
 	ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`
 	WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable` AND NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `replaced_binary_packages_copy`
 	WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`)) AND NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `install_target_providers`
 	JOIN `moveable_binary_packages_copy`
 	ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`
@@ -176,7 +176,7 @@ DELETE `replaced_binary_packages`,`moveable_binary_packages`
 	ON `repl_bp`.`id`=`install_target_providers`.`package`
 	JOIN `dependencies`
 	ON `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `replaced_binary_packages_copy`
 	WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`)
 	JOIN `dependency_types`
@@ -190,12 +190,12 @@ SELECT *
 	JOIN `repository_stability_relations` AS `repl_rr`
 	ON `repl_rr`.`more_stable`=`repl_r`.`stability` AND `repl_rr`.`less_stable`=`req_r`.`stability`
 	WHERE NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `moveable_binary_packages_copy`
 	JOIN `install_target_providers` AS `subst_itp`
 	ON `moveable_binary_packages_copy`.`id`=`subst_itp`.`package`
 	WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`) AND NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `binary_packages` AS `subst_bp`
 	JOIN `install_target_providers` AS `subst_itp`
 	ON `subst_bp`.`id`=`subst_itp`.`package`
@@ -204,7 +204,7 @@ SELECT *
 	JOIN `repository_stability_relations` AS `subst_rr`
 	ON `subst_rr`.`more_stable`=`subst_r`.`stability`
 	WHERE `subst_rr`.`less_stable`=`repl_r`.`stability` AND NOT EXISTS (
-SELECT *
+SELECT 1
 	FROM `replaced_binary_packages_copy2`
 	WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
 SET row_count_saved = row_count_saved + ROW_COUNT();

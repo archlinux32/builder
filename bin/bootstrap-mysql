@@ -454,19 +454,19 @@ if [ ! "$1" = 'slim' ]; then
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
     # ... by a not-deleted, "more stable" package already in place or ...
     printf ' WHERE NOT EXISTS ('
-      printf 'SELECT * FROM `install_target_providers`'
+      printf 'SELECT 1 FROM `install_target_providers`'
       mysql_join_install_target_providers_binary_packages '' 'prov_bp'
       mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
       printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`'
       printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
       printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable`'
       printf ' AND NOT EXISTS ('
-        printf 'SELECT * FROM `replaced_binary_packages_copy`'
+        printf 'SELECT 1 FROM `replaced_binary_packages_copy`'
         printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
       printf ')'
     # ... by a moved package
     printf ') AND NOT EXISTS ('
-      printf 'SELECT * FROM `install_target_providers`'
+      printf 'SELECT 1 FROM `install_target_providers`'
       printf ' JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`'
       printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
     printf ');\n'
@@ -506,7 +506,7 @@ if [ ! "$1" = 'slim' ]; then
     mysql_join_install_target_providers_dependencies
     printf ' AND NOT EXISTS ('
       # dependencies of replaced packages don't matter
-      printf 'SELECT * FROM `replaced_binary_packages_copy`'
+      printf 'SELECT 1 FROM `replaced_binary_packages_copy`'
       printf ' WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`'
     printf ')'
     mysql_join_dependencies_dependency_types
@@ -523,7 +523,7 @@ if [ ! "$1" = 'slim' ]; then
     # a) ^
     printf ' WHERE NOT EXISTS ('
       # no moved package ...
-      printf 'SELECT *'
+      printf 'SELECT 1'
       printf ' FROM `moveable_binary_packages_copy`'
       mysql_join_binary_packages_install_target_providers 'moveable_binary_packages_copy' 'subst_itp'
       # ... provides the same
@@ -531,7 +531,7 @@ if [ ! "$1" = 'slim' ]; then
     # b) 1) ^
     printf ') AND NOT EXISTS ('
       # no current package ...
-      printf 'SELECT *'
+      printf 'SELECT 1'
       printf ' FROM `binary_packages` AS `subst_bp`'
       mysql_join_binary_packages_install_target_providers 'subst_bp' 'subst_itp'
       # ... in a repository ...
@@ -543,7 +543,7 @@ if [ ! "$1" = 'slim' ]; then
       printf ' WHERE `subst_rr`.`less_stable`=`repl_r`.`stability`'
       printf ' AND NOT EXISTS ('
       # ... and which is not replaced ...
-        printf 'SELECT * FROM `replaced_binary_packages_copy2`'
+        printf 'SELECT 1 FROM `replaced_binary_packages_copy2`'
         printf ' WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`'
       printf ')'
       # ... and provides the same
