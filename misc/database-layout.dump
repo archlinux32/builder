@@ -44,6 +44,30 @@ CREATE TEMPORARY TABLE `moveable_binary_packages_copy` (`id` BIGINT, `to_reposit
 DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages_copy2`;
 DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages_copy2`;
 CREATE TEMPORARY TABLE `replaced_binary_packages_copy2` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `package_blobs`;
+CREATE TEMPORARY TABLE `package_blobs` (`ps_a` BIGINT, `ps_b` BIGINT, UNIQUE KEY `content` (`ps_a`,`ps_b`));
+INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)
+	SELECT `a_ps`.`id`,`b_ps`.`id`
+	FROM `package_sources` AS `a_ps`
+	JOIN `package_sources` AS `b_ps`
+	ON UNIX_TIMESTAMP(`a_ps`.`commit_time`) - UNIX_TIMESTAMP(`b_ps`.`commit_time`) BETWEEN -10 AND 10
+	JOIN `build_assignments` AS `a_ba`
+	ON `a_ps`.`id`=`a_ba`.`package_source`
+	JOIN `build_assignments` AS `b_ba`
+	ON `b_ps`.`id`=`b_ba`.`package_source`
+	JOIN `binary_packages` AS `a_bp`
+	ON `a_ba`.`id`=`a_bp`.`build_assignment`
+	JOIN `binary_packages` AS `b_bp`
+	ON `b_ba`.`id`=`b_bp`.`build_assignment`
+	JOIN `repositories` AS `a_r`
+	ON `a_bp`.`repository`=`a_r`.`id`
+	JOIN `repositories` AS `b_r`
+	ON `b_bp`.`repository`=`b_r`.`id`
+	JOIN `repository_stabilities` AS `a_rs`
+	ON `a_r`.`stability`=`a_rs`.`id`
+	JOIN `repository_stabilities` AS `b_rs`
+	ON `b_r`.`stability`=`b_rs`.`id`
+	WHERE `a_rs`.`name` = `from_stability` AND `b_rs`.`name` = `from_stability`;
 INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)
 	SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`
 	FROM `binary_packages`
@@ -183,6 +207,40 @@ SELECT *
 SELECT *
 	FROM `replaced_binary_packages_copy2`
 	WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
+SET row_count_saved = row_count_saved + ROW_COUNT();
+DELETE
+	FROM `replaced_binary_packages_copy`;
+INSERT IGNORE INTO `replaced_binary_packages_copy`
+	SELECT `replaced_binary_packages`.*
+	FROM `replaced_binary_packages`;
+DELETE
+	FROM `replaced_binary_packages_copy2`;
+INSERT IGNORE INTO `replaced_binary_packages_copy2`
+	SELECT `replaced_binary_packages`.*
+	FROM `replaced_binary_packages`;
+DELETE
+	FROM `moveable_binary_packages_copy`;
+INSERT IGNORE INTO `moveable_binary_packages_copy`
+	SELECT `moveable_binary_packages`.*
+	FROM `moveable_binary_packages`;
+DELETE `replaced_binary_packages`,`moveable_binary_packages`
+	FROM `replaced_binary_packages`
+	RIGHT JOIN `moveable_binary_packages`
+	ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`
+	JOIN `binary_packages`
+	ON `binary_packages`.`id`=`moveable_binary_packages`.`id`
+	JOIN `build_assignments`
+	ON `binary_packages`.`build_assignment`=`build_assignments`.`id`
+	JOIN `package_blobs`
+	ON `build_assignments`.`package_source`=`package_blobs`.`ps_a`
+	JOIN `build_assignments` AS `bl_ba`
+	ON `bl_ba`.`package_source`=`package_blobs`.`ps_b`
+	JOIN `binary_packages` AS `bl_bp`
+	ON `bl_ba`.`id`=`bl_bp`.`build_assignment`
+	WHERE NOT EXISTS (
+SELECT 1
+	FROM `moveable_binary_packages_copy`
+	WHERE `moveable_binary_packages_copy`.`id`=`bl_bp`.`id`);
 SET row_count_saved = row_count_saved + ROW_COUNT();
 UNTIL row_count_saved=0
 END REPEAT;
