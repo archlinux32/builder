@@ -408,6 +408,7 @@ if [ ! "$1" = 'slim' ]; then
     # now we delete all unreplaceable and unmoveable packages from the respective
     # list until no further changes are required
     printf 'REPEAT\n'
+    printf 'SET row_count_saved = 0;\n'
     # create copies of our temporary tables *yuck*
     for table in 'replaced' 'moveable'; do
       for copy in '' '2'; do
@@ -449,7 +450,7 @@ if [ ! "$1" = 'slim' ]; then
       printf ' JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`'
       printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
     printf ');\n'
-    printf 'SET @row_count_saved = ROW_COUNT();\n'
+    printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
 
     # refresh copies of our temporary tables *yuck*
     for table in 'replaced' 'moveable'; do
@@ -529,7 +530,8 @@ if [ ! "$1" = 'slim' ]; then
       printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
       # b) 2) ^
     printf ');\n'
-    printf 'UNTIL row_count_saved=0 AND ROW_COUNT()=0\n'
+    printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
+    printf 'UNTIL row_count_saved=0\n'
     printf 'END REPEAT;\n'
     for table in 'moveable' 'replaced'; do
       for copy in '' '2'; do

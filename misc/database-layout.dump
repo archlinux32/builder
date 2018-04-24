@@ -80,6 +80,7 @@ INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)
 	JOIN `binary_packages` AS `r_bp`
 	ON `r_r`.`id`=`r_bp`.`repository` AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;
 REPEAT
+SET row_count_saved = 0;
 DELETE
 	FROM `replaced_binary_packages_copy`;
 INSERT IGNORE INTO `replaced_binary_packages_copy`
@@ -125,7 +126,7 @@ SELECT *
 	JOIN `moveable_binary_packages_copy`
 	ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`
 	WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`);
-SET @row_count_saved = ROW_COUNT();
+SET row_count_saved = row_count_saved + ROW_COUNT();
 DELETE
 	FROM `replaced_binary_packages_copy`;
 INSERT IGNORE INTO `replaced_binary_packages_copy`
@@ -182,7 +183,8 @@ SELECT *
 SELECT *
 	FROM `replaced_binary_packages_copy2`
 	WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
-UNTIL row_count_saved=0 AND ROW_COUNT()=0
+SET row_count_saved = row_count_saved + ROW_COUNT();
+UNTIL row_count_saved=0
 END REPEAT;
 DROP TEMPORARY TABLE `moveable_binary_packages_copy`;
 DROP TEMPORARY TABLE `replaced_binary_packages_copy`;
