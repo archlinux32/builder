@@ -9,6 +9,9 @@ if [ -z "${base_dir}" ]; then
   . '../conf/default.conf'
 fi
 
+# TODO: replace most/all insert-select queries by separate select and insert
+# queries
+
 # base64_encode_each encode each line of stdin with base64
 
 base64_encode_each() {
