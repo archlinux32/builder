@@ -14,9 +14,6 @@
 
 # TODO: keep database clean in case of abort
 
-# TODO: removing something from the blacklist should trigger a build
-# (if it is found in upstreams repositories)
-
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
