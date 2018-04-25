@@ -319,7 +319,7 @@ binary_packages	CREATE TABLE `binary_packages` (
 	 `architecture` smallint(6) NOT NULL,
 	 `is_to_be_deleted` bit(1) NOT NULL,
 	 `sha512sum` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-	 `last_moved` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	 `last_moved` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `file_name` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`),
 	 UNIQUE KEY `content` (`build_assignment`,`sub_pkgrel`,`pkgname`,`architecture`,`repository`),
@@ -337,7 +337,7 @@ build_assignments	CREATE TABLE `build_assignments` (
 	 `is_broken` bit(1) NOT NULL,
 	 `priority` smallint(6) NOT NULL,
 	 `is_black_listed` text COLLATE utf8mb4_unicode_ci,
-	 `return_date` datetime DEFAULT NULL,
+	 `return_date` timestamp NULL DEFAULT NULL,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `content` (`package_source`,`architecture`),
 	 KEY `architecture` (`architecture`),
@@ -396,7 +396,7 @@ email_actions	CREATE TABLE `email_actions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 email_log	CREATE TABLE `email_log` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
-	 `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	 `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 `success` bit(1) NOT NULL,
 	 `action` mediumint(9) DEFAULT NULL,
 	 `count` mediumint(9) DEFAULT NULL,
@@ -420,7 +420,7 @@ failed_builds	CREATE TABLE `failed_builds` (
 	 `id` mediumint(9) NOT NULL AUTO_INCREMENT,
 	 `build_slave` mediumint(9) NOT NULL,
 	 `build_assignment` bigint(20) NOT NULL,
-	 `date` datetime NOT NULL,
+	 `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 `reason` smallint(6) NOT NULL,
 	 `log_file` varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL,
 	 PRIMARY KEY (`id`),
@@ -475,7 +475,7 @@ package_sources	CREATE TABLE `package_sources` (
 	 `upstream_package_repository` smallint(6) NOT NULL,
 	 `uses_upstream` bit(1) NOT NULL,
 	 `uses_modification` bit(1) NOT NULL,
-	 `commit_time` datetime NOT NULL,
+	 `commit_time` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `content` (`pkgbase`,`git_revision`,`mod_git_revision`),
 	 KEY `upstream_package_repository` (`upstream_package_repository`),
@@ -537,7 +537,7 @@ ssh_keys	CREATE TABLE `ssh_keys` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ssh_log	CREATE TABLE `ssh_log` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
-	 `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	 `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 `build_slave` mediumint(9) DEFAULT NULL,
 	 `action` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
 	 `parameters` text COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -547,7 +547,7 @@ ssh_log	CREATE TABLE `ssh_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 statistics	CREATE TABLE `statistics` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
-	 `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	 `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 `stable_packages_count` mediumint(9) NOT NULL,
 	 `pending_tasks_count` mediumint(9) NOT NULL,
 	 `pending_packages_count` mediumint(9) NOT NULL,
