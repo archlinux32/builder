@@ -19,7 +19,7 @@ fi
 mysql_cleanup
 
 # update todos
-find "${base_dir}/bin/" "${base_dir}/conf/" -type f \
+find "${base_dir}/bin/" "${base_dir}/conf/" "${base_dir}/lib/" -type f \
   -exec grep -nHF '' '{}' \; | \
   sed 's,^'"$(str_to_regex "${base_dir}")"'/,,' | \
   sed -n '
