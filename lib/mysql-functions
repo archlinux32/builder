@@ -882,16 +882,19 @@ mysql_cleanup() {
     printf ');\n'
     # remove jobs from build slaves that are not on the build-list
     if [ "${operator}" = 'DELETE' ]; then
-      printf 'UPDATE `build_slaves`'
+      printf 'UPDATE `repositories`'
     else
-      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `build_slaves`'
+      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `repositories`'
     fi
-    mysql_join_build_slaves_binary_packages
-    mysql_join_binary_packages_repositories
+    mysql_join_repositories_binary_packages
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' RIGHT'
+    mysql_join_binary_packages_build_slaves
     if [ "${operator}" = 'DELETE' ]; then
       printf ' SET `build_slaves`.`currently_building`=NULL'
     fi
-    printf ' WHERE `repositories`.`name`!="build-list";\n'
+    printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
+    printf ' AND `repositories`.`id` IS NULL;\n'
     # remove build orders from build slaves which have not connected within 1h
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `build_slaves`'
