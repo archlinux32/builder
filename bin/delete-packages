@@ -135,19 +135,19 @@ export TMPDIR="${tmp_dir}"
     printf ')'
   printf ');\n'
 
-  printf ' SELECT DISTINCT "repo",`repositories`.`name`'
+  printf 'SELECT DISTINCT "repo",`repositories`.`name`'
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
   mysql_join_binary_packages_repositories
   printf ';\n'
 
-  printf ' SELECT "package",`repositories`.`name`,`binary_packages`.`pkgname`'
+  printf 'SELECT "package",`repositories`.`name`,`binary_packages`.`pkgname`'
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
   mysql_join_binary_packages_repositories
   printf ';\n'
 
-  printf ' SELECT "package-file",`repositories`.`name`,'
+  printf 'SELECT "package-file",`repositories`.`name`,'
   mysql_package_name_query
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
@@ -155,7 +155,7 @@ export TMPDIR="${tmp_dir}"
   mysql_join_binary_packages_architectures
   printf ';\n'
 
-  printf ' SELECT "package-id",`to_deletes`.`id`'
+  printf 'SELECT "package-id",`to_deletes`.`id`'
   printf ' FROM `to_deletes`'
   printf ';\n'
 } | \
