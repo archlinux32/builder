@@ -206,15 +206,20 @@ if [ ! -s "${work_dir}/build-master-sanity" ]; then
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
-    printf ' AND NOT EXISTS ('
-      printf 'SELECT * FROM `dependencies`'
-      mysql_join_dependencies_dependency_types
-      printf ' AND `dependency_types`.`relevant_for_binary_packages`'
-      mysql_join_dependencies_install_target_providers
-      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
-      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
-      printf ' WHERE `prov_r`.`name`="build-list"'
-      printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
+    printf ' AND ('
+      printf 'NOT EXISTS ('
+        printf 'SELECT 1 FROM `dependencies`'
+        mysql_join_dependencies_dependency_types
+        printf ' AND `dependency_types`.`relevant_for_building`'
+        mysql_join_dependencies_install_target_providers
+        mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+        mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+        printf ' WHERE `prov_r`.`name`="build-list"'
+        printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
+      printf ') OR EXISTS ('
+        printf 'SELECT 1 FROM `build_dependency_loops`'
+        printf ' WHERE `build_dependency_loops`.`build_assignment`=`build_assignments`.`id`'
+      printf ')'
     printf '))'
     printf ');\n'
   } | \
