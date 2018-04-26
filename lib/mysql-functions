@@ -109,6 +109,7 @@ mysql_add_package_source() {
   local repo_path
   local commit_time
   local pkgbuild
+  local upstream_package_repository_id
 
   if grep -qx 'PKGBUILD_mod = \S\+' "${srcinfo_file}"; then
     uses_modification=1
@@ -148,11 +149,31 @@ mysql_add_package_source() {
   fi
   printf 'I' >&2
 
+  upstream_package_repository_id=$(
+    {
+      printf 'SELECT `upstream_repositories`.`id`'
+      printf ' FROM `upstream_repositories`'
+      printf ' WHERE `upstream_repositories`.`name` = from_base64("%s")' \
+        "$(
+          printf '%s' "${upstream_package_repository}" | \
+            base64 -w0
+        )"
+      printf ' LIMIT 1;\n'
+    } | \
+      mysql_run_query
+  )
+
+  if [ -z "${upstream_package_repository_id}" ]; then
+    >&2 printf 'Cannot find upstream package repository "%s" in the database.\n' \
+      "${upstream_package_repository}"
+    exit 2
+  fi
+
   {
     printf 'INSERT IGNORE INTO package_sources'
     printf ' (`pkgbase`,`git_revision`,`mod_git_revision`,`upstream_package_repository`,`uses_upstream`,`uses_modification`,`commit_time`)'
-    printf ' SELECT'
-    printf ' from_base64("%s"),' \
+    printf ' VALUES ('
+    printf 'from_base64("%s"),' \
       "$(
         printf '%s' "${pkgbase}" | \
           base64 -w0
@@ -165,14 +186,12 @@ mysql_add_package_source() {
         printf '%s' "${mod_git_revision}" | \
           base64 -w0
       )"
-    printf ' `upstream_repositories`.`id`,%s,%s,from_unixtime(%s)' \
-      "${uses_upstream}" "${uses_modification}" "${commit_time}"
-    printf ' FROM `upstream_repositories`'
-    printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
-      "$(
-        printf '%s' "${upstream_package_repository}" | \
-          base64 -w0
-      )"
+    printf '%s,' \
+      "${upstream_package_repository_id}" \
+      "${uses_upstream}" \
+      "${uses_modification}"
+    printf 'from_unixtime(%s));\n' \
+      "${commit_time}"
   } | \
     mysql_run_query
   printf 'J' >&2
