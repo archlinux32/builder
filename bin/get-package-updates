@@ -22,8 +22,12 @@ usage() {
   >&2 echo ''
   >&2 echo 'possible options:'
   >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
+  >&2 echo '  -d|--date $datetime:'
+  >&2 echo '                Pull latest commit before $datetime'
+  >&2 echo '                (yyyy-mm-ddThh:mm:ss). Conflicts -n.'
   >&2 echo '  -h|--help:    Show this help and exit.'
   >&2 echo '  -n|--no-pull: Do not pull git repos, merely reorder build list.'
+  >&2 echo '                Conflicts -d.'
   >&2 echo '  -x|--test-exclusion $package:'
   >&2 echo '                Print additionally deleted/excluded packages if'
   >&2 echo '                "$package" would be black listed.'
@@ -31,8 +35,9 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o bhnx: \
+  getopt -o bd:hnx: \
     --long block \
+    --long date: \
     --long help \
     --long no-pull \
     --long test-exclusion: \
@@ -41,6 +46,7 @@ eval set -- "$(
 )"
 
 block_flag='-n'
+date_time=''
 test_exclusion=''
 pull=true
 
@@ -49,6 +55,10 @@ do
   case "$1" in
     -b|--block)
       block_flag=''
+    ;;
+    -d|--date)
+      shift
+      date_time="$1"
     ;;
     -h|--help)
       usage 0
@@ -79,6 +89,11 @@ done
 
 if [ $# -ne 0 ]; then
   >&2 echo 'Too many arguments.'
+  usage
+fi
+
+if [ -n "${date_time}" ] && ! ${pull}; then
+  >&2 printf -- '-d and -n are mutually exclusive.\n'
   usage
 fi
 
@@ -143,9 +158,15 @@ for repo in ${repo_names}; do
   )'"
   # determine new git revision
   if ${pull}; then
-    eval "new_repo_revisions__${repo}='$(
-      git -C "${repo_path}" rev-parse HEAD
-    )'"
+    if [ -z "${date_time}" ]; then
+      eval "new_repo_revisions__${repo}='$(
+        git -C "${repo_path}" rev-parse HEAD
+      )'"
+    else
+      eval "new_repo_revisions__${repo}='$(
+        git -C "${repo_path}" rev-list -n1 --until "${date_time}" HEAD
+      )'"
+    fi
   else
     eval 'new_repo_revisions__'"${repo}"'="${old_repo_revisions__'"${repo}"'}"'
   fi
