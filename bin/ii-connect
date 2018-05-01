@@ -140,7 +140,7 @@ if [ "$1" = 'watch' ]; then
           printf 'up? I'"'"'m up for %s, %s\n' "$(uptime -p | sed 's/^up //')" "$(uptime | sed 's/.*,  //')"  | \
             sponge "${out_file%/out}/in"
         fi
-        regex='^\(\S\+ \)\?\S\+ <\S\+> \(.* \)\?[Tt]h\(anks\|x\)\([ ,.]\|$\)'
+        regex='^\(\S\+ \)\?\S\+ <\S\+> \(.* \)\?[Tt]h\(anks\|x\)\([ ,.!]\|$\)'
         if grep "${regex}" "${out_file}" | \
           grep -q "${sloppy_salutation}"; then
           done_something=true
