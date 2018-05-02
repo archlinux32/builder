@@ -1,0 +1,127 @@
+#!/bin/sh
+
+# shellcheck source=../conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+usage() {
+  >&2 echo ''
+  >&2 echo 'find-obsolete-packages: find packages which are no longer available upstream.'
+  >&2 echo ''
+  >&2 echo 'possible options:'
+  >&2 echo '  -h|--help:'
+  >&2 echo '    Show this help and exit.'
+  >&2 echo '  -m|--mirror https://mirror.example.com/archlinux'
+  >&2 echo '    Mirror url to take upstream'"'"'s packages from.'
+  >&2 echo '  -n|--no-action:'
+  >&2 echo '    Do not mark packages as to_be_deleted.'
+  >&2 echo '  -w|--wait:'
+  >&2 echo '    Wait for lock if necessary.'
+  [ -z "$1" ] && exit 1 || exit "$1"
+}
+
+eval set -- "$(
+  getopt -o hm:nw \
+    --long help \
+    --long mirror: \
+    --long no-action \
+    --long wait \
+    -n "$(basename "$0")" -- "$@" || \
+  echo usage
+)"
+
+mirror=''
+no_action=false
+wait_for_lock='-n'
+
+while true
+do
+  case "$1" in
+    -h|--help)
+      usage 0
+    ;;
+    -m|--mirror)
+      if [ -n "${mirror}" ]; then
+        >&2 echo 'Already have one -m flag.'
+        usage
+      fi
+      shift
+      mirror="$1"
+    ;;
+    -n|--no-action)
+      no_action=true
+    ;;
+    -w|--wait)
+      wait_for_lock=''
+    ;;
+    --)
+      shift
+      break
+    ;;
+    *)
+      >&2 echo 'Whoops, forgot to implement option "'"$1"'" internally.'
+      exit 42
+    ;;
+  esac
+  shift
+done
+
+if [ $# -ne 0 ]; then
+  >&2 echo 'Too many arguments.'
+  usage
+fi
+
+if [ -z "${mirror}" ]; then
+  >&2 echo 'Flag -m missing'
+  usage
+fi
+
+if ! ${no_action}; then
+  exec 9> "${sanity_check_lock_file}"
+  if ! flock -s ${wait_for_lock} 9; then
+    >&2 echo 'Cannot get sanity-check lock.'
+    exit 1
+  fi
+
+  exec 8> "${build_list_lock_file}"
+  if ! flock ${wait_for_lock} 8; then
+    >&2 echo 'Cannot get build-list lock.'
+    exit 1
+  fi
+fi
+
+{
+  for repo in core extra community; do
+    curl -Ss "${mirror}/${repo}/os/x86_64/${repo}.db.tar.gz" | \
+      tar -tz
+  done | \
+    sed -n '
+      s,\(-[^-]*\)\{2\}/desc$,,
+      T
+      p
+      p
+    '
+  # shellcheck disable=SC2016
+  {
+    printf 'SELECT DISTINCT `binary_packages`.`pkgname`'
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `repositories`.`is_on_master_mirror`'
+    printf ' AND NOT `binary_packages`.`is_to_be_deleted`'
+  } | \
+    mysql_run_query
+} | \
+  sort | \
+  uniq -u | \
+  if ${no_action}; then
+    cat
+  else
+    # shellcheck disable=SC2016
+    base64_encode_each | \
+      sed '
+        s/^/from_base64("/
+        s/$/"),/
+        1 s/^/UPDATE `binary_packages` SET `is_to_be_deleted`=1 WHERE `binary_packages`.`pkgname` IN (/
+        $ s/,$/);/
+      ' | \
+      mysql_run_query
+  fi
