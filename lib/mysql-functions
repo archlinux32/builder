@@ -62,21 +62,27 @@ mysql_run_query() {
   # a present query_file means there was an error
   if [ -f "${query_stdin}" ]; then
     >&2 printf 'I could not complete a mysql query!\n'
-    if [ ! -s "${work_dir}/build-master-sanity" ]; then
+    if [ ! -s "${work_dir}/build-master-sanity" ] && \
+      [ -z "${file_name_extra}" ]; then
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say
-      for file in \
-        "${query_stdin}" \
-        "${query_stdout}" \
-        "${query_stderr}"; do
-        cp "${file}" "${webserver_directory}/mysql-queries/${file##*/}.txt"
-        chmod go+r "${webserver_directory}/mysql-queries/${file##*/}.txt"
-      done
     fi
+    for file in \
+      "${query_stdin}" \
+      "${query_stdout}" \
+      "${query_stderr}"; do
+      cp "${file}" "${webserver_directory}/mysql-queries/${file##*/}.txt"
+      chmod go+r "${webserver_directory}/mysql-queries/${file##*/}.txt"
+    done
     if [ -z "${file_name_extra}" ]; then
       echo 'A mysql query failed.' > \
         "${work_dir}/build-master-sanity"
+    else
+      rm -f \
+        "${query_stdin}" \
+        "${query_stdout}" \
+        "${query_stderr}"
     fi
     return 2
   fi
