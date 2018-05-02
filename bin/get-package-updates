@@ -456,10 +456,10 @@ while [ -n "${black_listed_new}" ]; do
         printf ' AND `dependency_types`.`relevant_for_building`'
         printf ' AND `dependency_types`.`relevant_for_binary_packages`'
         printf ' WHERE NOT EXISTS ('
-          printf ' SELECT *'
+          printf ' SELECT 1'
           printf ' FROM `install_target_providers`'
           printf ' WHERE NOT EXISTS ('
-            printf ' SELECT *'
+            printf ' SELECT 1'
             printf ' FROM `bl`'
             printf ' JOIN `package_sources` AS `b_ps` ON `bl`.`pkgbase`=`b_ps`.`pkgbase`'
             mysql_join_package_sources_build_assignments 'b_ps' 'b_ba'
@@ -470,7 +470,7 @@ while [ -n "${black_listed_new}" ]; do
         printf ') AND EXISTS ('
         # TODO: This should be corrected at the root: automatic install targets, which are bogus should
         #       not be added in the first place - but how do we detect that?
-          printf ' SELECT *'
+          printf ' SELECT 1'
           printf ' FROM `install_target_providers`'
           printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
         printf ');\n'
