@@ -43,7 +43,7 @@ hand_out_assignment() {
   # shellcheck disable=SC2016
   {
     printf 'UPDATE `build_slaves`'
-    printf ' SET `currently_building` = from_base64(%s)' \
+    printf ' SET `currently_building` = from_base64("%s")' \
       "$(printf '%s' "$1" | base64 -w0)"
     # shellcheck disable=SC2154
     printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
@@ -51,7 +51,7 @@ hand_out_assignment() {
 
     printf 'UPDATE `build_assignments`'
     printf ' SET `build_assignments`.`priority`=0'
-    printf ' WHERE `build_assignments`.`id`=from_base64(%s);\n' \
+    printf ' WHERE `build_assignments`.`id`=from_base64("%s");\n' \
       "$(printf '%s' "${slave_id}" | base64 -w0)"
   } | \
     mysql_run_query
