@@ -133,6 +133,7 @@ next_building=$(
       printf ' AS `part_of_loop`,'
       printf '`build_assignments`.`id` AS `ba_id`'
       printf ' FROM `build_assignments`'
+      mysql_join_build_assignments_package_sources
       mysql_join_build_assignments_binary_packages
       mysql_join_binary_packages_repositories
       printf ' LEFT'
