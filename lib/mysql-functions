@@ -941,7 +941,7 @@ mysql_cleanup() {
     printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
     printf ' OR `build_slaves`.`logged_lines` IS NOT NULL);\n'
   } | \
-    mysql_run_query
+    mysql_run_query 'unimportant'
 }
 
 # mysql_query_has_pending_dependencies `build_assignment`.`id`
