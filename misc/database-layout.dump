@@ -492,10 +492,13 @@ repositories	CREATE TABLE `repositories` (
 	 `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
 	 `stability` mediumint(9) NOT NULL,
 	 `is_on_master_mirror` bit(1) NOT NULL,
+	 `architecture` smallint(6) NOT NULL,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `name` (`name`),
 	 KEY `stability` (`stability`),
-	 CONSTRAINT `repositories_ibfk_1` FOREIGN KEY (`stability`) REFERENCES `repository_stabilities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+	 KEY `architecture` (`architecture`),
+	 CONSTRAINT `repositories_ibfk_1` FOREIGN KEY (`stability`) REFERENCES `repository_stabilities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+	 CONSTRAINT `repositories_ibfk_2` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 repository_moves	CREATE TABLE `repository_moves` (
 	 `id` mediumint(9) NOT NULL AUTO_INCREMENT,
