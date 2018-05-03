@@ -550,6 +550,8 @@ recursively_umount_and_rm() {
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
 #  append $sub_pkgrel to the pkgrel
 
+# TODO: actually include the other architectures
+
 mangle_pkgbuild() {
   local PKGBUILD="$1"
   local sub_pkgrel="$2"

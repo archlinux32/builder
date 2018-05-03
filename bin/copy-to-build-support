@@ -2,6 +2,8 @@
 
 # copy the given package(s) into build-support
 
+# TODO: enable separate repositories for each architecture
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 

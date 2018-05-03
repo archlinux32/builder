@@ -292,6 +292,7 @@ mysql_generate_package_metadata() {
       exit 2
     fi
     # remove empty lines and unsupported architectures
+    # TODO: support more architectures
     sed -i '
       /^[^=]*=\s*$/d
       /^\s*arch = /{
