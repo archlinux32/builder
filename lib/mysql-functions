@@ -1186,6 +1186,7 @@ for link in \
   'package_sources:upstream_package_repository:upstream_repositories' \
   \
   'repositories:stability:repository_stabilities' \
+  'repositories:architecture:architectures' \
   \
   'repository_moves:upstream_package_repository:upstream_repositories' \
   'repository_moves:upstream_package_repository upstream_package_repository:package_sources' \
