@@ -41,6 +41,7 @@ eval set -- "$(
 
 silence=0
 repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
+archs='i686'
 web=false
 
 while true
@@ -218,11 +219,13 @@ while [ $# -gt 0 ]; do
       errors=$(
         {
           # shellcheck disable=SC2086
-          printf 'expected %s\n' ${repos}
-          ls_master_mirror 'i686' | \
-            sed 's|^|found |'
+          for arch in ${archs}; do
+            printf 'expected '"${arch}"' %s\n' ${repos}
+            ls_master_mirror "${arch}" | \
+              sed 's|^|found '"${arch}"' |'
+          done
         } | \
-          sort -k2 | \
+          sort -k2,3 | \
           uniq -uf1
       )
       if [ -n "${errors}" ]; then
@@ -242,109 +245,111 @@ while [ $# -gt 0 ]; do
 
     package-database)
 
-      for repo in ${repos}; do
+      for arch in ${archs}; do
+        for repo in ${repos}; do
 
-        [ ${silence} -gt 0 ] || \
-          printf 'checking consistency of repository "%s" on the master mirror ...' "${repo}" >> \
-          "${tmp_dir}/messages"
+          [ ${silence} -gt 0 ] || \
+            printf 'checking consistency of repository "%s/%s" on the master mirror ...' "${arch}" "${repo}" >> \
+            "${tmp_dir}/messages"
 
-        packages=$(
-          ls_master_mirror "i686/${repo}" | \
-            grep '\.pkg\.tar\.xz\(\.sig\)\?$'
-        ) || true
+          packages=$(
+            ls_master_mirror "${arch}/${repo}" | \
+              grep '\.pkg\.tar\.xz\(\.sig\)\?$'
+          ) || true
 
-        errors=$(
-          echo "${packages}" | \
-            grep '\S' | \
-            sed '
-              s|^\(.*\.pkg\.tar\.xz\)$|package \1|
-              s|^\(.*\.pkg\.tar\.xz\)\.sig$|signature \1|
-            ' | \
-            sort -k2 | \
-            uniq -cf1 | \
-            grep -v '^\s*2\s' | \
-            awk '{print $2 " " $3}'
-        ) || true
-        if [ -n "${errors}" ]; then
-          if [ ${silence} -le 1 ]; then
-            printf '\nThe following packages in %s are missing a signature or vice versa:\n%s\n' \
-              "${repo}" \
-              "${errors}" >> \
-              "${tmp_dir}/messages"
-          fi
-          i_am_insane
-        fi
-
-        ${master_mirror_rsync_command} \
-          "${master_mirror_rsync_directory}/i686/${repo}/${repo}.db.tar.gz" \
-          "${master_mirror_rsync_directory}/i686/${repo}/${repo}.files.tar.gz" \
-          "${tmp_dir}/"
-
-        errors=$(
-          {
-            tar -Oxzf "${tmp_dir}/${repo}.db.tar.gz" --wildcards '*/desc' 2>/dev/null | \
-              sed -n '
-                /^%FILENAME%$/ {
-                  N
-                  s/^.*\n/in_database /
-                  p
-                }
-              '
-            echo "${packages}" | \
-              sed '
-                /\.pkg\.tar\.xz$/ !d
-                s/^/in_repository /
-              ' | \
-              sort -u
-          } | \
-            sort -k2 | \
-            uniq -uf1
-        )
-        if [ -n "${errors}" ]; then
-          if [ ${silence} -le 1 ]; then
-            printf '\nThe following packages in %s are missing from the database or vice versa:\n%s\n' \
-              "${repo}" \
-              "${errors}" >> \
-              "${tmp_dir}/messages"
-          fi
-          i_am_insane
-        fi
-
-        errors=$(
-          {
-            tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
-              grep '/$' | \
-              sed '
-                s|/$||
-                s|^|in_database |
-              '
+          errors=$(
             echo "${packages}" | \
               grep '\S' | \
               sed '
-                s|-[^-]\+$||
-                s|^|in_repository |
+                s|^\(.*\.pkg\.tar\.xz\)$|package \1|
+                s|^\(.*\.pkg\.tar\.xz\)\.sig$|signature \1|
               ' | \
-              sort -u
-          } | \
-            sort -k2 | \
-            uniq -uf1
-        )
-        if [ -n "${errors}" ]; then
-          if [ ${silence} -le 1 ]; then
-            printf '\nThe following packages in %s are missing from the file-database or vice versa:\n%s\n' \
-              "${repo}" \
-              "${errors}" >> \
-              "${tmp_dir}/messages"
+              sort -k2 | \
+              uniq -cf1 | \
+              grep -v '^\s*2\s' | \
+              awk '{print $2 " " $3}'
+          ) || true
+          if [ -n "${errors}" ]; then
+            if [ ${silence} -le 1 ]; then
+              printf '\nThe following packages in %s are missing a signature or vice versa:\n%s\n' \
+                "${repo}" \
+                "${errors}" >> \
+                "${tmp_dir}/messages"
+            fi
+            i_am_insane
           fi
-          i_am_insane
-        fi
 
-        find "${tmp_dir:?}" -mindepth 1 \( -not -name 'messages' \) -delete
+          ${master_mirror_rsync_command} \
+            "${master_mirror_rsync_directory}/${arch}/${repo}/${repo}.db.tar.gz" \
+            "${master_mirror_rsync_directory}/${arch}/${repo}/${repo}.files.tar.gz" \
+            "${tmp_dir}/"
 
-        [ ${silence} -gt 0 ] || \
-          echo ' passed.' >> \
-          "${tmp_dir}/messages"
+          errors=$(
+            {
+              tar -Oxzf "${tmp_dir}/${repo}.db.tar.gz" --wildcards '*/desc' 2>/dev/null | \
+                sed -n '
+                  /^%FILENAME%$/ {
+                    N
+                    s/^.*\n/in_database /
+                    p
+                  }
+                '
+              echo "${packages}" | \
+                sed '
+                  /\.pkg\.tar\.xz$/ !d
+                  s/^/in_repository /
+                ' | \
+                sort -u
+            } | \
+              sort -k2 | \
+              uniq -uf1
+          )
+          if [ -n "${errors}" ]; then
+            if [ ${silence} -le 1 ]; then
+              printf '\nThe following packages in %s are missing from the database or vice versa:\n%s\n' \
+                "${repo}" \
+                "${errors}" >> \
+                "${tmp_dir}/messages"
+            fi
+            i_am_insane
+          fi
 
+          errors=$(
+            {
+              tar -tzf "${tmp_dir}/${repo}.files.tar.gz" | \
+                grep '/$' | \
+                sed '
+                  s|/$||
+                  s|^|in_database |
+                '
+              echo "${packages}" | \
+                grep '\S' | \
+                sed '
+                  s|-[^-]\+$||
+                  s|^|in_repository |
+                ' | \
+                sort -u
+            } | \
+              sort -k2 | \
+              uniq -uf1
+          )
+          if [ -n "${errors}" ]; then
+            if [ ${silence} -le 1 ]; then
+              printf '\nThe following packages in %s are missing from the file-database or vice versa:\n%s\n' \
+                "${repo}" \
+                "${errors}" >> \
+                "${tmp_dir}/messages"
+            fi
+            i_am_insane
+          fi
+
+          find "${tmp_dir:?}" -mindepth 1 \( -not -name 'messages' \) -delete
+
+          [ ${silence} -gt 0 ] || \
+            echo ' passed.' >> \
+            "${tmp_dir}/messages"
+
+        done
       done
 
     ;;
@@ -359,23 +364,26 @@ while [ $# -gt 0 ]; do
         {
           # shellcheck disable=SC2016
           {
-            printf 'SELECT "mysql",CONCAT(`repositories`.`name`,"/",'
+            printf 'SELECT "mysql",CONCAT(`r_a`.`name`,"/",`repositories`.`name`,"/",'
             mysql_package_name_query
             printf ') FROM `binary_packages`'
             mysql_join_binary_packages_repositories
             printf ' AND `repositories`.`is_on_master_mirror`'
             mysql_join_binary_packages_architectures
+            mysql_join_repositories_architectures '' 'r_a'
           } | \
             mysql_run_query | \
             tr '\t' ' '
-          ls_master_mirror 'i686' | \
-            while read -r repo; do
-              ls_master_mirror "i686/${repo}" | \
-                sed '
-                  /\.pkg\.tar\.xz$/!d
-                  s,^,package-file '"${repo}"'/,
-                '
-            done
+          for arch in ${archs}; do
+            ls_master_mirror "${arch}" | \
+              while read -r repo; do
+                ls_master_mirror "${arch}/${repo}" | \
+                  sed '
+                    /\.pkg\.tar\.xz$/!d
+                    s,^,package-file '"${arch}"'/'"${repo}"'/,
+                  '
+              done
+          done
         } | \
           sed 's/\(-[0-9]\+\)\.0\(-[^- ]\+$\)/\1\2/' | \
           sort -k2 | \
