@@ -746,29 +746,34 @@ mysql_sanity_check() {
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_sanity_check.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
-    for dir in $(ls_master_mirror 'i686'); do
-      ls_master_mirror "i686/${dir}" | \
-        sed -n '
-          s/\.pkg\.tar\.xz$//
-          T
-          s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
-          s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
-          s|^|'"${dir}"'/|
-          p
-        '
+    # shellcheck disable=SC2041
+    for arch in 'i686'; do
+      for dir in $(ls_master_mirror "${arch}"); do
+        ls_master_mirror "${arch}/${dir}" | \
+          sed -n '
+            s/\.pkg\.tar\.xz$//
+            T
+            s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
+            s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
+            s|^|'"${arch}"'/'"${dir}"'/|
+            p
+          '
+      done
     done | \
       sort > \
       "${temp_dir}/master-mirror-listing"
 
     {
-      printf 'SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
+      printf 'SELECT `r_a`.`name`,`repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
       mysql_join_binary_packages_repositories
+      mysql_join_repositories_architectures '' 'r_a'
       printf ' WHERE `repositories`.`is_on_master_mirror`'
     } | \
       mysql_run_query | \
       sed '
+        s,\t,/,
         s,\t,/,
         s,\t,-,
         s,\t,:,
