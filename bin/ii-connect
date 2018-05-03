@@ -79,8 +79,10 @@ if [ "$1" = 'watch' ]; then
         channel="${channel##*/}"
         if [ -z "${channel%%#*}" ]; then
           prefix='buildmaster: '
+          sloppy_salutation='buildmaster'
         else
           prefix=''
+          sloppy_salutation=''
         fi
         regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
         if grep -q "${regex}" "${out_file}"; then
@@ -129,6 +131,22 @@ if [ "$1" = 'watch' ]; then
                 sponge "${out_file%/out}/in"
             done
           sed -i "/${regex}/d" "${out_file}"
+        fi
+        regex='^\(\S\+ \)\?\S\+ <\S\+> .*[Ww]hat'"'"'\?s *[Uu]p'
+        if grep "${regex}" "${out_file}" | \
+          grep -q "${sloppy_salutation}"; then
+          done_something=true
+          sed -i "/${regex}/d" "${out_file}"
+          printf 'up? I'"'"'m up for %s, %s\n' "$(uptime -p | sed 's/^up //')" "$(uptime | sed 's/.*,  //')"  | \
+            sponge "${out_file%/out}/in"
+        fi
+        regex='^\(\S\+ \)\?\S\+ <\S\+> \(.* \)\?[Tt]h\(anks\|x\)\([ ,.!]\|$\)'
+        if grep "${regex}" "${out_file}" | \
+          grep -q "${sloppy_salutation}"; then
+          done_something=true
+          sed -i "/${regex}/d" "${out_file}"
+          printf 'np\n' | \
+            sponge "${out_file%/out}/in"
         fi
       done
     sleep 1

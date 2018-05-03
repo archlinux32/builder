@@ -9,6 +9,9 @@ if [ -z "${base_dir}" ]; then
   . '../conf/default.conf'
 fi
 
+# TODO: replace most/all insert-select queries by separate select and insert
+# queries
+
 # base64_encode_each encode each line of stdin with base64
 
 base64_encode_each() {
@@ -59,21 +62,27 @@ mysql_run_query() {
   # a present query_file means there was an error
   if [ -f "${query_stdin}" ]; then
     >&2 printf 'I could not complete a mysql query!\n'
-    if [ ! -s "${work_dir}/build-master-sanity" ]; then
+    if [ ! -s "${work_dir}/build-master-sanity" ] && \
+      [ -z "${file_name_extra}" ]; then
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say
-      for file in \
-        "${query_stdin}" \
-        "${query_stdout}" \
-        "${query_stderr}"; do
-        cp "${file}" "${webserver_directory}/mysql-queries/${file##*/}.txt"
-        chmod go+r "${webserver_directory}/mysql-queries/${file##*/}.txt"
-      done
     fi
+    for file in \
+      "${query_stdin}" \
+      "${query_stdout}" \
+      "${query_stderr}"; do
+      cp "${file}" "${webserver_directory}/mysql-queries/${file##*/}.txt"
+      chmod go+r "${webserver_directory}/mysql-queries/${file##*/}.txt"
+    done
     if [ -z "${file_name_extra}" ]; then
       echo 'A mysql query failed.' > \
         "${work_dir}/build-master-sanity"
+    else
+      rm -f \
+        "${query_stdin}" \
+        "${query_stdout}" \
+        "${query_stderr}"
     fi
     return 2
   fi
@@ -106,6 +115,7 @@ mysql_add_package_source() {
   local repo_path
   local commit_time
   local pkgbuild
+  local upstream_package_repository_id
 
   if grep -qx 'PKGBUILD_mod = \S\+' "${srcinfo_file}"; then
     uses_modification=1
@@ -145,11 +155,31 @@ mysql_add_package_source() {
   fi
   printf 'I' >&2
 
+  upstream_package_repository_id=$(
+    {
+      printf 'SELECT `upstream_repositories`.`id`'
+      printf ' FROM `upstream_repositories`'
+      printf ' WHERE `upstream_repositories`.`name` = from_base64("%s")' \
+        "$(
+          printf '%s' "${upstream_package_repository}" | \
+            base64 -w0
+        )"
+      printf ' LIMIT 1;\n'
+    } | \
+      mysql_run_query
+  )
+
+  if [ -z "${upstream_package_repository_id}" ]; then
+    >&2 printf 'Cannot find upstream package repository "%s" in the database.\n' \
+      "${upstream_package_repository}"
+    exit 2
+  fi
+
   {
     printf 'INSERT IGNORE INTO package_sources'
     printf ' (`pkgbase`,`git_revision`,`mod_git_revision`,`upstream_package_repository`,`uses_upstream`,`uses_modification`,`commit_time`)'
-    printf ' SELECT'
-    printf ' from_base64("%s"),' \
+    printf ' VALUES ('
+    printf 'from_base64("%s"),' \
       "$(
         printf '%s' "${pkgbase}" | \
           base64 -w0
@@ -162,14 +192,12 @@ mysql_add_package_source() {
         printf '%s' "${mod_git_revision}" | \
           base64 -w0
       )"
-    printf ' `upstream_repositories`.`id`,%s,%s,from_unixtime(%s)' \
-      "${uses_upstream}" "${uses_modification}" "${commit_time}"
-    printf ' FROM `upstream_repositories`'
-    printf ' WHERE `upstream_repositories`.`name` = from_base64("%s");' \
-      "$(
-        printf '%s' "${upstream_package_repository}" | \
-          base64 -w0
-      )"
+    printf '%s,' \
+      "${upstream_package_repository_id}" \
+      "${uses_upstream}" \
+      "${uses_modification}"
+    printf 'from_unixtime(%s));\n' \
+      "${commit_time}"
   } | \
     mysql_run_query
   printf 'J' >&2
@@ -264,6 +292,7 @@ mysql_generate_package_metadata() {
       exit 2
     fi
     # remove empty lines and unsupported architectures
+    # TODO: support more architectures
     sed -i '
       /^[^=]*=\s*$/d
       /^\s*arch = /{
@@ -718,29 +747,34 @@ mysql_sanity_check() {
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_sanity_check.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
 
-    for dir in $(ls_master_mirror 'i686'); do
-      ls_master_mirror "i686/${dir}" | \
-        sed -n '
-          s/\.pkg\.tar\.xz$//
-          T
-          s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
-          s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
-          s|^|'"${dir}"'/|
-          p
-        '
+    # shellcheck disable=SC2041
+    for arch in 'i686'; do
+      for dir in $(ls_master_mirror "${arch}"); do
+        ls_master_mirror "${arch}/${dir}" | \
+          sed -n '
+            s/\.pkg\.tar\.xz$//
+            T
+            s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
+            s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
+            s|^|'"${arch}"'/'"${dir}"'/|
+            p
+          '
+      done
     done | \
       sort > \
       "${temp_dir}/master-mirror-listing"
 
     {
-      printf 'SELECT `repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
+      printf 'SELECT `r_a`.`name`,`repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
       mysql_join_binary_packages_repositories
+      mysql_join_repositories_architectures '' 'r_a'
       printf ' WHERE `repositories`.`is_on_master_mirror`'
     } | \
       mysql_run_query | \
       sed '
+        s,\t,/,
         s,\t,/,
         s,\t,-,
         s,\t,:,
@@ -882,16 +916,19 @@ mysql_cleanup() {
     printf ');\n'
     # remove jobs from build slaves that are not on the build-list
     if [ "${operator}" = 'DELETE' ]; then
-      printf 'UPDATE `build_slaves`'
+      printf 'UPDATE `repositories`'
     else
-      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `build_slaves`'
+      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `repositories`'
     fi
-    mysql_join_build_slaves_binary_packages
-    mysql_join_binary_packages_repositories
+    mysql_join_repositories_binary_packages
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' RIGHT'
+    mysql_join_binary_packages_build_slaves
     if [ "${operator}" = 'DELETE' ]; then
       printf ' SET `build_slaves`.`currently_building`=NULL'
     fi
-    printf ' WHERE `repositories`.`name`!="build-list";\n'
+    printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
+    printf ' AND `repositories`.`id` IS NULL;\n'
     # remove build orders from build slaves which have not connected within 1h
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `build_slaves`'
@@ -916,7 +953,7 @@ mysql_cleanup() {
     printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
     printf ' OR `build_slaves`.`logged_lines` IS NOT NULL);\n'
   } | \
-    mysql_run_query
+    mysql_run_query 'unimportant'
 }
 
 # mysql_query_has_pending_dependencies `build_assignment`.`id`
@@ -1155,6 +1192,7 @@ for link in \
   'package_sources:upstream_package_repository:upstream_repositories' \
   \
   'repositories:stability:repository_stabilities' \
+  'repositories:architecture:architectures' \
   \
   'repository_moves:upstream_package_repository:upstream_repositories' \
   'repository_moves:upstream_package_repository upstream_package_repository:package_sources' \

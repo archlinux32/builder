@@ -9,17 +9,6 @@ if [ -z "${base_dir}" ]; then
   . '../conf/default.conf'
 fi
 
-if [ ! -s "${work_dir}/build-master-sanity" ]; then
-  {
-    date
-    printf 'sourcing common-functions for %s\n' "$0"
-    printf '%s parameters:' "$#"
-    printf ' "%s"' "$@"
-    printf '\n'
-  } >> \
-    "${work_dir}/command-log"
-fi
-
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision
 # find the PKGBUILD and modification of $package from $repository
 # sets $PKGBUILD and $PKGBUILD_mod
@@ -560,6 +549,8 @@ recursively_umount_and_rm() {
 # mangle_pkgbuild $PKGBUILD [$sub_pkgrel]
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
 #  append $sub_pkgrel to the pkgrel
+
+# TODO: actually include the other architectures
 
 mangle_pkgbuild() {
   local PKGBUILD="$1"

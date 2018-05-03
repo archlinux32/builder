@@ -466,6 +466,9 @@ while [ "${count}" -ne 0 ]; do
                 find "${package_content_dir}/${pkgfile##*/}" \
                   -name 'opt' -prune , \
                   -exec objdump -x '{}' \; 2>/dev/null | \
+                  sed '
+                    /^architecture:.* i386:x86-64, /,/^architecture:.* i386:x86-32, / d
+                  ' | \
                   grep -w 'NEEDED' | \
                   awk '{print $2}' | \
                   sed '

@@ -208,8 +208,8 @@
     </item>
     <item type="database-table" id="{9085c36f-5884-41c8-9ca8-9d53973e657d}">
       <position>
-        <x>737</x>
-        <y>38</y>
+        <x>777</x>
+        <y>32</y>
       </position>
       <table>
         <name>statitstics</name>
@@ -540,12 +540,6 @@
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>repository</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
             <name>epoch</name>
             <data-type>MEDIUMINT</data-type>
             <required>True</required>
@@ -605,13 +599,19 @@
             <required>False</required>
             <primary-key>False</primary-key>
           </column>
+          <column>
+            <name>last_moved</name>
+            <data-type>DATETIME</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
         </column-list>
       </table>
     </item>
     <item type="database-table" id="{f8caa2d5-11ba-485c-b273-8183713896bf}">
       <position>
-        <x>554</x>
-        <y>117</y>
+        <x>549</x>
+        <y>105</y>
       </position>
       <table>
         <name>install_target_providers</name>
@@ -668,6 +668,12 @@
           <column>
             <name>is_on_master_mirror</name>
             <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>architecture</name>
+            <data-type>SMALLINT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
@@ -832,8 +838,8 @@
     </item>
     <item type="database-table" id="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}">
       <position>
-        <x>563</x>
-        <y>42</y>
+        <x>557</x>
+        <y>30</y>
       </position>
       <table>
         <name>install_targets</name>
@@ -1118,6 +1124,69 @@
         </column-list>
       </table>
     </item>
+    <item type="database-table" id="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}">
+      <position>
+        <x>543</x>
+        <y>182</y>
+      </position>
+      <table>
+        <name>binary_packages_in_repositories</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>package</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>repository</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-relationship" id="{25ec7ee3-9041-4ef4-a5b8-c41a06385813}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>529</x>
+              <y>318.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>509.547</x>
+              <y>345.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>4</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
     <item type="database-relationship" id="{3539786a-db3b-4c5c-ba35-e89fb027cda8}">
       <line>
         <connector-list>
@@ -1140,7 +1209,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1173,7 +1242,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1206,7 +1275,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1239,7 +1308,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1272,7 +1341,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1305,7 +1374,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1338,7 +1407,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1371,7 +1440,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1404,7 +1473,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1437,7 +1506,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1470,7 +1539,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1503,7 +1572,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1536,7 +1605,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1569,7 +1638,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1602,7 +1671,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1635,7 +1704,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1668,7 +1737,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1701,7 +1770,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1734,7 +1803,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1767,40 +1836,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{75410d72-ad2c-4357-aab5-e97f9fb74da5}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>511.719</x>
-              <y>191.875</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>613.703</x>
-              <y>273</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1833,7 +1869,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1849,8 +1885,8 @@
         <connector-list>
           <connector>
             <position>
-              <x>554</x>
-              <y>148.906</y>
+              <x>549</x>
+              <y>136.906</y>
             </position>
             <angle>180</angle>
             <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
@@ -1866,7 +1902,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1899,7 +1935,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1915,16 +1951,16 @@
         <connector-list>
           <connector>
             <position>
-              <x>632.109</x>
-              <y>117</y>
+              <x>627.109</x>
+              <y>105</y>
             </position>
             <angle>90</angle>
             <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
           </connector>
           <connector>
             <position>
-              <x>613.016</x>
-              <y>91.8125</y>
+              <x>607.016</x>
+              <y>79.8125</y>
             </position>
             <angle>270</angle>
             <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
@@ -1932,7 +1968,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1956,8 +1992,8 @@
           </connector>
           <connector>
             <position>
-              <x>563</x>
-              <y>66.9062</y>
+              <x>557</x>
+              <y>54.9062</y>
             </position>
             <angle>180</angle>
             <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
@@ -1965,7 +2001,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -1982,7 +2018,7 @@
           <connector>
             <position>
               <x>698.406</x>
-              <y>311.906</y>
+              <y>318.906</y>
             </position>
             <angle>0</angle>
             <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
@@ -1998,7 +2034,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -2031,7 +2067,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -2064,13 +2100,13 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
         </modality>
         <columns>
-          <child>11</child>
+          <child>10</child>
           <parent>0</parent>
         </columns>
       </relationship>
@@ -2080,7 +2116,7 @@
         <connector-list>
           <connector>
             <position>
-              <x>559.755</x>
+              <x>638.51</x>
               <y>395</y>
             </position>
             <angle>90</angle>
@@ -2088,8 +2124,8 @@
           </connector>
           <connector>
             <position>
-              <x>585.469</x>
-              <y>350.812</y>
+              <x>641.938</x>
+              <y>364.812</y>
             </position>
             <angle>270</angle>
             <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
@@ -2097,7 +2133,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -2113,7 +2149,7 @@
         <connector-list>
           <connector>
             <position>
-              <x>638.51</x>
+              <x>559.755</x>
               <y>395</y>
             </position>
             <angle>90</angle>
@@ -2121,8 +2157,8 @@
           </connector>
           <connector>
             <position>
-              <x>641.938</x>
-              <y>350.812</y>
+              <x>585.469</x>
+              <y>364.812</y>
             </position>
             <angle>270</angle>
             <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
@@ -2130,7 +2166,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -2163,7 +2199,7 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
@@ -2196,10 +2232,76 @@
         </connector-list>
       </line>
       <relationship>
-        <cardinality>OneToMany</cardinality>
+        <cardinality>OneToOne</cardinality>
         <modality>
           <child>Mandatory</child>
           <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{c672e45e-2bd4-4ff1-9b42-fdd2443cae6a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>543</x>
+              <y>213.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>511.719</x>
+              <y>191.875</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{0213a360-5a3b-484f-82c7-320003506c8a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>647.922</x>
+              <y>245.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>613.703</x>
+              <y>273</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToMany</cardinality>
+        <modality>
+          <child>Optional</child>
+          <parent>Optional</parent>
         </modality>
         <columns>
           <child>2</child>

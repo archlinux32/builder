@@ -18,6 +18,7 @@
 # TODO: honor manual build order of tool-chain:
 # toolchain build order: linux-api-headers->glibc->binutils->gcc->binutils->glibc
 
+# hand_out_assignment $build_assignments.id
 hand_out_assignment() {
 
   # shellcheck disable=SC2016
@@ -32,46 +33,28 @@ hand_out_assignment() {
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="build-list"'
-    printf ' AND `package_sources`.`%s`=from_base64("%s")' \
-      'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
-      'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
-      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
-    printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
-      "$(printf '%s' "$4" | base64 -w0)"
+    printf ' AND `build_assignments`.`id`=from_base64("%s")' \
+      "$(printf '%s' "$1" | base64 -w0)"
     printf ' LIMIT 1;\n'
-
-    printf 'UPDATE `build_slaves`'
-    printf ' SET `currently_building` = ('
-    printf ' SELECT `build_assignments`.`id`'
-    printf ' FROM `build_assignments`'
-    mysql_join_build_assignments_package_sources
-    mysql_join_package_sources_upstream_repositories
-    printf ' WHERE'
-    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
-      'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
-      'git_revision'     "$(printf '%s' "$2" | base64 -w0)" \
-      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
-    printf ' `upstream_repositories`.`name` = from_base64("%s")' \
-      "$(printf '%s' "$4" | base64 -w0)"
-    printf ')'
-    # shellcheck disable=SC2154
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-      "$(printf '%s' "${slave}" | base64 -w0)"
-
-    printf 'UPDATE `build_assignments`'
-    mysql_join_build_assignments_package_sources
-    mysql_join_package_sources_upstream_repositories
-    printf ' SET `build_assignments`.`priority`=0'
-    printf ' WHERE'
-    printf ' `package_sources`.`%s` = from_base64("%s") AND' \
-      'pkgbase'          "$(printf '%s' "$1" | base64 -w0)" \
-      'git_revision'     "$(printf '%s' "$2" | base64 -w0)" \
-      'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
-    printf ' `upstream_repositories`.`name` = from_base64("%s");\n' \
-      "$(printf '%s' "$4" | base64 -w0)"
   } | \
     mysql_run_query | \
     tr '\t' ' '
+
+  # shellcheck disable=SC2016
+  {
+    printf 'UPDATE `build_slaves`'
+    printf ' SET `currently_building` = from_base64("%s")' \
+      "$(printf '%s' "$1" | base64 -w0)"
+    # shellcheck disable=SC2154
+    printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
+      "$(printf '%s' "${slave_id}" | base64 -w0)"
+
+    printf 'UPDATE `build_assignments`'
+    printf ' SET `build_assignments`.`priority`=0'
+    printf ' WHERE `build_assignments`.`id`=from_base64("%s");\n' \
+      "$(printf '%s' "${slave_id}" | base64 -w0)"
+  } | \
+    mysql_run_query
 
   exit 0
 
@@ -108,13 +91,13 @@ trap clean_up EXIT
 currently_building=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT '
-    mysql_query_select_pkgbase_and_revision
+    printf 'SELECT `build_assignments`.`id`'
+    printf ' FROM `build_assignments`'
     mysql_join_build_assignments_build_slaves
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_repositories
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
-      "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
+      "$(printf '%s' "${slave_id}" | base64 -w0)"
     printf ' AND `repositories`.`name`="build-list"'
     printf ' LIMIT 1;\n'
   } | \
@@ -122,8 +105,7 @@ currently_building=$(
 )
 
 if [ -n "${currently_building}" ]; then
-  # shellcheck disable=SC2086
-  hand_out_assignment ${currently_building}
+  hand_out_assignment "${currently_building}"
 fi
 
 # a package with [all dependencies met or which is part of a loop]
@@ -135,54 +117,54 @@ fi
 next_building=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT '
-    printf '`package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
-      "$(
-        printf '%s' "$1" | \
-          base64 -w0
-      )"
-    printf '`build_assignments`.`priority`,'
-    printf 'COALESCE('
-    printf 'MAX(`failed_builds`.`date`),0'
-    printf ') AS `last_trial`,'
-    mysql_query_is_part_of_loop '`build_assignments`.`id`'
-    printf ' AS `part_of_loop`,'
-    mysql_query_select_pkgbase_and_revision
-    mysql_join_build_assignments_binary_packages
-    mysql_join_binary_packages_repositories
-    printf ' LEFT'
-    mysql_join_build_assignments_failed_builds
-    printf ' WHERE `repositories`.`name`="build-list"'
-    printf ' AND NOT EXISTS ('
-      printf ' SELECT *'
-      printf ' FROM `build_slaves`'
-      printf ' WHERE `build_slaves`.`currently_building`=`build_assignments`.`id`'
-    printf ') AND ('
-      printf '`build_assignments`.`is_blocked` IS NULL'
-      printf ' OR'
-      printf ' `package_sources`.`pkgbase`=from_base64("%s")' \
+    printf 'SELECT `q`.`ba_id` FROM'
+    printf '('
+      printf 'SELECT '
+      printf '`package_sources`.`pkgbase`=from_base64("%s") AS `requested`,' \
         "$(
           printf '%s' "$1" | \
             base64 -w0
         )"
-    printf ') AND ('
+      printf '`build_assignments`.`priority`,'
+      printf 'COALESCE('
+      printf 'MAX(`failed_builds`.`date`),0'
+      printf ') AS `last_trial`,'
       mysql_query_is_part_of_loop '`build_assignments`.`id`'
-      printf ' OR NOT '
-      mysql_query_has_pending_dependencies '`build_assignments`.`id`'
-    printf ')'
-    printf ' GROUP BY `build_assignments`.`id`'
-    printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
-    printf ' LIMIT 1;\n'
+      printf ' AS `part_of_loop`,'
+      printf '`build_assignments`.`id` AS `ba_id`'
+      printf ' FROM `build_assignments`'
+      mysql_join_build_assignments_package_sources
+      mysql_join_build_assignments_binary_packages
+      mysql_join_binary_packages_repositories
+      printf ' LEFT'
+      mysql_join_build_assignments_failed_builds
+      printf ' WHERE `repositories`.`name`="build-list"'
+      printf ' AND NOT EXISTS ('
+        printf ' SELECT 1'
+        printf ' FROM `build_slaves`'
+        printf ' WHERE `build_slaves`.`currently_building`=`build_assignments`.`id`'
+      printf ') AND ('
+        printf '`build_assignments`.`is_blocked` IS NULL'
+        printf ' OR'
+        printf ' `package_sources`.`pkgbase`=from_base64("%s")' \
+          "$(
+            printf '%s' "$1" | \
+              base64 -w0
+          )"
+      printf ') AND ('
+        mysql_query_is_part_of_loop '`build_assignments`.`id`'
+        printf ' OR NOT '
+        mysql_query_has_pending_dependencies '`build_assignments`.`id`'
+      printf ')'
+      printf ' GROUP BY `build_assignments`.`id`'
+      printf ' ORDER BY `requested` DESC, `priority` DESC, `last_trial`, `part_of_loop`, `build_assignments`.`id`'
+      printf ' LIMIT 1'
+    printf ') AS `q`;\n'
   } | \
-    mysql_run_query | \
-    sed '
-      y/\t/ /
-      s/^.* \(\S\+\( \S\+\)\{3\}\)$/\1/
-    '
+    mysql_run_query
 )
 if [ -n "${next_building}" ]; then
-  # shellcheck disable=SC2086
-  hand_out_assignment ${next_building}
+  hand_out_assignment "${next_building}"
 fi
 
 # Check if there are any pending packages at all

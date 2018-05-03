@@ -17,9 +17,27 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
   fi
 
   # shellcheck disable=SC2016
+  slave_id=$(
+    {
+      printf 'SELECT `build_slaves`.`id` FROM `build_slaves`'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+        "$(
+          printf '%s' "$1" | \
+            base64 -w0
+        )"
+    } | \
+      mysql_run_query
+  )
+  if [ -z "${slave_id}" ]; then
+    >&2 printf 'Build slave "%s" is unnknown to the database.\n' "$1"
+    exit 42
+  fi
+
+  # shellcheck disable=SC2016
   {
     printf 'INSERT INTO `ssh_log` (`build_slave`,`action`,`parameters`)'
-    printf ' SELECT `build_slaves`.`id`'
+    printf ' VALUES (%s' \
+      "${slave_id}"
     printf ',from_base64("%s")' \
       "$(
         printf '%s' "${SSH_ORIGINAL_COMMAND%% *}" | \
@@ -29,16 +47,11 @@ if [ "x${SSH_ORIGINAL_COMMAND%% *}" = 'xget-assignment' ] || \
         printf '%s' "${SSH_ORIGINAL_COMMAND#* }" | \
           base64 -w0
       )"
-    printf ' FROM `build_slaves`'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-      "$(
-        printf '%s' "$1" | \
-          base64 -w0
-      )"
+    printf ');\n'
   } | \
     mysql_run_query 'unimportant'
 
-  slave="$1" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
+  slave="$1" slave_id="${slave_id}" /bin/sh -c "${base_dir}/bin/${SSH_ORIGINAL_COMMAND}"
 
 else
 
