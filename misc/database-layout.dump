@@ -329,6 +329,16 @@ binary_packages	CREATE TABLE `binary_packages` (
 	 CONSTRAINT `binary_packages_ibfk_2` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
 	 CONSTRAINT `binary_packages_ibfk_3` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+binary_packages_in_repositories	CREATE TABLE `binary_packages_in_repositories` (
+	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
+	 `package` bigint(20) NOT NULL,
+	 `repository` mediumint(9) NOT NULL,
+	 PRIMARY KEY (`id`),
+	 UNIQUE KEY `content` (`package`,`repository`),
+	 KEY `binary_packages_in_repositories_ibfk_2` (`repository`),
+	 CONSTRAINT `binary_packages_in_repositories_ibfk_1` FOREIGN KEY (`package`) REFERENCES `binary_packages` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+	 CONSTRAINT `binary_packages_in_repositories_ibfk_2` FOREIGN KEY (`repository`) REFERENCES `repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 build_assignments	CREATE TABLE `build_assignments` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
 	 `package_source` bigint(20) NOT NULL,
