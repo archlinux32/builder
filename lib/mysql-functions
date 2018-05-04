@@ -321,14 +321,8 @@ mysql_generate_package_metadata() {
     any_arch=$(
       cut -f1 < \
         "${tmp_dir}/build-assignments.id" | \
-        grep -vxFm 1 "$(
-          printf '%s' 'any' | \
-            base64 -w0
-        )" || \
-        {
-          printf '%s' 'any' | \
-            base64 -w0
-        }
+        sort | \
+        head -n1
     )
 
     # iterate over all pkgnames
