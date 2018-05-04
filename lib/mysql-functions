@@ -319,17 +319,16 @@ mysql_generate_package_metadata() {
     # shellcheck disable=SC2034
     # select any specific arch (which will be building the 'any' part of a split package)
     any_arch=$(
-      {
-        sed -n '
-          s/^\tarch = //
-          T
-          p
-        ' "${temp_dir}/SRCINFO" | \
-          sort -r | \
-          grep -vxFm 1 'any' || \
-          echo 'any'
-      } | \
-        base64_encode_each
+      cut -f1 < \
+        "${tmp_dir}/build-assignments.id" | \
+        grep -vxFm 1 "$(
+          printf '%s' 'any' | \
+            base64 -w0
+        )" || \
+        {
+          printf '%s' 'any' | \
+            base64 -w0
+        }
     )
 
     grep '^pkgname = ' "${temp_dir}/SRCINFO" | \
