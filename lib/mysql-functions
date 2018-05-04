@@ -299,22 +299,20 @@ mysql_generate_package_metadata() {
         grep -vxF 'any' || \
         echo 'any'
     } | \
+      base64_encode_each | \
       while read -r arch; do
-        printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`,`is_blocked`,`is_broken`,`priority`)'
-        printf ' SELECT from_base64("%s"),`architectures`.`id`,NULL,0,0' \
-          "$(
-            printf '%s' "${package_source_id}" | \
-              base64 -w0
-          )"
+        printf 'INSERT INTO `build_assignments` (`package_source`,`architecture`,`is_blocked`,`is_broken`,`priority`)'
+        printf ' SELECT %s,`architectures`.`id`,NULL,0,0' \
+          "${package_source_id}"
         printf ' FROM `architectures`'
         printf ' WHERE `architectures`.`name` = from_base64("%s")' \
-          "$(
-            printf '%s' "${arch}" | \
-              base64 -w0
-          )"
-        printf ';\n'
-      done > \
-      "${temp_dir}/add-build-assignments-command"
+          "${arch}"
+        printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`id`);\n'
+        printf 'SELECT "%s",LAST_INSERT_ID();\n' \
+          "${arch}"
+      done | \
+      mysql_run_query > \
+      "${tmp_dir}/build-assignments.id"
 
     # TODO: correctly link between binary_packages and build_assignments using any_arch
 
@@ -630,9 +628,6 @@ mysql_generate_package_metadata() {
       done
 
     {
-      if [ -s "${temp_dir}/add-build-assignments-command" ]; then
-        cat "${temp_dir}/add-build-assignments-command"
-      fi
       if [ -s "${temp_dir}/add-binary-packages-command" ]; then
         cat "${temp_dir}/add-binary-packages-command"
       fi
