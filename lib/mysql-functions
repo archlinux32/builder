@@ -335,6 +335,9 @@ mysql_generate_package_metadata() {
             )
             {
               {
+                # this binary package is either built by the build_assignment
+                # with the identical arch (if existent) or by the one
+                # with arch=$any_arch
                 grep "^${arch64} " "${temp_dir}/build-assignments.id" || \
                   grep "^${any_arch} " "${temp_dir}/build-assignments.id"
               } | \
