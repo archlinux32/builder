@@ -312,7 +312,7 @@ mysql_generate_package_metadata() {
           "${arch}"
       done | \
       mysql_run_query > \
-      "${tmp_dir}/build-assignments.id"
+      "${temp_dir}/build-assignments.id"
 
     # TODO: correctly link between binary_packages and build_assignments using any_arch
 
@@ -320,7 +320,7 @@ mysql_generate_package_metadata() {
     # select any specific arch (which will be building the 'any' part of a split package)
     any_arch=$(
       cut -f1 < \
-        "${tmp_dir}/build-assignments.id" | \
+        "${temp_dir}/build-assignments.id" | \
         sort | \
         head -n1
     )
@@ -357,6 +357,7 @@ mysql_generate_package_metadata() {
           done
       done
 
+    # now each "ARCHINFO $pkgname $arch" file represents one binary package
     find "${temp_dir}" -mindepth 1 -maxdepth 1 -name 'ARCHINFO * *' -printf '%f\n' | \
       while read -r _ pkgname arch; do
         pkgver=$(
