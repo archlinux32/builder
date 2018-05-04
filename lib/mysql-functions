@@ -180,7 +180,7 @@ mysql_add_package_source() {
   fi
 
   {
-    printf 'INSERT IGNORE INTO package_sources'
+    printf 'INSERT INTO package_sources'
     printf ' (`pkgbase`,`git_revision`,`mod_git_revision`,`upstream_package_repository`,`uses_upstream`,`uses_modification`,`commit_time`)'
     printf ' VALUES ('
     printf 'from_base64("%s"),' \
@@ -200,8 +200,10 @@ mysql_add_package_source() {
       "${upstream_package_repository_id}" \
       "${uses_upstream}" \
       "${uses_modification}"
-    printf 'from_unixtime(%s));\n' \
+    printf 'from_unixtime(%s))' \
       "${commit_time}"
+    printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`id`);\n'
+    printf 'SELECT LAST_INSERT_ID();\n'
   } | \
     mysql_run_query
   printf 'J' >&2
@@ -273,7 +275,9 @@ mysql_generate_package_metadata() {
     printf '.c' >&2
 
     # add the package source
-    mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}" "${temp_dir}/SRCINFO"
+    package_source_id=$(
+      mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}" "${temp_dir}/SRCINFO"
+    )
     printf '.d' >&2
 
     # now we encode everything in base64
@@ -300,34 +304,28 @@ mysql_generate_package_metadata() {
 
     # add the build assignment(s)
     {
-      archs=$(
-        sed -n '
-          s/^\tarch = //
-          T
-          p
-        ' "${temp_dir}/SRCINFO" | \
-          grep -vxF 'any' | \
-          sort -u
-      )
-      if [ -z "${archs}" ]; then
+      sed -n '
+        s/^\tarch = //
+        T
+        p
+      ' "${temp_dir}/SRCINFO" | \
+        sort -u | \
+        grep -vxF 'any' || \
         echo 'any'
-      else
-        printf '%s\n' "${archs}"
-      fi
     } | \
       while read -r arch; do
         printf 'INSERT IGNORE INTO `build_assignments` (`package_source`,`architecture`,`is_blocked`,`is_broken`,`priority`)'
-        printf ' SELECT `package_sources`.`id`,`architectures`.`id`,NULL,0,0'
-        printf ' FROM `architectures` JOIN `package_sources`'
+        printf ' SELECT from_base64("%s"),`architectures`.`id`,NULL,0,0' \
+          "$(
+            printf '%s' "${package_source_id}" | \
+              base64 -w0
+          )"
+        printf ' FROM `architectures`'
         printf ' WHERE `architectures`.`name` = from_base64("%s")' \
           "$(
             printf '%s' "${arch}" | \
               base64 -w0
           )"
-        printf ' AND `package_sources`.`%s` = from_base64("%s")' \
-          'pkgbase' "${pkgbase}" \
-          'git_revision' "${git_revision}" \
-          'mod_git_revision' "${mod_git_revision}"
         printf ';\n'
       done > \
       "${temp_dir}/add-build-assignments-command"
