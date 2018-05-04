@@ -271,22 +271,6 @@ mysql_generate_package_metadata() {
       printf '%s' "${current_repository}" | \
         base64 -w0
     )
-    pkgbase=$(
-      printf '%s' "${pkgbase}" | \
-        base64 -w0
-    )
-    git_revision=$(
-      printf '%s' "${git_revision}" | \
-        base64 -w0
-    )
-    mod_git_revision=$(
-      printf '%s' "${mod_git_revision}" | \
-        base64 -w0
-    )
-    repository=$(
-      printf '%s' "${repository}" | \
-        base64 -w0
-    )
 
     # add the build assignment(s)
     {
@@ -314,15 +298,14 @@ mysql_generate_package_metadata() {
       mysql_run_query > \
       "${temp_dir}/build-assignments.id"
 
-    # TODO: correctly link between binary_packages and build_assignments using any_arch
-
-    # shellcheck disable=SC2034
     # select any specific arch (which will be building the 'any' part of a split package)
     any_arch=$(
       cut -f1 < \
         "${temp_dir}/build-assignments.id" | \
         sort | \
-        head -n1
+        head -n1 | \
+        tr -d '\n' | \
+        base64 -w0
     )
 
     # iterate over all pkgnames
@@ -350,9 +333,18 @@ mysql_generate_package_metadata() {
               printf '%s' "${arch}" | \
                 base64 -w0
             )
-            sed '
-              s/^\(\S\+\)_'"${arch}"' = /\1 = /
-            ' "${temp_dir}/BINARYINFO.${pkgname64}" > \
+            {
+              {
+                grep "^${arch64} " "${temp_dir}/build-assignments.id" || \
+                  grep "^${any_arch} " "${temp_dir}/build-assignments.id"
+              } | \
+                sed '
+                  s/^.*\s/build-assignment-id = /
+                '
+              sed '
+                s/^\(\S\+\)_'"${arch}"' = /\1 = /
+              ' "${temp_dir}/BINARYINFO.${pkgname64}"
+            } > \
               "${temp_dir}/ARCHINFO ${pkgname64} ${arch64}"
           done
       done
@@ -360,6 +352,10 @@ mysql_generate_package_metadata() {
     # now each "ARCHINFO $pkgname $arch" file represents one binary package
     find "${temp_dir}" -mindepth 1 -maxdepth 1 -name 'ARCHINFO * *' -printf '%f\n' | \
       while read -r _ pkgname arch; do
+        build_assignment_id=$(
+          grep '^build-assignment-id = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
+            cut -d' ' -f3
+        )
         pkgver=$(
           grep '^pkgver = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
@@ -382,6 +378,7 @@ mysql_generate_package_metadata() {
             tr -d '\n' | \
             base64 -w0
         )
+        # TODO: allow versioned install_targets
         provides=$(
           grep '^\(groups\|provides\) = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
@@ -463,8 +460,8 @@ mysql_generate_package_metadata() {
             'is_tested' \
             'is_to_be_deleted'
           printf ') SELECT '
+          printf '%s,' "${build_assignment_id}"
           printf '`%s`.`id`,' \
-            'build_assignments' \
             'repositories' \
             'architectures'
           printf 'from_base64("%s"),' \
@@ -476,18 +473,11 @@ mysql_generate_package_metadata() {
             "${sub_pkgrel}"
           printf ' `%s` JOIN' \
             'repositories' \
-            'architectures' \
-            'build_assignments'
-          mysql_join_build_assignments_package_sources
-          mysql_join_package_sources_upstream_repositories
+            'architectures'
           printf ' WHERE'
           printf ' `%s`.`%s` = from_base64("%s") AND' \
             'repositories' 'name' "${current_repository}" \
-            'architectures' 'name' "${arch}" \
-            'package_sources' 'pkgbase' "${pkgbase}" \
-            'package_sources' 'git_revision' "${git_revision}" \
-            'package_sources' 'mod_git_revision' "${mod_git_revision}" \
-            'upstream_repositories' 'name' "${repository}"
+            'architectures' 'name' "${arch}"
           printf ';\n'
         } | \
           sed '
