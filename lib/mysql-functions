@@ -2,6 +2,9 @@
 
 # contains functions used to access mysql db
 
+# TODO: return ids on INSERT/UPDATE queries and use those in subsequent
+# queries
+
 # shellcheck disable=SC2016,SC2039
 
 if [ -z "${base_dir}" ]; then
