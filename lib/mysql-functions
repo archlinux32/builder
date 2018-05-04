@@ -204,55 +204,6 @@ mysql_add_package_source() {
   printf 'J' >&2
 }
 
-# mysql_show_binary_package $pkgname $pkgver $pkgrel $sub_pkgrel
-
-# shellcheck disable=SC2031,SC2086,SC2154
-mysql_show_binary_package() {
-  local names='pkgname pkgver pkgrel sub_pkgrel'
-  local name
-  for name in ${names}; do
-    eval 'local '"${name}"
-    eval "${name}"'=$(
-      printf "%s" "$1" |
-        base64 -w0
-    )'
-    shift
-  done
-
-  {
-    printf 'SELECT'
-    printf ' `%s`.`%s`,' \
-      'repositories' 'name' \
-      'binary_packages' 'pkgname' \
-      'package_sources' 'pkgver' \
-      'package_sources' 'pkgrel' \
-      'binary_packages' 'sub_pkgrel' \
-      'architectures' 'name' \
-      'package_sources' 'pkgbase' \
-      'package_sources' 'git_revision' \
-      'package_sources' 'mod_git_revision' \
-      'upstream_repositories' 'name'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_architectures
-    mysql_join_binary_packages_repositories
-    mysql_join_binary_packages_build_assignments
-    mysql_join_build_assignments_package_sources
-    mysql_join_package_sources_upstream_repositories
-    printf ' WHERE'
-    printf ' `%s`.`%s` = from_base64("%s") AND' \
-      'binary_packages' 'pkgname' "${pkgname}" \
-      'binary_packages' 'sub_pkgrel' "${sub_pkgrel}" \
-      'package_sources' 'pkgver' "${pkgver}" \
-      'package_sources' 'pkgrel' "${pkgrel}"
-    printf ';'
-  } | \
-    sed '
-      s|, FROM| FROM|g
-      s|AND;|;|g
-    ' | \
-    mysql_run_query --html --column-names
-}
-
 # mysql_generate_package_metadata $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
 # if sub_pkgrel should be determined automatically
 # and
@@ -1068,47 +1019,6 @@ mysql_repair_binary_packages_without_build_assignment() {
       printf ' WHERE `binary_packages`.`id`=%s' "${id}"
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' "${pkgbase}"
     done | \
-    mysql_run_query
-}
-
-# mysql_remove_duplicate_binary_packages
-# remove duplicate binary_packages, matching pkgname, epoch, pkgver, pkgrel,
-# having difference of 1 in sub_pkgrel
-
-mysql_remove_duplicate_build_order() {
-  {
-    printf 'CREATE TEMPORARY TABLE `ren`'
-    printf ' (`old` BIGINT, `new` BIGINT, `repo` BIGINT, `sub_pkgrel` BIGINT);\n'
-    printf 'INSERT INTO `ren` (`old`,`new`,`repo`,`sub_pkgrel`)'
-    printf ' SELECT `old`.`id`,`new`.`id`,`old`.`repository`,`old`.`sub_pkgrel`'
-    printf ' FROM `binary_packages` as `old`'
-    printf ' JOIN `binary_packages` as `new` ON'
-    printf ' `old`.`%s`=`new`.`%s` AND' \
-      'pkgname' 'pkgname' \
-      'epoch' 'epoch' \
-      'pkgver' 'pkgver' \
-      'pkgrel' 'pkgrel'
-    printf ' `old`.`sub_pkgrel`+1=`new`.`sub_pkgrel`'
-    mysql_join_binary_packages_repositories 'old' 'orep'
-    mysql_join_binary_packages_repositories 'new' 'nrep'
-    printf ' WHERE `orep`.`name`!="to-be-decided"'
-    printf ' AND `nrep`.`name`="to-be-decided";\n'
-    printf 'UPDATE IGNORE `dependencies`'
-    printf ' JOIN `ren` ON `ren`.`old`=`dependencies`.`dependent`'
-    printf ' SET `dependencies`.`dependent`=`ren`.`new`;\n'
-    printf 'UPDATE IGNORE `install_target_providers`'
-    printf ' JOIN `ren` ON `ren`.`old`=`install_target_providers`.`package`'
-    printf ' SET `install_target_providers`.`package`=`ren`.`new`;\n'
-    printf 'DELETE FROM `binary_packages`'
-    printf ' WHERE EXISTS ('
-      printf 'SELECT * FROM `ren`'
-      printf ' WHERE `ren`.`old`=`binary_packages`.`id`'
-    printf ');\n'
-    printf 'UPDATE IGNORE `binary_packages`'
-    printf ' JOIN `ren` ON `ren`.`new`=`binary_packages`.`id`'
-    printf ' SET `binary_packages`.`repository`=`ren`.`repo`,'
-    printf ' `binary_packages`.`sub_pkgrel`=`ren`.`sub_pkgrel`;\n'
-  } | \
     mysql_run_query
 }
 
