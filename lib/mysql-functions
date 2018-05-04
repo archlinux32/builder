@@ -171,7 +171,7 @@ mysql_add_package_source() {
   fi
 
   {
-    printf 'INSERT INTO package_sources'
+    printf 'INSERT INTO `package_sources`'
     printf ' (`pkgbase`,`git_revision`,`mod_git_revision`,`upstream_package_repository`,`uses_upstream`,`uses_modification`,`commit_time`)'
     printf ' VALUES ('
     printf 'from_base64("%s"),' \
@@ -193,7 +193,7 @@ mysql_add_package_source() {
       "${uses_modification}"
     printf 'from_unixtime(%s))' \
       "${commit_time}"
-    printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`id`);\n'
+    printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`package_sources`.`id`);\n'
     printf 'SELECT LAST_INSERT_ID();\n'
   } | \
     mysql_run_query
@@ -291,7 +291,7 @@ mysql_generate_package_metadata() {
         printf ' FROM `architectures`'
         printf ' WHERE `architectures`.`name` = from_base64("%s")' \
           "${arch}"
-        printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`id`);\n'
+        printf ' ON DUPLICATE KEY UPDATE `id`=LAST_INSERT_ID(`build_assignments`.`id`);\n'
         printf 'SELECT "%s",LAST_INSERT_ID();\n' \
           "${arch}"
       done | \
@@ -338,8 +338,8 @@ mysql_generate_package_metadata() {
                 # this binary package is either built by the build_assignment
                 # with the identical arch (if existent) or by the one
                 # with arch=$any_arch
-                grep "^${arch64} " "${temp_dir}/build-assignments.id" || \
-                  grep "^${any_arch} " "${temp_dir}/build-assignments.id"
+                grep "^${arch64}"'\s' "${temp_dir}/build-assignments.id" || \
+                  grep "^${any_arch}"'\s' "${temp_dir}/build-assignments.id"
               } | \
                 sed '
                   s/^.*\s/build-assignment-id = /
@@ -351,6 +351,13 @@ mysql_generate_package_metadata() {
               "${temp_dir}/ARCHINFO ${pkgname64} ${arch64}"
           done
       done
+
+    # TODO: This should become multiple mysql queries:
+    # 1st inserting install_targets
+    # 2nd inserting binary_packages (and binary_packages_in_repositories)
+    # 3rd,4th inserting dependencies and install_target_providers
+    # The links between the above should _solely_ be made by the ids of
+    # the respective rows.
 
     # now each "ARCHINFO $pkgname $arch" file represents one binary package
     find "${temp_dir}" -mindepth 1 -maxdepth 1 -name 'ARCHINFO * *' -printf '%f\n' | \
@@ -485,7 +492,7 @@ mysql_generate_package_metadata() {
         } | \
           sed '
             s|,)|)|g
-            s| JOIN JOIN | JOIN |
+            s| JOIN WHERE | WHERE |
             s| AND;$|;|
           ' >> \
           "${temp_dir}/add-binary-packages-command"
