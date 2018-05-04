@@ -3,13 +3,6 @@
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
-# TODO: this should become some sort of mysql dump to bootstrap the
-# tables and stored functions only - when the database is gone, we're
-# pretty much screwed anyway :-D
-
-tmp_dir=$(mktemp -d 'tmp.bootstrap-mysql.XXXXXXXXXX' --tmpdir)
-trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
-
 exec 9> "${build_list_lock_file}"
 if ! flock -n 9; then
   >&2 echo 'Cannot get build-list lock.'
@@ -26,914 +19,361 @@ if ! flock -s -n 7; then
   exit 1
 fi
 
-for dir in $(ls_master_mirror 'i686'); do
-  ls_master_mirror "i686/${dir}" | \
-    sed '
-      /\.pkg\.tar\.xz$/!d
-      s|^|'"${dir}"' |
-    '
-done | \
-  sort -k2,2 > \
-  "${tmp_dir}/master-mirror-listing"
+#shellcheck disable=SC2016
+{
+  # show_broken_packages_and_dependencies
+  # gives a list of broken packages and their dependencies if they're
+  # still on the build- or deletion-list
+  printf 'DROP PROCEDURE IF EXISTS show_broken_packages_and_dependencies;\n'
+  printf 'DELIMITER //\n'
+  printf 'CREATE PROCEDURE show_broken_packages_and_dependencies()\n'
+  printf 'BEGIN\n'
+  printf 'CREATE TEMPORARY TABLE `%s` (`id` BIGINT, UNIQUE KEY (`id`));\n' \
+    'broken_packages_and_dependencies' 'broken_packages_and_dependencies_old'
+  printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
+  printf ' SELECT `build_assignments`.`id`'
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_build_assignments
+  printf ' AND `build_assignments`.`is_broken`'
+  mysql_join_binary_packages_repositories
+  printf ' AND `repositories`.`name`="build-list";\n'
+  printf 'REPEAT\n'
+  printf 'INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`)'
+  printf ' SELECT `broken_packages_and_dependencies`.`id` FROM `broken_packages_and_dependencies`;\n'
+  printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
+  printf ' SELECT `new_bp`.`build_assignment`'
+  printf ' FROM `broken_packages_and_dependencies_old`'
+  mysql_join_build_assignments_binary_packages 'broken_packages_and_dependencies_old' 'old_bp'
+  mysql_join_binary_packages_dependencies 'old_bp'
+  mysql_join_dependencies_dependency_types
+  printf ' AND `dependency_types`.`relevant_for_building`'
+  mysql_join_dependencies_install_target_providers
+  mysql_join_install_target_providers_binary_packages '' 'new_bp'
+  mysql_join_binary_packages_repositories 'new_bp' 'new_repo'
+  printf ' AND `new_repo`.`name` IN ("build-list","deletion-list");\n'
+  printf 'UNTIL ROW_COUNT()=0\n'
+  printf 'END REPEAT;\n'
+  printf 'SELECT '
+  mysql_query_select_pkgbase_and_revision
+  printf ' JOIN `broken_packages_and_dependencies` ON `broken_packages_and_dependencies`.`id`=`build_assignments`.`id`;\n'
+  printf 'END\n'
+  printf '//\n'
+  printf 'DELIMITER ;\n'
 
-if [ ! "$1" = 'slim' ]; then
-  tables=$(
-    printf '%s\n' \
-      'dependency_types SMALLINT' \
-      ' name VARCHAR(32)' \
-      ' relevant_for_building BIT' \
-      ' relevant_for_binary_packages BIT' \
-      ' UNIQUE name' \
-      'dependencies BIGINT' \
-      ' dependent BIGINT :binary_packages' \
-      ' depending_on BIGINT :install_targets' \
-      ' dependency_type SMALLINT :dependency_types' \
-      ' UNIQUE content dependent depending_on dependency_type' \
-      'install_targets BIGINT' \
-      ' name VARCHAR(64)' \
-      ' UNIQUE name' \
-      'install_target_providers BIGINT' \
-      ' package BIGINT :binary_packages' \
-      ' install_target BIGINT :install_targets' \
-      ' UNIQUE content package install_target' \
-      'binary_packages BIGINT' \
-      ' build_assignment BIGINT :build_assignments' \
-      ' repository MEDIUMINT :repositories' \
-      ' epoch MEDIUMINT' \
-      ' pkgver VARCHAR(64)' \
-      ' pkgrel MEDIUMINT' \
-      ' sub_pkgrel MEDIUMINT' \
-      ' has_issues BIT' \
-      ' is_tested BIT' \
-      ' is_to_be_deleted BIT' \
-      ' pkgname VARCHAR(64)' \
-      ' architecture SMALLINT :architectures' \
-      ' sha512sum NULL' \
-      ' UNIQUE content build_assignment sub_pkgrel pkgname architecture repository' \
-      ' UNIQUE file_name pkgname epoch pkgver pkgrel sub_pkgrel architecture repository' \
-      'repositories MEDIUMINT' \
-      ' name VARCHAR(64)' \
-      ' stability MEDIUMINT :repository_stabilities' \
-      ' is_on_master_mirror BIT' \
-      ' UNIQUE name' \
-      'repository_stabilities MEDIUMINT' \
-      ' name VARCHAR(32)' \
-      ' bugtracker_category VARCHAR(64) NULL' \
-      ' UNIQUE name' \
-      'architectures SMALLINT' \
-      ' name VARCHAR(16)' \
-      ' UNIQUE name' \
-      'build_assignments BIGINT' \
-      ' package_source BIGINT :package_sources' \
-      ' architecture SMALLINT :architectures' \
-      ' is_blocked VARCHAR(128) NULL' \
-      ' is_black_listed TEXT NULL' \
-      ' is_broken BIT' \
-      ' priority SMALLINT' \
-      ' UNIQUE content package_source architecture' \
-      'build_dependency_loops BIGINT' \
-      ' loop MEDIUMINT' \
-      ' build_assignment BIGINT :build_assignments' \
-      ' UNIQUE content loop build_assignment' \
-      'build_slaves MEDIUMINT' \
-      ' name VARCHAR(32)' \
-      ' ssh_key VARCHAR(1024)' \
-      ' operator VARCHAR(32)' \
-      ' currently_building BIGINT NULL :build_assignments' \
-      ' last_connection DATETIME' \
-      ' logged_lines BIGINT NULL' \
-      ' last_action VARCHAR(32) NULL' \
-      ' UNIQUE name' \
-      'package_sources BIGINT' \
-      ' pkgbase VARCHAR(64)' \
-      ' git_revision VARCHAR(40)' \
-      ' mod_git_revision VARCHAR(40)' \
-      ' upstream_package_repository SMALLINT :upstream_repositories' \
-      ' uses_upstream BIT' \
-      ' uses_modification BIT' \
-      ' commit_time DATETIME' \
-      ' UNIQUE content pkgbase git_revision mod_git_revision' \
-      'upstream_repositories SMALLINT' \
-      ' name VARCHAR(64)' \
-      ' git_repository SMALLINT :git_repositories' \
-      ' UNIQUE content name git_repository' \
-      'git_repositories SMALLINT' \
-      ' name VARCHAR(64)' \
-      ' url VARCHAR(128)' \
-      ' directory VARCHAR(128)' \
-      ' head VARCHAR(40)' \
-      ' UNIQUE name' \
-      ' UNIQUE url' \
-      ' UNIQUE directory' \
-      'fail_reasons SMALLINT' \
-      ' name VARCHAR(32)' \
-      ' identifier VARCHAR(64)' \
-      ' severity SMALLINT' \
-      ' UNIQUE name' \
-      'failed_builds MEDIUMINT' \
-      ' build_slave MEDIUMINT :build_slaves' \
-      ' build_assignment BIGINT :build_assignments' \
-      ' date DATETIME' \
-      ' reason SMALLINT :fail_reasons' \
-      ' log_file VARCHAR(512)' \
-      'todos MEDIUMINT' \
-      ' file VARCHAR(64)' \
-      ' line MEDIUMINT' \
-      ' description VARCHAR(512)' \
-      'todo_links MEDIUMINT' \
-      ' dependent MEDIUMINT' \
-      ' depending_on MEDIUMINT' \
-      'repository_stability_relations MEDIUMINT' \
-      ' more_stable MEDIUMINT :repository_stabilities' \
-      ' less_stable MEDIUMINT :repository_stabilities' \
-      'repository_moves MEDIUMINT' \
-      ' from_repository MEDIUMINT :repositories' \
-      ' to_repository MEDIUMINT :repositories' \
-      ' upstream_package_repository SMALLINT :upstream_repositories' \
-      ' UNIQUE source from_repository upstream_package_repository' \
-      'statistics BIGINT' \
-      ' date DATETIME' \
-      ' stable_packages_count MEDIUMINT' \
-      ' pending_tasks_count MEDIUMINT' \
-      ' pending_packages_count MEDIUMINT' \
-      ' staging_packages_count MEDIUMINT' \
-      ' testing_packages_count MEDIUMINT' \
-      ' tested_packages_count MEDIUMINT' \
-      ' broken_tasks_count MEDIUMINT' \
-      ' dependency_loops_count MEDIUMINT' \
-      ' dependency_looped_tasks_count MEDIUMINT' \
-      ' locked_tasks_count MEDIUMINT' \
-      ' blocked_tasks_count MEDIUMINT' \
-      ' next_tasks_count MEDIUMINT' \
-      ' UNIQUE date'
-  )
+  # calculate_dependencies_of_package_upto_first_built_one
+  # save binary packages (only their `id`) in `relevant_binary_packages` and `relevant_binary_packages_copy`
+  printf 'DROP PROCEDURE IF EXISTS calculate_dependencies_of_package_upto_first_built_one;\n'
+  printf 'DELIMITER //\n'
+  printf 'CREATE PROCEDURE calculate_dependencies_of_package_upto_first_built_one(IN `target_pkgbase` VARCHAR(64))\n'
+  printf 'BEGIN\n'
+  printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
+  printf ' SELECT `binary_packages`.`id`'
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_repositories
+  printf ' AND `repositories`.`name`="build-list"'
+  mysql_join_binary_packages_build_assignments
+  mysql_join_build_assignments_package_sources
+  printf ' WHERE `package_sources`.`pkgbase`=`target_pkgbase`;\n'
+  printf 'REPEAT\n'
+  printf 'INSERT IGNORE INTO `relevant_binary_packages_copy` (`id`)'
+  printf ' SELECT `relevant_binary_packages`.`id` FROM `relevant_binary_packages`;\n'
+  printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
+  printf ' SELECT `install_target_providers`.`package`'
+  printf ' FROM `relevant_binary_packages_copy`'
+  printf ' JOIN `binary_packages` ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id`'
+  mysql_join_binary_packages_repositories
+  printf ' AND `repositories`.`name`="build-list"'
+  mysql_join_binary_packages_dependencies
+  mysql_join_dependencies_dependency_types
+  printf ' AND `dependency_types`.`relevant_for_building`'
+  mysql_join_dependencies_install_target_providers
+  printf ';\n'
+  printf 'UNTIL ROW_COUNT()=0\n'
+  printf 'END REPEAT;\n'
+  printf 'END\n'
+  printf '//\n'
+  printf 'DELIMITER ;\n'
 
-  # shellcheck disable=SC2016
-  {
-    printf '%s\n' \
-      '/*!40014 SET UNIQUE_CHECKS=0 */;' \
-      '/*!40014 SET FOREIGN_KEY_CHECKS=0 */;'
-    for turn in 'drop' 'create' 'link'; do
-      echo "${tables}" | \
-        sed -n '
-          /^\S/p
-        ' | \
-        while read -r table size; do
-          case "${turn}" in
-            'drop')
-              printf 'DROP TABLE IF EXISTS `%s`;\n' "${table}"
-            ;;
-            'create'|'link')
-              if [ "${turn}" = 'create' ]; then
-                printf 'CREATE TABLE `%s` (\n' "${table}"
-                printf '  `id` %s NOT NULL AUTO_INCREMENT,\n' "${size}"
-              fi
-              echo "${tables}" | \
-                sed -n '
-                  s/^'"$(str_to_regex "${table} ${size}")"'$//
-                  T
-                  :a
-                    $!N
-                    s/\n\S.*$//
-                    $!Ta
-                  s/^\n//
-                  p
-                ' | \
-                while read -r column type rest; do
-                  case "${column}" in
-                    'UNIQUE')
-                      if [ ! "${turn}" = 'create' ]; then
-                        continue
-                      fi
-                      if [ -z "${rest}" ]; then
-                        rest="${type}"
-                      fi
-                      printf '  UNIQUE KEY `%s` (' "${type}"
-                      # shellcheck disable=SC2086
-                      printf '`%s`,' ${rest} | \
-                        sed 's|,$||'
-                      printf ')'
-                    ;;
-                    *)
-                      if [ "${turn}" = 'create' ]; then
-                        printf '  `%s` %s' "${column}" "${type}"
-                        if ! echo "${rest}" | \
-                          grep -qwF 'NULL'; then
-                          printf ' NOT NULL'
-                        fi
-                      else
-                        echo "${rest}" | \
-                          tr ' ' '\n' | \
-                          sed -n 's/^://;T;p' | \
-                          while read -r link; do
-                            printf 'ALTER TABLE `%s` ADD FOREIGN KEY (`%s`) REFERENCES `%s` (`id`) ON UPDATE CASCADE ON DELETE ' \
-                              "${table}" \
-                              "${column}" \
-                              "${link}"
-                            if echo "${rest}" | \
-                              grep -qwF 'NULL'; then
-                              printf 'SET NULL'
-                            else
-                              printf 'CASCADE'
-                            fi
-                            printf ';\n'
-                          done
-                      fi
-                    ;;
-                  esac
-                  if [ "${turn}" = 'create' ]; then
-                    printf ',\n'
-                  fi
-                done
-              if [ "${turn}" = 'create' ]; then
-                printf '  PRIMARY KEY (`id`));\n'
-              fi
-            ;;
-            *)
-              >&2 printf 'unknown turn "%s"\n' "${turn}"
-              exit 2
-          esac
-        done
-    done
-    printf '%s\n' \
-      '/*!40014 SET UNIQUE_CHECKS=1 */;' \
-      '/*!40014 SET FOREIGN_KEY_CHECKS=1 */;'
+  # calculate_maximal_moveable_set
+  # stores results in `moveable_binary_packages` and `replaced_binary_packages`
+  # Give a maximal list of packages to be moved, while implementing the
+  # condition from db-update:
 
-    # show_broken_packages_and_dependencies
-    # gives a list of broken packages and their dependencies if they're
-    # still on the build- or deletion-list
-    printf 'DROP PROCEDURE IF EXISTS show_broken_packages_and_dependencies;\n'
-    printf 'DELIMITER //\n'
-    printf 'CREATE PROCEDURE show_broken_packages_and_dependencies()\n'
-    printf 'BEGIN\n'
-    printf 'CREATE TEMPORARY TABLE `%s` (`id` BIGINT, UNIQUE KEY (`id`));\n' \
-      'broken_packages_and_dependencies' 'broken_packages_and_dependencies_old'
-    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
-    printf ' SELECT `build_assignments`.`id`'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_build_assignments
-    printf ' AND `build_assignments`.`is_broken`'
-    mysql_join_binary_packages_repositories
-    printf ' AND `repositories`.`name`="build-list";\n'
-    printf 'REPEAT\n'
-    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`)'
-    printf ' SELECT `broken_packages_and_dependencies`.`id` FROM `broken_packages_and_dependencies`;\n'
-    printf 'INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)'
-    printf ' SELECT `new_bp`.`build_assignment`'
-    printf ' FROM `broken_packages_and_dependencies_old`'
-    mysql_join_build_assignments_binary_packages 'broken_packages_and_dependencies_old' 'old_bp'
-    mysql_join_binary_packages_dependencies 'old_bp'
-    mysql_join_dependencies_dependency_types
-    printf ' AND `dependency_types`.`relevant_for_building`'
-    mysql_join_dependencies_install_target_providers
-    mysql_join_install_target_providers_binary_packages '' 'new_bp'
-    mysql_join_binary_packages_repositories 'new_bp' 'new_repo'
-    printf ' AND `new_repo`.`name` IN ("build-list","deletion-list");\n'
-    printf 'UNTIL ROW_COUNT()=0\n'
-    printf 'END REPEAT;\n'
-    printf 'SELECT '
-    mysql_query_select_pkgbase_and_revision
-    printf ' JOIN `broken_packages_and_dependencies` ON `broken_packages_and_dependencies`.`id`=`build_assignments`.`id`;\n'
-    printf 'END\n'
-    printf '//\n'
-    printf 'DELIMITER ;\n'
+  # Every package which is replaced[1], must have its provided install_targets:
+  #   a) provided by another moved or not-replaced package or
+  #   b) not required by any not-replaced package.
 
-    # calculate_dependencies_of_package_upto_first_built_one
-    # save binary packages (only their `id`) in `relevant_binary_packages` and `relevant_binary_packages_copy`
-    printf 'DROP PROCEDURE IF EXISTS calculate_dependencies_of_package_upto_first_built_one;\n'
-    printf 'DELIMITER //\n'
-    printf 'CREATE PROCEDURE calculate_dependencies_of_package_upto_first_built_one(IN `target_pkgbase` VARCHAR(64))\n'
-    printf 'BEGIN\n'
-    printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
-    printf ' SELECT `binary_packages`.`id`'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_repositories
-    printf ' AND `repositories`.`name`="build-list"'
-    mysql_join_binary_packages_build_assignments
-    mysql_join_build_assignments_package_sources
-    printf ' WHERE `package_sources`.`pkgbase`=`target_pkgbase`;\n'
-    printf 'REPEAT\n'
-    printf 'INSERT IGNORE INTO `relevant_binary_packages_copy` (`id`)'
-    printf ' SELECT `relevant_binary_packages`.`id` FROM `relevant_binary_packages`;\n'
-    printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
-    printf ' SELECT `install_target_providers`.`package`'
-    printf ' FROM `relevant_binary_packages_copy`'
-    printf ' JOIN `binary_packages` ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id`'
-    mysql_join_binary_packages_repositories
-    printf ' AND `repositories`.`name`="build-list"'
-    mysql_join_binary_packages_dependencies
-    mysql_join_dependencies_dependency_types
-    printf ' AND `dependency_types`.`relevant_for_building`'
-    mysql_join_dependencies_install_target_providers
-    printf ';\n'
-    printf 'UNTIL ROW_COUNT()=0\n'
-    printf 'END REPEAT;\n'
-    printf 'END\n'
-    printf '//\n'
-    printf 'DELIMITER ;\n'
+  # Every package being moved needs to have all dependencies
+  # installable in the target repository.
 
-    # calculate_maximal_moveable_set
-    # stores results in `moveable_binary_packages` and `replaced_binary_packages`
-    # Give a maximal list of packages to be moved, while implementing the
-    # condition from db-update:
+  # TODO: [1] A "replaced" package may also be in a different repository
+  # e.g. if a-2 is moved from [staging] to [testing] and there is only
+  # a-1 in [core], then this will be "replaced" by a-2 on a system
+  # running on [testing] repositories.
 
-    # Every package which is replaced[1], must have its provided install_targets:
-    #   a) provided by another moved or not-replaced package or
-    #   b) not required by any not-replaced package.
+  printf 'DROP PROCEDURE IF EXISTS calculate_maximal_moveable_set;\n'
+  printf 'DELIMITER //\n'
+  printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
+  printf 'BEGIN\n'
+  # variables to store count of changed rows
+  printf 'DECLARE row_count_saved INT DEFAULT 0;\n'
+  for copy in '' '_copy' '_copy2'; do
+    printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
+      'moveable' "${copy}" \
+      'replaced' "${copy}"
+    printf 'CREATE TEMPORARY TABLE `replaced_binary_packages%s` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n' \
+      "${copy}"
+    if [ "${copy}" = '_copy2' ]; then
+      continue
+    fi
+    printf 'CREATE TEMPORARY TABLE `moveable_binary_packages%s` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n' \
+      "${copy}"
+  done
+  printf 'DROP TEMPORARY TABLE IF EXISTS `package_blobs`;\n'
+  printf 'CREATE TEMPORARY TABLE `package_blobs` (`ps_a` BIGINT, `ps_b` BIGINT, UNIQUE KEY `content` (`ps_a`,`ps_b`));\n'
+  # all packages being vaguely relevant enter `package_blobs`, because
+  # they might block any other package from moving
+  printf 'INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)'
+  printf ' SELECT `a_ps`.`id`,`b_ps`.`id`'
+  printf ' FROM `package_sources` AS `a_ps`'
+  printf ' JOIN `package_sources` AS `b_ps`'
+  printf ' ON UNIX_TIMESTAMP(`a_ps`.`commit_time`) - UNIX_TIMESTAMP(`b_ps`.`commit_time`) BETWEEN -10 AND 10'
+  mysql_join_package_sources_build_assignments 'a_ps' 'a_ba'
+  mysql_join_package_sources_build_assignments 'b_ps' 'b_ba'
+  mysql_join_build_assignments_binary_packages 'a_ba' 'a_bp'
+  mysql_join_build_assignments_binary_packages 'b_ba' 'b_bp'
+  mysql_join_binary_packages_repositories 'a_bp' 'a_r'
+  mysql_join_binary_packages_repositories 'b_bp' 'b_r'
+  mysql_join_repositories_repository_stabilities 'a_r' 'a_rs'
+  mysql_join_repositories_repository_stabilities 'b_r' 'b_rs'
+  printf ' WHERE `a_rs`.`name` = `from_stability`'
+  printf ' AND `b_rs`.`name` = `from_stability`;\n'
+  # these packages are considered for moving:
+  printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
+  printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_repositories
+  mysql_join_repositories_repository_stabilities
+  mysql_join_binary_packages_build_assignments
+  mysql_join_build_assignments_package_sources
+  mysql_join_package_sources_upstream_repositories
+  mysql_join_upstream_repositories_repository_moves
+  printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+  # correct stability: "testing"/"staging" - as chosen
+  printf ' WHERE `repository_stabilities`.`name` = `from_stability`'
+  printf ' AND ('
+    printf '`from_stability`="staging"'
+    # "testing" packages must be tested
+    printf ' OR `binary_packages`.`is_tested`'
+  printf ')'
+  # no open issues
+  printf ' AND NOT `binary_packages`.`has_issues`'
+  printf ';\n'
+  # these packages are considered for being replaced:
+  # for each moved package
+  printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
+  printf ' SELECT `r_bp`.`id`,`m_bp`.`id`'
+  printf ' FROM `moveable_binary_packages`'
+  printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
+  mysql_join_binary_packages_repositories 'm_bp' 'm_r'
+  mysql_join_binary_packages_build_assignments 'm_bp' 'm_ba'
+  mysql_join_build_assignments_package_sources 'm_ba' 'm_ps'
+  mysql_join_package_sources_upstream_repositories 'm_ps' 'm_ur'
+  mysql_join_upstream_repositories_repository_moves 'm_ur'
+  printf ' AND `repository_moves`.`from_repository`=`m_r`.`id`'
+  # in its target repository
+  printf ' JOIN `repositories` AS `r_r` ON `repository_moves`.`to_repository`=`r_r`.`id`'
+  mysql_join_repositories_binary_packages 'r_r' 'r_bp'
+  # all packages with identical names
+  printf ' AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;\n'
+  # now we delete all unreplaceable and unmoveable packages from the respective
+  # list until no further changes are required
+  printf 'REPEAT\n'
+  printf 'SET row_count_saved = 0;\n'
 
-    # Every package being moved needs to have all dependencies
-    # installable in the target repository.
-
-    # TODO: [1] A "replaced" package may also be in a different repository
-    # e.g. if a-2 is moved from [staging] to [testing] and there is only
-    # a-1 in [core], then this will be "replaced" by a-2 on a system
-    # running on [testing] repositories.
-
-    printf 'DROP PROCEDURE IF EXISTS calculate_maximal_moveable_set;\n'
-    printf 'DELIMITER //\n'
-    printf 'CREATE PROCEDURE calculate_maximal_moveable_set(IN `from_stability` VARCHAR(32))\n'
-    printf 'BEGIN\n'
-    # variables to store count of changed rows
-    printf 'DECLARE row_count_saved INT DEFAULT 0;\n'
-    for copy in '' '_copy' '_copy2'; do
-      printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages%s`;\n' \
-        'moveable' "${copy}" \
-        'replaced' "${copy}"
-      printf 'CREATE TEMPORARY TABLE `replaced_binary_packages%s` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));\n' \
-        "${copy}"
-      if [ "${copy}" = '_copy2' ]; then
+  # create copies of our temporary tables *yuck*
+  for table in 'replaced' 'moveable'; do
+    for copy in '' '2'; do
+      if [ "${table}" = 'moveable' ] && \
+        [ "${copy}" = '2' ]; then
         continue
       fi
-      printf 'CREATE TEMPORARY TABLE `moveable_binary_packages%s` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));\n' \
-        "${copy}"
+      printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
+      printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+      printf ' SELECT `%s_binary_packages`.*' "${table}"
+      printf ' FROM `%s_binary_packages`;\n' "${table}"
     done
-    printf 'DROP TEMPORARY TABLE IF EXISTS `package_blobs`;\n'
-    printf 'CREATE TEMPORARY TABLE `package_blobs` (`ps_a` BIGINT, `ps_b` BIGINT, UNIQUE KEY `content` (`ps_a`,`ps_b`));\n'
-    # all packages being vaguely relevant enter `package_blobs`, because
-    # they might block any other package from moving
-    printf 'INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)'
-    printf ' SELECT `a_ps`.`id`,`b_ps`.`id`'
-    printf ' FROM `package_sources` AS `a_ps`'
-    printf ' JOIN `package_sources` AS `b_ps`'
-    printf ' ON UNIX_TIMESTAMP(`a_ps`.`commit_time`) - UNIX_TIMESTAMP(`b_ps`.`commit_time`) BETWEEN -10 AND 10'
-    mysql_join_package_sources_build_assignments 'a_ps' 'a_ba'
-    mysql_join_package_sources_build_assignments 'b_ps' 'b_ba'
-    mysql_join_build_assignments_binary_packages 'a_ba' 'a_bp'
-    mysql_join_build_assignments_binary_packages 'b_ba' 'b_bp'
-    mysql_join_binary_packages_repositories 'a_bp' 'a_r'
-    mysql_join_binary_packages_repositories 'b_bp' 'b_r'
-    mysql_join_repositories_repository_stabilities 'a_r' 'a_rs'
-    mysql_join_repositories_repository_stabilities 'b_r' 'b_rs'
-    printf ' WHERE `a_rs`.`name` = `from_stability`'
-    printf ' AND `b_rs`.`name` = `from_stability`;\n'
-    # these packages are considered for moving:
-    printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
-    printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_repositories
-    mysql_join_repositories_repository_stabilities
-    mysql_join_binary_packages_build_assignments
-    mysql_join_build_assignments_package_sources
-    mysql_join_package_sources_upstream_repositories
-    mysql_join_upstream_repositories_repository_moves
-    printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
-    # correct stability: "testing"/"staging" - as chosen
-    printf ' WHERE `repository_stabilities`.`name` = `from_stability`'
-    printf ' AND ('
-      printf '`from_stability`="staging"'
-      # "testing" packages must be tested
-      printf ' OR `binary_packages`.`is_tested`'
-    printf ')'
-    # no open issues
-    printf ' AND NOT `binary_packages`.`has_issues`'
-    printf ';\n'
-    # these packages are considered for being replaced:
-    # for each moved package
-    printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
-    printf ' SELECT `r_bp`.`id`,`m_bp`.`id`'
-    printf ' FROM `moveable_binary_packages`'
-    printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
-    mysql_join_binary_packages_repositories 'm_bp' 'm_r'
-    mysql_join_binary_packages_build_assignments 'm_bp' 'm_ba'
-    mysql_join_build_assignments_package_sources 'm_ba' 'm_ps'
-    mysql_join_package_sources_upstream_repositories 'm_ps' 'm_ur'
-    mysql_join_upstream_repositories_repository_moves 'm_ur'
-    printf ' AND `repository_moves`.`from_repository`=`m_r`.`id`'
-    # in its target repository
-    printf ' JOIN `repositories` AS `r_r` ON `repository_moves`.`to_repository`=`r_r`.`id`'
-    mysql_join_repositories_binary_packages 'r_r' 'r_bp'
-    # all packages with identical names
-    printf ' AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;\n'
-    # now we delete all unreplaceable and unmoveable packages from the respective
-    # list until no further changes are required
-    printf 'REPEAT\n'
-    printf 'SET row_count_saved = 0;\n'
-
-    # create copies of our temporary tables *yuck*
-    for table in 'replaced' 'moveable'; do
-      for copy in '' '2'; do
-        if [ "${table}" = 'moveable' ] && \
-          [ "${copy}" = '2' ]; then
-          continue
-        fi
-        printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
-        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
-        printf ' SELECT `%s_binary_packages`.*' "${table}"
-        printf ' FROM `%s_binary_packages`;\n' "${table}"
-      done
-    done
-    # a package is not moveable if its dependencies are not provided ...
-    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages`'
-    printf ' FROM `replaced_binary_packages`'
-    printf ' RIGHT JOIN `moveable_binary_packages`'
-    printf ' ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`'
-    printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
-    printf ' JOIN `repositories` AS `target_repositories` ON `moveable_binary_packages`.`to_repository`=`target_repositories`.`id`'
-    mysql_join_binary_packages_dependencies
-    mysql_join_dependencies_dependency_types
-    printf ' AND `dependency_types`.`relevant_for_binary_packages`'
-    # ... by a not-deleted, "more stable" package already in place or ...
-    printf ' WHERE NOT EXISTS ('
-      printf 'SELECT 1 FROM `install_target_providers`'
-      mysql_join_install_target_providers_binary_packages '' 'prov_bp'
-      mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
-      printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`'
-      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-      printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable`'
-      printf ' AND NOT EXISTS ('
-        printf 'SELECT 1 FROM `replaced_binary_packages_copy`'
-        printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
-      printf ')'
-    # ... by a moved package
-    printf ') AND NOT EXISTS ('
-      printf 'SELECT 1 FROM `install_target_providers`'
-      printf ' JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`'
-      printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
-    printf ');\n'
-    printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
-
-    # refresh copies of our temporary tables *yuck*
-    for table in 'replaced' 'moveable'; do
-      for copy in '' '2'; do
-        if [ "${table}" = 'moveable' ] && \
-          [ "${copy}" = '2' ]; then
-          continue
-        fi
-        printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
-        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
-        printf ' SELECT `%s_binary_packages`.*' "${table}"
-        printf ' FROM `%s_binary_packages`;\n' "${table}"
-      done
-    done
-
-    # packages which should not be replaced: ones providing something that is:
-    # a) still needed by a not-replaced package x "less stable" than the target repository and
-    # b) not provided by:
-    #   1) a moved package or
-    #   2) any current, not-replaced package in a repository more stable than x's repository
-    #
-    # Note, that this is not 100% clean from an academic point of view:
-    # It might require _downgrading_ of a package to keep fulfilling a dependency
-    # and it might require to do so _without_ any chance for the user to notice,
-    # because there may be more "dependencies" in the database than in the package files.
-    #
-    # However, in practice both should not happen.
-    #
-    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
-    printf ' JOIN `moveable_binary_packages` ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
-    printf ' JOIN `binary_packages` AS `repl_bp` ON `repl_bp`.`id`=`replaced_binary_packages`.`id`'
-    mysql_join_binary_packages_install_target_providers 'repl_bp'
-    mysql_join_install_target_providers_dependencies
+  done
+  # a package is not moveable if its dependencies are not provided ...
+  printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages`'
+  printf ' FROM `replaced_binary_packages`'
+  printf ' RIGHT JOIN `moveable_binary_packages`'
+  printf ' ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`'
+  printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
+  printf ' JOIN `repositories` AS `target_repositories` ON `moveable_binary_packages`.`to_repository`=`target_repositories`.`id`'
+  mysql_join_binary_packages_dependencies
+  mysql_join_dependencies_dependency_types
+  printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+  # ... by a not-deleted, "more stable" package already in place or ...
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT 1 FROM `install_target_providers`'
+    mysql_join_install_target_providers_binary_packages '' 'prov_bp'
+    mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+    printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`'
+    printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+    printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable`'
     printf ' AND NOT EXISTS ('
-      # dependencies of replaced packages don't matter
       printf 'SELECT 1 FROM `replaced_binary_packages_copy`'
-      printf ' WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`'
+      printf ' WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`'
     printf ')'
-    mysql_join_dependencies_dependency_types
-    # consider only runtime dependencies
-    printf ' AND `dependency_types`.`relevant_for_binary_packages`'
-    mysql_join_dependencies_binary_packages '' 'req_bp'
-    # we need to check wether req_bp's dependency is (un)critical
-    mysql_join_binary_packages_repositories 'repl_bp' 'repl_r'
-    mysql_join_binary_packages_repositories 'req_bp' 'req_r'
-    # dependent package is "less stable" than dependency
-    printf ' JOIN `repository_stability_relations` AS `repl_rr`'
-    printf ' ON `repl_rr`.`more_stable`=`repl_r`.`stability`'
-    printf ' AND `repl_rr`.`less_stable`=`req_r`.`stability`'
-    # a) ^
-    printf ' WHERE NOT EXISTS ('
-      # no moved package ...
-      printf 'SELECT 1'
-      printf ' FROM `moveable_binary_packages_copy`'
-      mysql_join_binary_packages_install_target_providers 'moveable_binary_packages_copy' 'subst_itp'
-      # ... provides the same
-      printf ' WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
-    # b) 1) ^
-    printf ') AND NOT EXISTS ('
-      # no current package ...
-      printf 'SELECT 1'
-      printf ' FROM `binary_packages` AS `subst_bp`'
-      mysql_join_binary_packages_install_target_providers 'subst_bp' 'subst_itp'
-      # ... in a repository ...
-      mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
-      # ... more stable ...
-      printf ' JOIN `repository_stability_relations` AS `subst_rr`'
-      printf ' ON `subst_rr`.`more_stable`=`subst_r`.`stability`'
-      # ... than x's repository ...
-      printf ' WHERE `subst_rr`.`less_stable`=`repl_r`.`stability`'
-      printf ' AND NOT EXISTS ('
-      # ... and which is not replaced ...
-        printf 'SELECT 1 FROM `replaced_binary_packages_copy2`'
-        printf ' WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`'
-      printf ')'
-      # ... and provides the same
-      printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
-      # b) 2) ^
-    printf ');\n'
-    printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
+  # ... by a moved package
+  printf ') AND NOT EXISTS ('
+    printf 'SELECT 1 FROM `install_target_providers`'
+    printf ' JOIN `moveable_binary_packages_copy` ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`'
+    printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
+  printf ');\n'
+  printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
 
-    # refresh copies of our temporary tables *yuck*
-    for table in 'replaced' 'moveable'; do
-      for copy in '' '2'; do
-        if [ "${table}" = 'moveable' ] && \
-          [ "${copy}" = '2' ]; then
-          continue
-        fi
-        printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
-        printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
-        printf ' SELECT `%s_binary_packages`.*' "${table}"
-        printf ' FROM `%s_binary_packages`;\n' "${table}"
-      done
+  # refresh copies of our temporary tables *yuck*
+  for table in 'replaced' 'moveable'; do
+    for copy in '' '2'; do
+      if [ "${table}" = 'moveable' ] && \
+        [ "${copy}" = '2' ]; then
+        continue
+      fi
+      printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
+      printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+      printf ' SELECT `%s_binary_packages`.*' "${table}"
+      printf ' FROM `%s_binary_packages`;\n' "${table}"
     done
-
-    printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
-    printf ' RIGHT JOIN `moveable_binary_packages`'
-    printf ' ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
-    printf ' JOIN `binary_packages`'
-    printf ' ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
-    mysql_join_binary_packages_build_assignments
-    printf ' JOIN `package_blobs`'
-    printf ' ON `build_assignments`.`package_source`=`package_blobs`.`ps_a`'
-    printf ' JOIN `build_assignments` AS `bl_ba`'
-    printf ' ON `bl_ba`.`package_source`=`package_blobs`.`ps_b`'
-    mysql_join_build_assignments_binary_packages 'bl_ba' 'bl_bp'
-    printf ' WHERE NOT EXISTS ('
-      printf 'SELECT 1 FROM `moveable_binary_packages_copy`'
-      printf ' WHERE `moveable_binary_packages_copy`.`id`=`bl_bp`.`id`'
-    printf ');\n'
-    printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
-
-    printf 'UNTIL row_count_saved=0\n'
-    printf 'END REPEAT;\n'
-    for table in 'moveable' 'replaced'; do
-      for copy in '' '2'; do
-        if [ "${table}" = 'moveable' ] && \
-          [ "${copy}" = '2' ]; then
-          continue
-        fi
-        printf 'DROP TEMPORARY TABLE `%s_binary_packages_copy%s`;\n' \
-          "${table}" "${copy}"
-      done
-    done
-    printf 'END\n'
-    printf '//\n'
-    printf 'DELIMITER ;\n'
-
-    printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
-      'CREATE ROUTINE' 'buildmaster.*' \
-      'CREATE TEMPORARY TABLES' 'buildmaster.*' \
-      'EXECUTE' 'buildmaster.*' \
-      'RELOAD' '*.*' \
-      'SELECT' 'buildmaster.*' \
-      'SELECT' 'mysql.proc' \
-      'SHOW VIEW' 'buildmaster.*' \
-      'UPDATE' 'buildmaster.*'
-    printf 'GRANT %s ON %s TO '"'"'webserver'"'"'@'"'"'localhost'"'"';\n' \
-      'CREATE TEMPORARY TABLES' 'buildmaster.*' \
-      'SELECT' 'buildmaster.*' \
-      'SHOW VIEW' 'buildmaster.*'
-    printf 'FLUSH PRIVILEGES;\n'
-  } | \
-    mysql_run_query -u root -p
-fi
-
-# shellcheck disable=SC2016
-{
-  printf 'INSERT IGNORE INTO `architectures` (`name`) VALUES '
-  printf '("%s"),' \
-    'any' 'i686' | \
-    sed 's|,$||'
-  printf ';\n'
-  printf 'INSERT IGNORE INTO `fail_reasons` (`identifier`,`name`,`severity`) VALUES '
-  printf '(from_base64("%s"),"%s",%s),' \
-    "$(
-      printf '%s' '==> ERROR: A failure occurred in build()\.' | \
-        base64 -w0
-    )" 'build()' 0 \
-    "$(
-      printf '%s' '==> ERROR: Could not download sources\.' | \
-        base64 -w0
-    )" 'source' 1 \
-    "$(
-      printf '%s' '.*error: failed to commit transaction (invalid or corrupted package)' | \
-        base64 -w0
-    )" 'package-cache' 2 \
-    "$(
-      printf '%s' '==> ERROR: A failure occurred in prepare()\.' | \
-        base64 -w0
-    )" 'prepare()' 2 \
-    "$(
-      printf '%s' '==> ERROR: A failure occurred in package\(_\S\+\)\?()\.' | \
-        base64 -w0
-    )" 'package()' 3 \
-    "$(
-      printf '%s' '==> ERROR: A failure occurred in check()\.' | \
-        base64 -w0
-    )" 'check()' 4 \
-    "$(
-      printf '%s' '==> ERROR: '"'"'pacman'"'"' failed to install missing dependencies\.' | \
-        base64 -w0
-    )" 'dependencies' 1 \
-    "$(
-      printf '%s' '==> ERROR: Running makepkg as root is not allowed as it can cause permanent,.*' | \
-        base64 -w0
-    )" 'run-as-root' 1 \
-    "$(
-      printf '.*' | \
-        base64 -w0
-    )" 'unknown' 100 | \
-    sed 's|,$||'
-  printf ';\n'
-  printf 'INSERT IGNORE INTO `git_repositories` (`name`,`url`,`directory`,`head`) VALUES'
-  {
-    for repo in ${repo_names}; do
-      eval 'repo_path="${repo_paths__'"${repo}"'}"'
-      printf '\n  ('
-      printf 'from_base64("%s"),' \
-        "$(
-          printf '%s' "${repo}" | \
-            base64 -w0
-        )" \
-        "$(
-          git -C "${repo_path}" remote -v | \
-            awk '{print $2}' | \
-            tail -n1 | \
-            base64_encode_each
-        )" \
-        "$(
-          printf '%s' "${repo_path}" | \
-            base64 -w0
-        )" \
-        "$(
-          git -C "${repo_path}" rev-parse HEAD | \
-            base64_encode_each
-        )" | \
-        sed 's|,$|),|'
-    done
-    printf ';\n'
-  } | \
-    sed '
-      s|,;|;|
-    '
-
-  for repo in \
-    'core:packages' \
-    'extra:packages' \
-    'multilib:packages' \
-    'community:community'; do
-    printf 'INSERT IGNORE INTO `upstream_repositories` (`name`,`git_repository`) SELECT\n'
-    printf '  from_base64("%s"),`id` FROM `git_repositories` WHERE `name` = from_base64("%s");\n' \
-      "$(
-        printf '%s' "${repo%:*}" | \
-          base64 -w0
-      )" \
-      "$(
-        printf '%s' "${repo#*:}" | \
-          base64 -w0
-      )"
   done
 
-  printf 'INSERT IGNORE INTO `build_slaves` (`name`,`ssh_key`,`operator`,`last_connection`) VALUES'
-  {
-    sed -n '
-      s/^command="\S\+ \(\S\+\)" \S\+ \(\S\+\) \S\+$/\1 \2/
-      T
-      p
-    ' ~/.ssh/authorized_keys | \
-      while read -r name key; do
-        case "${name}" in
-          'nlopc'*|'rechenknecht')
-            operator='deep42thought'
-          ;;
-          'buildknecht'*)
-            operator='deep42thought/vollzornbrot'
-          ;;
-          'eurobuild3')
-            operator='abaumann'
-          ;;
-          *)
-            operator="${name}"
-          ;;
-        esac
-        printf '\n  ('
-        printf 'from_base64("%s"),' \
-          "$(
-            printf '%s' "${name}" | \
-              base64 -w0
-          )" \
-          "$(
-            printf '%s' "${key}" | \
-              base64 -w0
-          )" \
-          "$(
-            printf '%s' "${operator}" | \
-              base64 -w0
-          )"
-        printf 'NOW()),'
-      done
-    printf ';\n'
-  } | \
-    sed 's|,;|;|'
+  # packages which should not be replaced: ones providing something that is:
+  # a) still needed by a not-replaced package x "less stable" than the target repository and
+  # b) not provided by:
+  #   1) a moved package or
+  #   2) any current, not-replaced package in a repository more stable than x's repository
+  #
+  # Note, that this is not 100% clean from an academic point of view:
+  # It might require _downgrading_ of a package to keep fulfilling a dependency
+  # and it might require to do so _without_ any chance for the user to notice,
+  # because there may be more "dependencies" in the database than in the package files.
+  #
+  # However, in practice both should not happen.
+  #
+  printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
+  printf ' JOIN `moveable_binary_packages` ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
+  printf ' JOIN `binary_packages` AS `repl_bp` ON `repl_bp`.`id`=`replaced_binary_packages`.`id`'
+  mysql_join_binary_packages_install_target_providers 'repl_bp'
+  mysql_join_install_target_providers_dependencies
+  printf ' AND NOT EXISTS ('
+    # dependencies of replaced packages don't matter
+    printf 'SELECT 1 FROM `replaced_binary_packages_copy`'
+    printf ' WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`'
+  printf ')'
+  mysql_join_dependencies_dependency_types
+  # consider only runtime dependencies
+  printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+  mysql_join_dependencies_binary_packages '' 'req_bp'
+  # we need to check wether req_bp's dependency is (un)critical
+  mysql_join_binary_packages_repositories 'repl_bp' 'repl_r'
+  mysql_join_binary_packages_repositories 'req_bp' 'req_r'
+  # dependent package is "less stable" than dependency
+  printf ' JOIN `repository_stability_relations` AS `repl_rr`'
+  printf ' ON `repl_rr`.`more_stable`=`repl_r`.`stability`'
+  printf ' AND `repl_rr`.`less_stable`=`req_r`.`stability`'
+  # a) ^
+  printf ' WHERE NOT EXISTS ('
+    # no moved package ...
+    printf 'SELECT 1'
+    printf ' FROM `moveable_binary_packages_copy`'
+    mysql_join_binary_packages_install_target_providers 'moveable_binary_packages_copy' 'subst_itp'
+    # ... provides the same
+    printf ' WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
+  # b) 1) ^
+  printf ') AND NOT EXISTS ('
+    # no current package ...
+    printf 'SELECT 1'
+    printf ' FROM `binary_packages` AS `subst_bp`'
+    mysql_join_binary_packages_install_target_providers 'subst_bp' 'subst_itp'
+    # ... in a repository ...
+    mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+    # ... more stable ...
+    printf ' JOIN `repository_stability_relations` AS `subst_rr`'
+    printf ' ON `subst_rr`.`more_stable`=`subst_r`.`stability`'
+    # ... than x's repository ...
+    printf ' WHERE `subst_rr`.`less_stable`=`repl_r`.`stability`'
+    printf ' AND NOT EXISTS ('
+    # ... and which is not replaced ...
+      printf 'SELECT 1 FROM `replaced_binary_packages_copy2`'
+      printf ' WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`'
+    printf ')'
+    # ... and provides the same
+    printf ' AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`'
+    # b) 2) ^
+  printf ');\n'
+  printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
 
-  printf 'INSERT IGNORE INTO `repository_stabilities` (`name`,`bugtracker_category`) VALUES'
-  {
-    printf '\n  ("%s",%s),' \
-      'stable' '"Packages: Stable"' \
-      'testing' '"Packages: Testing"' \
-      'staging' 'NULL' \
-      'standalone' 'NULL' \
-      'unbuilt' '"Packages: Build-list"' \
-      'forbidden' 'NULL'
-    printf ';\n'
-  } | \
-    sed 's|,;|;|'
-
-  {
-    printf 'INSERT IGNORE INTO `repository_stability_relations` (`more_stable`,`less_stable`)'
-    printf ' SELECT `ms`.`id`,`ls`.`id`'
-    printf ' FROM `repository_stabilities` AS `ms` JOIN `repository_stabilities` AS `ls`'
-    printf ' WHERE '
-    printf '(`ms`.`name`="%s" AND `ls`.`name`="%s") OR ' \
-      'stable' 'stable' \
-      'stable' 'testing' \
-      'stable' 'staging' \
-      'stable' 'standalone' \
-      'stable' 'unbuilt' \
-      'stable' 'forbidden' \
-      'testing' 'testing' \
-      'testing' 'staging' \
-      'testing' 'standalone' \
-      'testing' 'unbuilt' \
-      'testing' 'forbidden' \
-      'staging' 'staging' \
-      'staging' 'standalone' \
-      'staging' 'unbuilt' \
-      'staging' 'forbidden' \
-      'unbuilt' 'forbidden' \
-      'standalone' 'standalone'
-    printf ';\n'
-  } | \
-    sed 's| OR ;|;|'
-
-  {
-    printf 'INSERT IGNORE INTO `repository_moves` (`from_repository`,`to_repository`,`upstream_package_repository`)'
-    printf ' SELECT `f`.`id`,`t`.`id`,`u`.`id`'
-    printf ' FROM'
-    printf ' `repositories` AS `%s` JOIN' \
-      'f' 't'
-    printf ' `upstream_repositories` AS `u`'
-    printf ' WHERE '
-    printf '(`f`.`name`="%s" AND `t`.`name`="%s" AND `u`.`name`="%s") OR ' \
-      'staging' 'testing' 'core' \
-      'staging' 'testing' 'extra' \
-      'staging' 'testing' 'multilib' \
-      'community-staging' 'community-testing' 'community' \
-      'community-staging' 'community-testing' 'multilib' \
-      'testing' 'core' 'core' \
-      'testing' 'extra' 'extra' \
-      'testing' 'extra' 'multilib' \
-      'community-testing' 'community' 'community' \
-      'community-testing' 'community' 'multilib'
-    printf ';\n'
-  } | \
-    sed 's| OR ;|;|'
-
-  for repo in \
-    'core:stable:AQ==' \
-    'extra:stable:AQ==' \
-    'community:stable:AQ==' \
-    'build-support:standalone:AQ==' \
-    'testing:testing:AQ==' \
-    'community-testing:testing:AQ==' \
-    'staging:staging:AQ==' \
-    'community-staging:staging:AQ==' \
-    'build-list:unbuilt:AA==' \
-    'deletion-list:forbidden:AA=='; do
-    printf 'INSERT IGNORE INTO `repositories` (`name`,`stability`,`is_on_master_mirror`) SELECT'
-    printf ' from_base64("%s"),`id`,from_base64("%s") FROM `repository_stabilities` WHERE `name`=from_base64("%s");\n' \
-      "$(
-        printf '%s' "${repo}" | \
-          cut -d: -f1 | \
-          base64_encode_each
-      )" \
-      "$(
-        printf '%s' "${repo}" | \
-          cut -d: -f3
-      )" \
-      "$(
-        printf '%s' "${repo}" | \
-          cut -d: -f2 | \
-          base64_encode_each
-      )"
+  # refresh copies of our temporary tables *yuck*
+  for table in 'replaced' 'moveable'; do
+    for copy in '' '2'; do
+      if [ "${table}" = 'moveable' ] && \
+        [ "${copy}" = '2' ]; then
+        continue
+      fi
+      printf 'DELETE FROM `%s_binary_packages_copy%s`;\n' "${table}" "${copy}"
+      printf 'INSERT IGNORE INTO `%s_binary_packages_copy%s`' "${table}" "${copy}"
+      printf ' SELECT `%s_binary_packages`.*' "${table}"
+      printf ' FROM `%s_binary_packages`;\n' "${table}"
+    done
   done
 
-  printf 'INSERT IGNORE INTO `dependency_types` (`name`,`relevant_for_building`,`relevant_for_binary_packages`) VALUES'
-  {
-    printf '\n  ("%s",%s,%s),' \
-      'make' '1' '0' \
-      'check' '0' '0' \
-      'link' '0' '1' \
-      'run' '1' '1'
-    printf ';\n'
-  } | \
-    sed 's|,;|;|'
+  printf 'DELETE `replaced_binary_packages`,`moveable_binary_packages` FROM `replaced_binary_packages`'
+  printf ' RIGHT JOIN `moveable_binary_packages`'
+  printf ' ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`'
+  printf ' JOIN `binary_packages`'
+  printf ' ON `binary_packages`.`id`=`moveable_binary_packages`.`id`'
+  mysql_join_binary_packages_build_assignments
+  printf ' JOIN `package_blobs`'
+  printf ' ON `build_assignments`.`package_source`=`package_blobs`.`ps_a`'
+  printf ' JOIN `build_assignments` AS `bl_ba`'
+  printf ' ON `bl_ba`.`package_source`=`package_blobs`.`ps_b`'
+  mysql_join_build_assignments_binary_packages 'bl_ba' 'bl_bp'
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT 1 FROM `moveable_binary_packages_copy`'
+    printf ' WHERE `moveable_binary_packages_copy`.`id`=`bl_bp`.`id`'
+  printf ');\n'
+  printf 'SET row_count_saved = row_count_saved + ROW_COUNT();\n'
+
+  printf 'UNTIL row_count_saved=0\n'
+  printf 'END REPEAT;\n'
+  for table in 'moveable' 'replaced'; do
+    for copy in '' '2'; do
+      if [ "${table}" = 'moveable' ] && \
+        [ "${copy}" = '2' ]; then
+        continue
+      fi
+      printf 'DROP TEMPORARY TABLE `%s_binary_packages_copy%s`;\n' \
+        "${table}" "${copy}"
+    done
+  done
+  printf 'END\n'
+  printf '//\n'
+  printf 'DELIMITER ;\n'
+
+  printf 'GRANT %s ON %s TO '"'"'buildmaster'"'"'@'"'"'localhost'"'"';\n' \
+    'CREATE ROUTINE' 'buildmaster.*' \
+    'CREATE TEMPORARY TABLES' 'buildmaster.*' \
+    'EXECUTE' 'buildmaster.*' \
+    'RELOAD' '*.*' \
+    'SELECT' 'buildmaster.*' \
+    'SELECT' 'mysql.proc' \
+    'SHOW VIEW' 'buildmaster.*' \
+    'UPDATE' 'buildmaster.*'
+  printf 'GRANT %s ON %s TO '"'"'webserver'"'"'@'"'"'localhost'"'"';\n' \
+    'CREATE TEMPORARY TABLES' 'buildmaster.*' \
+    'SELECT' 'buildmaster.*' \
+    'SHOW VIEW' 'buildmaster.*'
+  printf 'FLUSH PRIVILEGES;\n'
 } | \
-  mysql_run_query
-
-grep '^\('"$(
-  # shellcheck disable=SC2086
-  printf '%s\\|' ${standalone_package_repositories} ${stable_package_repositories}
-)"'\) ' "${tmp_dir}/master-mirror-listing" | \
-  sed '
-    s/\.pkg\.tar\.xz$//
-    s/-\([^-:]\+\)\(\(-[^-]\+\)\{2\}\)$/-0:\1\2/
-    s/\(-[0-9]\+\)\(-[^-]\+\)$/\1.0\2/
-    s/-\([^-:]\+\):\([^-:]\+\)-\([^-.]\+\)\.\([^-.]\+\)-\([^-]\+\)$/ \1 \2 \3 \4 \5/
-  ' | \
-  while read -r repo pkgname epoch pkgver pkgrel sub_pkgrel arch; do
-    # we don't care too much about those - they won't be moved anyways
-    printf '('
-    # shellcheck disable=SC2046
-    printf 'from_base64("%s"),' \
-      $(
-        printf '%s\n' \
-          "${pkgname}" \
-          "${epoch}" \
-          "${pkgver}" \
-          "${pkgrel}" \
-          "${sub_pkgrel}" \
-          "${arch}" \
-          "${repo}" | \
-          base64_encode_each
-      ) | \
-      sed 's/,$/),/'
-    printf '\n'
-  done > \
-  "${tmp_dir}/new-stable-packages"
-
-if [ -s "${tmp_dir}/new-stable-packages" ]; then
-  # shellcheck disable=SC2016
-  {
-    printf 'CREATE TEMPORARY TABLE `stable_packages` ('
-    printf '`%s` %s,' \
-      'pkgname' 'VARCHAR(64)' \
-      'epoch' 'MEDIUMINT' \
-      'pkgver' 'VARCHAR(64)' \
-      'pkgrel' 'MEDIUMINT' \
-      'sub_pkgrel' 'MEDIUMINT' \
-      'architecture' 'VARCHAR(16)' \
-      'repository' 'VARCHAR(64)' \
-      'build_assignment' 'BIGINT NOT NULL AUTO_INCREMENT'
-    printf 'PRIMARY KEY (`build_assignment`));\n'
-    sed '
-      1~10 ! b not_start
-      s/^/INSERT IGNORE INTO `stable_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`) VALUES \n/
-      :not_start
-      $    b end
-      0~10 b end
-      b
-      :end
-      s/,$/;/
-    ' "${tmp_dir}/new-stable-packages"
-    printf 'INSERT IGNORE INTO `binary_packages` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`,`build_assignment`,`has_issues`,`is_tested`,`is_to_be_deleted`)'
-    printf ' SELECT '
-    printf '`stable_packages`.`%s`,' \
-      'pkgname' \
-      'epoch' \
-      'pkgver' \
-      'pkgrel' \
-      'sub_pkgrel'
-    printf '`%s`.`id`,' \
-      'architectures' \
-      'repositories'
-    printf -- '-`build_assignment`,0,1,0 FROM `stable_packages`'
-    printf ' JOIN `%s` ON `stable_packages`.`%s`=`%s`.`name`' \
-      'repositories' 'repository' 'repositories' \
-      'architectures' 'architecture' 'architectures'
-    printf ';\n'
-    printf 'DROP TABLE `stable_packages`;\n'
-  } | \
-    mysql_run_query
-fi
-
-mysql_repair_binary_packages_without_build_assignment
+  mysql_run_query -u root -p
