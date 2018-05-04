@@ -921,8 +921,9 @@ extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name() {
   fi
 }
 
-# irc_say $channel
+# irc_say $channel [copy]
 # say content of stdin in irc channel $channel (default: #archlinux32)
+# and print copy to stdout if 'copy' is given
 
 # shellcheck disable=SC2120
 irc_say() {
@@ -933,6 +934,10 @@ irc_say() {
     channel="$1"
   fi
   if [ -p "${irc_dir}/${channel}/in" ]; then
-    sponge "${irc_dir}/${channel}/in"
+    if [ "$2" = 'copy' ]; then
+      pee cat 'sponge '"${irc_dir}/${channel}/in"
+    else
+      sponge "${irc_dir}/${channel}/in"
+    fi
   fi
 }
