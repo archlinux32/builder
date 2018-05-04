@@ -339,20 +339,12 @@ mysql_generate_package_metadata() {
             base64 -w0
         )
         sed -n '
-          /^pkgbase = \|^pkgname = '"$(str_to_regex "${pkgname}")"'$/{
-            :a
-              N
-              /\n$/{
-                p
-                T
-              }
-              ba
-          }
-        ' "${temp_dir}/SRCINFO" | \
-          sed '
+          /^pkgbase = \|^pkgname = '"$(str_to_regex "${pkgname}")"'$/,/^$/ {
             /^\S/d
             s/^\s*//
-          ' > \
+            p
+          }
+        ' "${temp_dir}/SRCINFO" > \
           "${temp_dir}/BINARYINFO.${pkgname64}"
 
         grep '^arch = ' "${temp_dir}/BINARYINFO.${pkgname64}" | \
