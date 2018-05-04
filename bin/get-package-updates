@@ -503,6 +503,7 @@ if [ "${deletion_list_count}" -gt 1000 ]; then
   >&2 printf 'There are %s > 1000 packages on the deletion-list. This does not seem right.\n' \
     "${deletion_list_count}"
   if [ ! -s "${work_dir}/told-irc-about-too-many-deletion-list-packages" ]; then
+    # shellcheck disable=SC2119
     {
       printf '\001ACTION refuses to blacklist %s packages.\001\n' "${deletion_list_count}"
       for repo_name in ${repo_names}; do

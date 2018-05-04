@@ -193,6 +193,7 @@ if [ "$5" = 'ERROR' ]; then
       fi
     )
 
+    # shellcheck disable=SC2119
     {
       printf '%s is broken (says %s).' \
         "$1" \

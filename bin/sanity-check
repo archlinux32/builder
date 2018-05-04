@@ -19,6 +19,7 @@ usage() {
 
 i_am_insane() {
   if [ ! -s "${work_dir}/build-master-sanity" ]; then
+    # shellcheck disable=SC2119
     printf '\001ACTION goes insane.\001\n' | \
       irc_say
   fi
@@ -461,6 +462,7 @@ done
 
 if [ -f "${work_dir}/build-master-sanity" ]; then
   rm "${work_dir}/build-master-sanity"
+  # shellcheck disable=SC2119
   printf '\001ACTION resumes sanity.\001\n' | \
     irc_say
 fi

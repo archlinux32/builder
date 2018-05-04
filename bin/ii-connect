@@ -63,6 +63,7 @@ if [ "$1" = 'watch' ]; then
         /'"${welcome_user_regex}"'/ d
       ' "${irc_dir}/#archlinux32/out"
       done_something=true
+      # shellcheck disable=SC2119
       printf '%s\n' "${new_users}" | \
         sed '
           s/^/Hi /

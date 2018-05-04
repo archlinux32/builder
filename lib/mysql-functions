@@ -64,6 +64,7 @@ mysql_run_query() {
     >&2 printf 'I could not complete a mysql query!\n'
     if [ ! -s "${work_dir}/build-master-sanity" ] && \
       [ -z "${file_name_extra}" ]; then
+      # shellcheck disable=SC2119
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say

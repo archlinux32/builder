@@ -111,6 +111,7 @@ rm -f "${tmp_dir}/todos"
 
 if [ -s "${webserver_directory}/mysql-sanity.html" ] && \
   [ ! -s "${work_dir}/build-master-sanity" ]; then
+  # shellcheck disable=SC2119
   printf 'girls, my database is dirty again ...\n' | \
     irc_say
   echo 'build master is insane' > \
