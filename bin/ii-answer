@@ -94,7 +94,15 @@ find "${irc_dir}" \
     if grep "${regex}" "${out_file}" | \
       grep -q "${sloppy_salutation}"; then
       sed -i "/${regex}/d" "${out_file}"
-      printf 'up? I'"'"'m up for %s, %s\n' "$(uptime -p | sed 's/^up //')" "$(uptime | sed 's/.*,  //')" | \
+      {
+        printf 'up? I'"'"'m up for %s, %s' \
+          "$(uptime -p | sed 's/^up //')" \
+          "$(uptime | sed 's/.*,  //')"
+        if [ -s "${work_dir}/build-master-sanity" ]; then
+          printf ' ... and I'"'"'m insane :-D'
+        fi
+        printf '\n'
+      } | \
         irc_say "${channel}" 'copy'
     fi
     # answer "Thanks!"
