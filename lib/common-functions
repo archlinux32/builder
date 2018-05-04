@@ -551,8 +551,6 @@ recursively_umount_and_rm() {
 #  append $sub_pkgrel to the pkgrel
 #  remove "lib32-" from {make,check,opt,}depends
 
-# TODO: actually include the other architectures
-
 mangle_pkgbuild() {
   local PKGBUILD="$1"
   local sub_pkgrel="$2"
@@ -569,7 +567,7 @@ mangle_pkgbuild() {
 
   sed -i '
     /^arch=[^#]*any/!{
-      /^arch=(/s/(/(i686 /
+      /^arch=(/s/(/(i686 i486 pentium3 /
     }
     s/^\(\s*pkgrel=\)['"'"'"]\?\([0-9.]\+\)['"'"'"]\?\s*\(#.*\)\?$/\1"\2'"${sub_pkgrel}"'"/
   ' "${PKGBUILD}"
