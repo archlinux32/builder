@@ -549,6 +549,7 @@ recursively_umount_and_rm() {
 # mangle_pkgbuild $PKGBUILD [$sub_pkgrel]
 #  mangle $arch in PKBUILDs to contain i486, i586, i686
 #  append $sub_pkgrel to the pkgrel
+#  remove "lib32-" from {make,check,opt,}depends
 
 # TODO: actually include the other architectures
 
@@ -571,6 +572,16 @@ mangle_pkgbuild() {
       /^arch=(/s/(/(i686 /
     }
     s/^\(\s*pkgrel=\)['"'"'"]\?\([0-9.]\+\)['"'"'"]\?\s*\(#.*\)\?$/\1"\2'"${sub_pkgrel}"'"/
+  ' "${PKGBUILD}"
+
+  sed -i '
+    /^\s*\(\(make\|check\|opt\|\)depends\)=(/ {
+      :a
+        s,^\s*\(\S[^=]*\)=(\([^()]*\(#[^\n]*\n\)\?\)*),\0\n\1=(${\1[\@]/lib32-/})\n,
+        t
+        $!N
+        ba
+    }
   ' "${PKGBUILD}"
 }
 
