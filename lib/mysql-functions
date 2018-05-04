@@ -331,6 +331,7 @@ mysql_generate_package_metadata() {
         }
     )
 
+    # iterate over all pkgnames
     grep '^pkgname = ' "${temp_dir}/SRCINFO" | \
       cut -d' ' -f3 | \
       while read -r pkgname; do
@@ -347,6 +348,7 @@ mysql_generate_package_metadata() {
         ' "${temp_dir}/SRCINFO" > \
           "${temp_dir}/BINARYINFO.${pkgname64}"
 
+        # iterate over all archs
         grep '^arch = ' "${temp_dir}/BINARYINFO.${pkgname64}" | \
           cut -d' ' -f3 | \
           while read -r arch; do
@@ -360,18 +362,21 @@ mysql_generate_package_metadata() {
               "${temp_dir}/ARCHINFO ${pkgname64} ${arch64}"
           done
       done
+
     find "${temp_dir}" -mindepth 1 -maxdepth 1 -name 'ARCHINFO * *' -printf '%f\n' | \
       while read -r _ pkgname arch; do
         pkgver=$(
           grep '^pkgver = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
-            base64_encode_each
+            tr -d '\n' | \
+            base64 -w0
         )
         pkgrel=$(
           grep '^pkgrel = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
             cut -d' ' -f3 | \
             sed 's/\.[0-9]\+$//' | \
-            base64_encode_each
+            tr -d '\n' | \
+            base64 -w0
         )
         epoch=$(
           {
@@ -379,7 +384,8 @@ mysql_generate_package_metadata() {
               echo 'epoch = 0'
           } | \
             cut -d' ' -f3 | \
-            base64_encode_each
+            tr -d '\n' | \
+            base64 -w0
         )
         provides=$(
           grep '^\(groups\|provides\) = ' "${temp_dir}/ARCHINFO ${pkgname} ${arch}" | \
