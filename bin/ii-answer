@@ -1,0 +1,108 @@
+#!/bin/sh
+
+# answer to stuff on irc
+
+# shellcheck source=../conf/default.conf
+. "${0%/*}/../conf/default.conf"
+
+# welcome devs (in #archlinux32 only)
+welcome_user_regex='^\S\+ -!- \(abaumann\|deep42thought\|tyzoid\)(.* has joined \S\+$'
+new_users=$(
+  sed -n '
+    s/'"${welcome_user_regex}"'/\1/
+    T
+    p
+  ' "${irc_dir}/#archlinux32/out" | \
+    sort -u
+)
+if [ -n "${new_users}" ]; then
+  sed -i '
+    /'"${welcome_user_regex}"'/ d
+  ' "${irc_dir}/#archlinux32/out"
+  printf '%s\n' "${new_users}" | \
+    sed '
+      s/^/Hi /
+      s/$/!/
+    ' | \
+    irc_say '' 'copy'
+fi
+
+find "${irc_dir}" \
+  -type f \
+  -name 'out' \
+  -printf '%p\n' | \
+  while read -r out_file; do
+    channel="${out_file%/out}"
+    channel="${channel##*/}"
+    if [ -z "${channel%%#*}" ]; then
+      prefix='buildmaster: '
+      sloppy_salutation='buildmaster'
+    else
+      prefix=''
+      sloppy_salutation=''
+    fi
+    # answer "why don't you?"
+    regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
+    if grep -q "${regex}" "${out_file}"; then
+      sed -n '
+        s/'"${regex}"'/\2 /
+        T
+        p
+      ' "${out_file}" | \
+        while read -r line; do
+          reason=$(
+            echo "${line}" | \
+              xargs "${base_dir}/bin/why-dont-you" 2>&1
+          )
+          if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
+            echo "${reason}"
+          else
+            echo "${reason}" | \
+              head -n5
+            printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
+          fi | \
+            irc_say "${channel}" 'copy'
+        done
+      sed -i "/${regex}/d" "${out_file}"
+    fi
+    # answer "wtf?"
+    regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'wtf '
+    if grep -q "${regex}" "${out_file}"; then
+      sed -n '
+        s/'"${regex}"'//
+        T
+        p
+      ' "${out_file}" | \
+        while read -r line; do
+          reason=$("${base_dir}/bin/wtf" "${line}");
+          if [ -z "${reason}" ]; then
+            reason="Huh, I don't know that one."
+          fi
+          if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
+            echo "${reason}"
+          else
+            echo "${reason}" | \
+              head -n5
+            printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
+          fi | \
+            irc_say "${channel}" 'copy'
+        done
+      sed -i "/${regex}/d" "${out_file}"
+    fi
+    # answer "What's up?"
+    regex='^\(\S\+ \)\?\S\+ <\S\+> .*[Ww]hat'"'"'\?s *[Uu]p'
+    if grep "${regex}" "${out_file}" | \
+      grep -q "${sloppy_salutation}"; then
+      sed -i "/${regex}/d" "${out_file}"
+      printf 'up? I'"'"'m up for %s, %s\n' "$(uptime -p | sed 's/^up //')" "$(uptime | sed 's/.*,  //')" | \
+        irc_say "${channel}" 'copy'
+    fi
+    # answer "Thanks!"
+    regex='^\(\S\+ \)\?\S\+ <\S\+> \(.* \)\?[Tt]h\(anks\|x\)\([ ,.!]\|$\)'
+    if grep "${regex}" "${out_file}" | \
+      grep -q "${sloppy_salutation}"; then
+      sed -i "/${regex}/d" "${out_file}"
+      printf 'np\n' | \
+        irc_say "${channel}" 'copy'
+    fi
+  done

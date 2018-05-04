@@ -37,10 +37,9 @@ fi
 
 # watch if asked to
 if [ "$1" = 'watch' ]; then
-  done_something=false
   while pgrep -x 'ii' > /dev/null; do
     # this avoids missing modifications during our last execution
-    if ! ${done_something}; then
+    if [ -z "${said}" ]; then
       # shellcheck disable=SC2046
       inotifywait -e 'CLOSE_WRITE,CLOSE' $(
         find "${irc_dir}" \
@@ -48,109 +47,9 @@ if [ "$1" = 'watch' ]; then
           -name 'out'
         )
     fi
-    done_something=false
-    welcome_user_regex='^\S\+ -!- \(abaumann\|deep42thought\|tyzoid\)(.* has joined \S\+$'
-    new_users=$(
-      sed -n '
-        s/'"${welcome_user_regex}"'/\1/
-        T
-        p
-      ' "${irc_dir}/#archlinux32/out" | \
-        sort -u
+    said=$(
+      "${base_dir}/bin/ii-answer"
     )
-    if [ -n "${new_users}" ]; then
-      sed -i '
-        /'"${welcome_user_regex}"'/ d
-      ' "${irc_dir}/#archlinux32/out"
-      done_something=true
-      # shellcheck disable=SC2119
-      printf '%s\n' "${new_users}" | \
-        sed '
-          s/^/Hi /
-          s/$/!/
-        ' | \
-        irc_say
-    fi
-    find "${irc_dir}" \
-      -type f \
-      -name 'out' \
-      -printf '%p\n' | \
-      while read -r out_file; do
-        channel="${out_file%/out}"
-        channel="${channel##*/}"
-        if [ -z "${channel%%#*}" ]; then
-          prefix='buildmaster: '
-          sloppy_salutation='buildmaster'
-        else
-          prefix=''
-          sloppy_salutation=''
-        fi
-        regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'why[- ]don'"'"'\?t[- ]you \(build\|stabilize\|unstage\|keep\|stubbornly_keep\) '
-        if grep -q "${regex}" "${out_file}"; then
-          done_something=true
-          sed -n '
-            s/'"${regex}"'/\2 /
-            T
-            p
-          ' "${out_file}" | \
-            while read -r line; do
-              reason=$(
-                echo "${line}" | \
-                  xargs "${base_dir}/bin/why-dont-you" 2>&1
-              )
-              if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
-                echo "${reason}"
-              else
-                echo "${reason}" | \
-                  head -n5
-                printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
-              fi | \
-                sponge "${out_file%/out}/in"
-            done
-          sed -i "/${regex}/d" "${out_file}"
-        fi
-        regex='^\(\S\+ \)\?\S\+ <\S\+> '"${prefix}"'wtf '
-        if grep -q "${regex}" "${out_file}"; then
-          done_something=true
-          sed -n '
-            s/'"${regex}"'//
-            T
-            p
-          ' "${out_file}" | \
-            while read -r line; do
-              reason=$("${base_dir}/bin/wtf" "${line}");
-              if [ -z "${reason}" ]; then
-                reason="Huh, I don't know that one."
-              fi
-              if [ "$(echo "${reason}" | wc -l)" -le 5 ]; then
-                echo "${reason}"
-              else
-                echo "${reason}" | \
-                  head -n5
-                printf '... (%s lines total)\n' "$(echo "${reason}" | wc -l)"
-              fi | \
-                sponge "${out_file%/out}/in"
-            done
-          sed -i "/${regex}/d" "${out_file}"
-        fi
-        regex='^\(\S\+ \)\?\S\+ <\S\+> .*[Ww]hat'"'"'\?s *[Uu]p'
-        if grep "${regex}" "${out_file}" | \
-          grep -q "${sloppy_salutation}"; then
-          done_something=true
-          sed -i "/${regex}/d" "${out_file}"
-          printf 'up? I'"'"'m up for %s, %s\n' "$(uptime -p | sed 's/^up //')" "$(uptime | sed 's/.*,  //')"  | \
-            sponge "${out_file%/out}/in"
-        fi
-        regex='^\(\S\+ \)\?\S\+ <\S\+> \(.* \)\?[Tt]h\(anks\|x\)\([ ,.!]\|$\)'
-        if grep "${regex}" "${out_file}" | \
-          grep -q "${sloppy_salutation}"; then
-          done_something=true
-          sed -i "/${regex}/d" "${out_file}"
-          printf 'np\n' | \
-            sponge "${out_file%/out}/in"
-        fi
-      done
-    sleep 1
   done
   exit
 fi
