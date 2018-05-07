@@ -780,30 +780,6 @@ mysql_cleanup() {
     printf 'FROM `binary_packages`'
     mysql_join_binary_packages_repositories
     printf ' WHERE `repositories`.`name`="to-be-decided";\n'
-    # remove dependencies w/o binary_package or install_target
-    printf '%s FROM `dependencies` ' \
-      "${operator}"
-    printf 'WHERE NOT EXISTS '
-    printf '('
-      printf 'SELECT * FROM `binary_packages` '
-      printf 'WHERE `dependencies`.`dependent`=`binary_packages`.`id`'
-    printf ') OR NOT EXISTS '
-    printf '('
-      printf 'SELECT * FROM `install_targets` '
-      printf 'WHERE `dependencies`.`depending_on`=`install_targets`.`id`'
-    printf ');\n'
-    # remove install_target_providers w/o binary_package or install_target
-    printf '%s FROM `install_target_providers` ' \
-      "${operator}"
-    printf 'WHERE NOT EXISTS '
-    printf '('
-      printf 'SELECT * FROM `binary_packages` '
-      printf 'WHERE `install_target_providers`.`package`=`binary_packages`.`id`'
-    printf ') OR NOT EXISTS '
-    printf '('
-      printf 'SELECT * FROM `install_targets` '
-      printf 'WHERE `install_target_providers`.`install_target`=`install_targets`.`id`'
-    printf ');\n'
     # remove build_assignments w/o binary_package
     printf '%s FROM `build_assignments` ' \
       "${operator}"
@@ -822,14 +798,6 @@ mysql_cleanup() {
     mysql_join_failed_builds_build_assignments
     printf 'WHERE NOT `build_assignments`.`is_broken`'
     printf ';\n'
-    # remove failed_builds w/o build_assignment
-    printf '%s FROM `failed_builds` ' \
-      "${operator}"
-    printf 'WHERE NOT EXISTS '
-    printf '('
-      printf 'SELECT * FROM `build_assignments` '
-      printf 'WHERE `build_assignments`.`id`=`failed_builds`.`build_assignment`'
-    printf ');\n'
     # remove package_sources w/o build_assignment
     printf '%s FROM `package_sources` ' \
       "${operator}"
