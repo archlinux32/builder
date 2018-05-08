@@ -16,6 +16,9 @@
 
 # TODO: sign database
 
+# TODO: there is several stuff down there, which should rather be
+# identified by its id
+
 # shellcheck disable=SC2119,SC2120
 
 # shellcheck source=../conf/default.conf
