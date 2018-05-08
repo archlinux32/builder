@@ -894,6 +894,7 @@ mysql_query_select_pkgbase_and_revision() {
 # mysql_package_name_query
 # print a mysql query of the full name of a package file
 
+# shellcheck disable=SC2120
 mysql_package_name_query() {
   printf 'CONCAT('
   printf '`binary_packages`.`pkgname`,"-",'
