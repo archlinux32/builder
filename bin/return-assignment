@@ -576,6 +576,30 @@ trigger_mirror_refreshs
 } | \
   mysql_run_query
 
-for package in ${packages}; do
-  remove_old_package_versions 'i686' "${destination}" "${package}"
-done
+# shellcheck disable=SC2016
+{
+  printf 'SELECT'
+  printf ' `binary_packages`.`id`'
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_architectures
+  mysql_join_binary_packages_repositories
+  printf ' WHERE '
+  mysql_package_name_query
+  printf ' IN ('
+  # shellcheck disable=SC2086
+  printf '%s\n' ${packages} | \
+    base64_encode_each | \
+    sed '
+      s/^/from_base64("/
+      s/$/"),/
+    '
+  printf '"") AND `repositories`.`name`=from_base64("%s");\n' \
+    "$(
+      printf '%s' "${destination}" | \
+        base64 -w0
+    )"
+} | \
+  mysql_run_query | \
+  while read -r package_id; do
+    remove_old_package_versions "${package_id}"
+  done

@@ -109,8 +109,8 @@ sed -n '
     repository="${id#* }"
     id="${id%% *}"
 
-    printf '%s\n' "${package}" >> \
-      "${tmp_dir}/packages"
+    printf '%s\n' "${id}" >> \
+      "${tmp_dir}/package-ids"
     for suffix in '' '.sig'; do
       printf 'ln "i686/%s/%s%s" "i686/build-support/%s%s"\n' \
         "${repository}" \
@@ -180,14 +180,14 @@ if [ -s "${tmp_dir}/mysql-command" ]; then
     "${tmp_dir}/mysql-command"
 fi
 
-if [ -s "${tmp_dir}/packages" ]; then
-  while read -r package; do
-    remove_old_package_versions 'i686' 'build-support' "${package}"
+if [ -s "${tmp_dir}/package-ids" ]; then
+  while read -r package_id; do
+    remove_old_package_versions "${package_id}"
   done < \
-    "${tmp_dir}/packages"
+    "${tmp_dir}/package-ids"
 fi
 
 if [ -w "$1" ]; then
-  cat "${tmp_dir}/packages" > \
+  cat "${tmp_dir}/package-ids" > \
     "$1"
 fi
