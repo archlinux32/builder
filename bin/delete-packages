@@ -9,7 +9,8 @@
 # "Package x depends on package y" means, that something needed by x
 # is provided by y and no other package which will not be deleted.
 
-# shellcheck disable=SC2039
+# shellcheck disable=SC2039,SC2119,SC2120
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 

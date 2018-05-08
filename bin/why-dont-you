@@ -2,6 +2,8 @@
 
 # usage: why_dont_you $action $package1 $package2 ...
 
+# shellcheck disable=SC2119,SC2120
+
 # investigate, why a certain operation is not done with certain packages
 
 # shellcheck source=../conf/default.conf

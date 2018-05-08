@@ -5,6 +5,8 @@
 #  - show that the build is still running
 #  - get notified by the build master if the build is not necessary anymore
 
+# shellcheck disable=SC2119,SC2120
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 

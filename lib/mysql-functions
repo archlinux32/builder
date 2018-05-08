@@ -5,7 +5,7 @@
 # TODO: return ids on INSERT/UPDATE queries and use those in subsequent
 # queries
 
-# shellcheck disable=SC2016,SC2039
+# shellcheck disable=SC2016,SC2039,SC2119,SC2120
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
@@ -67,7 +67,6 @@ mysql_run_query() {
     >&2 printf 'I could not complete a mysql query!\n'
     if [ ! -s "${work_dir}/build-master-sanity" ] && \
       [ -z "${file_name_extra}" ]; then
-      # shellcheck disable=SC2119
       printf '\001ACTION failed to execute a mysql query - can you have a look at "%s"?.\001\n' \
         "${query_stdin##*/}" \
         | irc_say
@@ -891,18 +890,19 @@ mysql_query_select_pkgbase_and_revision() {
   mysql_join_package_sources_upstream_repositories
 }
 
-# mysql_package_name_query
+# mysql_package_name_query [binary_packages] [architectures]
 # print a mysql query of the full name of a package file
 
-# shellcheck disable=SC2120
 mysql_package_name_query() {
+  local bp_name="${1:-binary_packages}"
+  local a_name="${2:-architectures}"
   printf 'CONCAT('
-  printf '`binary_packages`.`pkgname`,"-",'
-  printf 'IF(`binary_packages`.`epoch`=0,"",CONCAT(`binary_packages`.`epoch`,":")),'
-  printf '`binary_packages`.`pkgver`,"-",'
-  printf '`binary_packages`.`pkgrel`,".",'
-  printf '`binary_packages`.`sub_pkgrel`,"-",'
-  printf '`architectures`.`name`,".pkg.tar.xz"'
+  printf '`%s`.`pkgname`,"-",' "${bp_name}"
+  printf 'IF(`%s`.`epoch`=0,"",CONCAT(`%s`.`epoch`,":")),' "${bp_name}" "${bp_name}"
+  printf '`%s`.`pkgver`,"-",' "${bp_name}"
+  printf '`%s`.`pkgrel`,".",' "${bp_name}"
+  printf '`%s`.`sub_pkgrel`,"-",' "${bp_name}"
+  printf '`%s`.`name`,".pkg.tar.xz"' "${a_name}"
   printf ')'
 }
 

@@ -4,6 +4,8 @@
 # Details:
 #  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
+# shellcheck disable=SC2119,SC2120
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 

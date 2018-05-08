@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# shellcheck disable=SC2119,SC2120
+
 wget -qO- 'https://pkgapi.arch32.tyzoid.com/esearch/'"$*"'.xml' | \
   awk '
     BEGIN {

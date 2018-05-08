@@ -14,7 +14,8 @@
 
 # TODO: enable separate repositories for each architecture
 
-# shellcheck disable=SC2039
+# shellcheck disable=SC2039,SC2119,SC2120
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 

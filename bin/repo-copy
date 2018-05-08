@@ -9,6 +9,8 @@
 #   - no database signatures are handled
 #   - only *.db.tar.gz and *.files.tar.gz are recognized as database
 
+# shellcheck disable=SC2119,SC2120
+
 usage() {
   >&2 echo 'usage:'
   >&2 echo ' repo-copy from-repo.db.tar.gz to-repo.db.tar.gz package1 package2 ...'

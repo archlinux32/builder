@@ -2,6 +2,8 @@
 
 # answer to stuff on irc
 
+# shellcheck disable=SC2119,SC2120
+
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
