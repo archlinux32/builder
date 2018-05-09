@@ -605,10 +605,10 @@ INSERT INTO `architectures` VALUES
   (1,'any'),
   (2,'i686');
 INSERT INTO `dependency_types` VALUES
-  (2,'run','',''),
+  (2,'run','1','1'),
   (3,'check','\0','\0'),
-  (4,'link','\0',''),
-  (5,'make','','\0');
+  (4,'link','\0','1'),
+  (5,'make','1','\0');
 INSERT INTO `email_actions` VALUES
   (2,'block'),
   (5,'copy-to-build-support'),
@@ -625,19 +625,15 @@ INSERT INTO `fail_reasons` VALUES
   (7,'dependencies','==> ERROR: \'pacman\' failed to install missing dependencies\\.',1),
   (8,'run-as-root','==> ERROR: Running makepkg as root is not allowed as it can caus',1),
   (9,'unknown','.*',100);
-INSERT INTO `git_repositories` VALUES
-  (1,'packages','git://git.archlinux.org/svntogit/packages.git','/home/slave/packages64','7806279e6d3b35afd7be9b49f59b459cef51cb00'),
-  (2,'community','git://git.archlinux.org/svntogit/community.git','/home/slave/community64','5369c9cd66063d9a10ce540d733dfbb285dbcf2b'),
-  (3,'archlinux32','https://github.com/archlinux32/packages.git','/home/slave/packages32','3d5ece893f85808c4b1a63df306e21d5fd97659e');
 INSERT INTO `repositories` VALUES
-  (1,'core',1,'',2),
-  (2,'extra',1,'',2),
-  (3,'community',1,'',2),
-  (4,'build-support',4,'',2),
-  (5,'testing',2,'',2),
-  (6,'community-testing',2,'',2),
-  (7,'staging',3,'',2),
-  (8,'community-staging',3,'',2),
+  (1,'core',1,'1',2),
+  (2,'extra',1,'1',2),
+  (3,'community',1,'1',2),
+  (4,'build-support',4,'1',2),
+  (5,'testing',2,'1',2),
+  (6,'community-testing',2,'1',2),
+  (7,'staging',3,'1',2),
+  (8,'community-staging',3,'1',2),
   (9,'build-list',5,'\0',1),
   (10,'deletion-list',6,'\0',1),
   (11,'to-be-decided',7,'\0',1);

@@ -43,13 +43,13 @@ mysqldump --skip-lock-tables 'buildmaster' \
   'dependency_types' \
   'email_actions' \
   'fail_reasons' \
-  'git_repositories' \
   'repositories' \
   'repository_moves' \
   'repository_stabilities' \
   'repository_stability_relations' \
   'upstream_repositories' | \
   grep '^INSERT ' | \
+  tr '\0\1' '01' | \
   sed '
     s/),(/),\n  (/g
     s/VALUES (/VALUES\n  (/g
