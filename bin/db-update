@@ -14,6 +14,9 @@
 
 # TODO: enable separate repositories for each architecture
 
+# TODO: restructure the layout of the master mirror: we should have
+# /pool (without subdirectories) and only symlinks in /$arch/$repo
+
 # shellcheck disable=SC2039,SC2119,SC2120
 
 # shellcheck source=../conf/default.conf
