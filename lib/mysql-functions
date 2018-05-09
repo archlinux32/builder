@@ -2,9 +2,6 @@
 
 # contains functions used to access mysql db
 
-# TODO: return ids on INSERT/UPDATE queries and use those in subsequent
-# queries
-
 # shellcheck disable=SC2016,SC2039,SC2119,SC2120
 
 if [ -z "${base_dir}" ]; then
@@ -197,6 +194,8 @@ mysql_add_package_source() {
   } | \
     mysql_run_query
 }
+
+# TODO: return ids on INSERT queries and use those in subsequent queries
 
 # mysql_generate_package_metadata $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
 # if sub_pkgrel should be determined automatically
