@@ -16,8 +16,6 @@
 
 # TODO: sign database
 
-# TODO: identify built packages by their id
-
 # shellcheck disable=SC2119,SC2120
 
 # shellcheck source=../conf/default.conf
@@ -401,31 +399,36 @@ fi
 packages=$(
   find . -maxdepth 1 -name '*.pkg.tar.xz' -printf '%f\n'
 )
+# shellcheck disable=SC2016
+{
+  printf 'SELECT'
+  printf ' `binary_packages`.`id`,'
+  mysql_package_name_query
+  printf ' FROM `binary_packages`'
+  mysql_join_binary_packages_architectures
+  mysql_join_binary_packages_repositories
+  printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
+    "$(
+      printf '%s' "${build_assignment_id}" | \
+        base64 -w0
+    )"
+  printf ' AND `repositories`.`name`="build-list"'
+  printf ';\n'
+} | \
+  mysql_run_query | \
+  tr '\t' ' ' | \
+  sort -k2 > \
+  "${tmp_dir}/package-ids"
+
 package_errors=$(
   {
-    # shellcheck disable=SC2086
-    printf '%s\n' ${packages} | \
+    printf '%s\n' "${packages}" | \
       sed '
         s|^|was_built: |
       '
-    # shellcheck disable=SC2016
-    {
-      printf 'SELECT CONCAT('
-        printf '"expected: ",'
-        mysql_package_name_query
-      printf ')'
-      printf ' FROM `binary_packages`'
-      mysql_join_binary_packages_architectures
-      mysql_join_binary_packages_repositories
-      printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
-        "$(
-          printf '%s' "${build_assignment_id}" | \
-            base64 -w0
-        )"
-      printf ' AND `repositories`.`name`="build-list"'
-      printf ';\n'
-    } | \
-      mysql_run_query
+    sed '
+      s|^[0-9]\+ |expected: |
+    ' "${tmp_dir}/package-ids"
   } | \
     sort -k2 | \
     uniq -u -f1
@@ -434,6 +437,12 @@ package_errors=$(
 if [ -n "${package_errors}" ]; then
   >&2 echo 'The following packages should have been built but are missing or vice versa:'
   >&2 echo "${package_errors}"
+  exit 4
+fi
+
+if [ ! -s "${tmp_dir}/package-ids" ]; then
+  >&2 echo 'No package was expected, no package was built.'
+  >&2 echo 'That should not happen!'
   exit 4
 fi
 
@@ -467,16 +476,24 @@ fi
 destination="${infos##* }"
 destination_id="${infos%% *}"
 
-# generate checksums
-find . -maxdepth 1 -name '*.pkg.tar.xz' \
-  -exec sha512sum {} \; | \
-  sed '
-    s,\s*\./,\t,
-  ' > \
-  "${tmp_dir}/sha512sums"
-
-# move namcap.logs
-find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
+while read -r package_id package_name; do
+  # move namcap.logs
+  mv \
+    "${tmp_dir}/${package_name}-namcap.log.gz" \
+    "${build_log_directory}/success/"
+  # generate checksum
+  sha512sum "${tmp_dir}/${package_name}" | \
+    awk '{print "'"${package_id}"'\t" $1}' >> \
+    "${tmp_dir}/sha512sums"
+  # generate list of required/provided libraries
+  for lib in 'provides' 'needs'; do
+    zcat "${tmp_dir}/${package_name}.so.${lib}.gz" | \
+      sed '
+        s/^/'"${package_id}"'\t/
+      ' >> "${tmp_dir}/so.${lib}"
+  done
+done < \
+  "${tmp_dir}/package-ids"
 
 # move packages
 ${master_mirror_rsync_command} \
@@ -499,49 +516,33 @@ trigger_mirror_refreshs
 # shellcheck disable=SC2016
 {
   # insert checksums into database
-  printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`sha512sum` VARCHAR(128), `pkgfile` VARCHAR(128));\n'
+  printf 'CREATE TEMPORARY TABLE `pkg_hashes` (`pkgid` BIGINT, `sha512sum` VARCHAR(128));\n'
   printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `pkg_hashes`;\n' \
     "${tmp_dir}/sha512sums"
   printf 'UPDATE `binary_packages`'
-  mysql_join_binary_packages_architectures
-  mysql_join_binary_packages_repositories
-  printf ' JOIN `pkg_hashes` ON `pkg_hashes`.`pkgfile`='
-  mysql_package_name_query
-  printf ' SET `binary_packages`.`sha512sum`=`pkg_hashes`.`sha512sum`'
-  printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
-    "$(
-      printf '%s' "${build_assignment_id}" | \
-        base64 -w0
-    )"
-  printf ' AND `repositories`.`name`="build-list";\n'
+  printf ' JOIN `pkg_hashes` ON `pkg_hashes`.`pkgid`=`binary_packages`.`id`'
+  printf ' SET `binary_packages`.`sha512sum`=`pkg_hashes`.`sha512sum`;\n'
   printf 'COMMIT;\n'
 
   # insert provided/needed libraries into database
   for lib_link in 'pl:provides' 'nl:needs'; do
-    printf 'CREATE TEMPORARY TABLE `%s` (`pkgfile` VARCHAR(64), `lib` VARCHAR(128));\n' \
+    printf 'CREATE TEMPORARY TABLE `%s` (`pkgid` BIGINT, `lib` VARCHAR(128));\n' \
       "${lib_link%:*}"
-    find . -maxdepth 1 -name '*.pkg.tar.xz.so.'"${lib_link#*:}"'.gz' -execdir zgrep -HF '' '{}' \; | \
-      sed -n '
-        s,^\./\(.\+\.pkg\.tar\.xz\)\.so\.'"${lib_link#*:}"'\.gz:\([^:]\+\)$,\1\n\2,
-        T
-        p
-      ' | \
-      base64_encode_each | \
-      sed '
-        N
-        s/^\(\S\+\)\n\(\S\+\)$/(from_base64("\1"),from_base64("\2")),/
-        $s/,$/;/
-        2 s/^/INSERT INTO `'"${lib_link%:*}"'` (`pkgfile`,`lib`) VALUES /
-      '
+    printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `%s`;\n' \
+      "${tmp_dir}/so.${lib_link#*:}" "${lib_link%:*}"
+
     printf 'INSERT IGNORE INTO `install_targets` (`name`)'
     printf ' SELECT DISTINCT `%s`.`lib` FROM `%s`;\n' \
       "${lib_link%:*}" "${lib_link%:*}"
+    printf 'COMMIT;\n'
+
     if [ "${lib_link%:*}" = 'pl' ]; then
       printf 'INSERT IGNORE INTO `install_target_providers` (`package`,`install_target`)'
     else
       printf 'INSERT IGNORE INTO `dependencies` (`dependent`,`depending_on`,`dependency_type`)'
     fi
-    printf ' SELECT `binary_packages`.`id`,`install_targets`.`id`'
+    printf ' SELECT `%s`.`pkgid`,`install_targets`.`id`' \
+      "${lib_link%:*}"
     if [ "${lib_link%:*}" = 'nl' ]; then
       printf ',`dependency_types`.`id`'
     fi
@@ -551,31 +552,26 @@ trigger_mirror_refreshs
     fi
     printf ' JOIN `%s` ON `%s`.`lib`=`install_targets`.`name`' \
       "${lib_link%:*}" "${lib_link%:*}"
-    printf ' JOIN `binary_packages`'
-    mysql_join_binary_packages_architectures
-    mysql_join_binary_packages_repositories
-    printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
-      "$(
-        printf '%s' "${build_assignment_id}" | \
-          base64 -w0
-      )"
-    printf ' AND `repositories`.`name`="build-list"'
-    printf ' AND '
-    mysql_package_name_query
-    printf '=`%s`.`pkgfile`' \
-      "${lib_link%:*}"
     printf ';\n'
     printf 'COMMIT;\n'
   done
 
-  # remove from build-list
+  # remove build_assignment's markers
   printf 'UPDATE `build_assignments`'
-  mysql_join_build_assignments_binary_packages
-  mysql_join_binary_packages_repositories '' 'old_repo'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
   printf ' `build_assignments`.`priority`=0,'
-  printf ' `build_assignments`.`return_date`=NOW(),'
+  printf ' `build_assignments`.`return_date`=NOW()'
+  printf ' WHERE `build_assignments`.`id`=from_base64("%s");\n' \
+    "$(
+      printf '%s' "${build_assignment_id}" | \
+        base64 -w0
+    )"
+  printf 'COMMIT;\n'
+
+  # remove from build-list
+  printf 'UPDATE `binary_packages`'
+  printf ' SET'
   printf ' `binary_packages`.`repository`=from_base64("%s")' \
     "$(
       printf '%s' "${destination_id}" | \
@@ -584,12 +580,16 @@ trigger_mirror_refreshs
   printf ' `binary_packages`.`has_issues`=0,'
   printf ' `binary_packages`.`is_tested`=0,'
   printf ' `binary_packages`.`last_moved`=NOW()'
-  printf ' WHERE `build_assignments`.`id`=from_base64("%s")' \
-    "$(
-      printf '%s' "${build_assignment_id}" | \
-        base64 -w0
-    )"
-  printf ' AND `old_repo`.`name`="build-list";\n'
+  printf ' WHERE `binary_packages`.`id` IN ('
+  cut -d' ' -f1 < \
+    "${tmp_dir}/package-ids" | \
+    base64_encode_each | \
+    sed '
+      s/^/from_base64("/
+      s/$/"),/
+      $ s/,$//
+    '
+  printf ');\n'
   printf 'COMMIT;\n'
 
   # remove from build slave's `currently_building`
@@ -610,6 +610,7 @@ trigger_mirror_refreshs
   mysql_join_build_dependency_loops_binary_packages
   mysql_join_binary_packages_repositories
   printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
+  printf 'COMMIT;\n'
   printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('
     printf 'SELECT 1 FROM `loops_to_delete`'
     printf ' WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'
@@ -618,29 +619,8 @@ trigger_mirror_refreshs
 } | \
   mysql_run_query
 
-# shellcheck disable=SC2016
-{
-  printf 'SELECT'
-  printf ' `binary_packages`.`id`'
-  printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_architectures
-  printf ' WHERE '
-  mysql_package_name_query
-  printf ' IN ('
-  # shellcheck disable=SC2086
-  printf '%s\n' ${packages} | \
-    base64_encode_each | \
-    sed '
-      s/^/from_base64("/
-      s/$/"),/
-    '
-  printf '"") AND `binary_packages`.`repository`=from_base64("%s");\n' \
-    "$(
-      printf '%s' "${destination_id}" | \
-        base64 -w0
-    )"
-} | \
-  mysql_run_query | \
+cut -d' ' -f1 < \
+  "${tmp_dir}/package-ids" | \
   while read -r package_id; do
     remove_old_package_versions "${package_id}"
   done
