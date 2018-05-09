@@ -905,6 +905,25 @@ mysql_package_name_query() {
   printf ')'
 }
 
+# TODO: delete mysql_repair_binary_packages_in_repositories when obsolete
+
+# mysql_repair_binary_packages_in_repositories
+# temporary function to keep binary_packages_in_repositories up-to-date
+mysql_repair_binary_packages_in_repositories() {
+  {
+    printf 'DELETE `binary_packages_in_repositories`'
+    printf ' FROM `binary_packages_in_repositories`'
+    printf ' LEFT JOIN `binary_packages`'
+    printf ' ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`'
+    printf ' WHERE `binary_packages`.`repository` != `binary_packages_in_repositories`.`repository`;\n'
+    printf 'COMMIT;\n'
+    printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`)'
+    printf ' SELECT `binary_packages`.`id`,`binary_packages`.`repository`'
+    printf ' FROM `binary_packages`;\n'
+  } | \
+    mysql_run_query
+}
+
 # mysql_join_*_*
 # print 'JOIN' part of mysql query to connect the respective tables
 # these functions take 2 optional arguments, acting as aliases for
