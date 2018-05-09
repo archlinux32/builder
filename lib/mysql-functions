@@ -968,6 +968,9 @@ for link in \
   'binary_packages:repository:repositories' \
   'binary_packages:build_assignment:build_assignments' \
   \
+  'binary_packages_in_repositories:package:binary_packages' \
+  'binary_packages_in_repositories:repository:repositories' \
+  \
   'build_assignments:architecture:architectures' \
   'build_assignments:package_source:package_sources' \
   \
