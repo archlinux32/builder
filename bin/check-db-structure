@@ -5,6 +5,8 @@
 # shellcheck source=../conf/default.conf
 . "${0%/*}/../conf/default.conf"
 
+# stored functions
+
 # shellcheck disable=SC2016
 {
   printf 'SELECT `proc`.`name` FROM `mysql`.`proc` WHERE `proc`.`Db`="buildmaster"' | \
@@ -18,6 +20,9 @@
     s/ \(SELECT\|FROM\|\(LEFT \|RIGHT \)\?JOIN\|ON\|WHERE\) /\n\t\1 /g
     s/(SELECT/(\nSELECT/g
   '
+
+# table headers
+
 # shellcheck disable=SC2016
 {
   printf 'SHOW TABLES' | \
@@ -30,4 +35,22 @@
   sed '
     s/ AUTO_INCREMENT=[0-9]\+ / /g
     s/^ /\t/
+  '
+
+# content of "constant" tables
+mysqldump --skip-lock-tables 'buildmaster' \
+  'architectures' \
+  'dependency_types' \
+  'email_actions' \
+  'fail_reasons' \
+  'git_repositories' \
+  'repositories' \
+  'repository_moves' \
+  'repository_stabilities' \
+  'repository_stability_relations' \
+  'upstream_repositories' | \
+  grep '^INSERT ' | \
+  sed '
+    s/),(/),\n  (/g
+    s/VALUES (/VALUES\n  (/g
   '
