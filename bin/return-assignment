@@ -16,8 +16,7 @@
 
 # TODO: sign database
 
-# TODO: there is several stuff down there, which should rather be
-# identified by its id
+# TODO: identify built packages by their id
 
 # shellcheck disable=SC2119,SC2120
 
@@ -61,10 +60,10 @@ if [ "$5" = 'ERROR' ]; then
       mysql_join_package_sources_upstream_repositories
       mysql_join_build_assignments_binary_packages
       mysql_join_binary_packages_repositories
-      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+      printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
         "$(
           # shellcheck disable=SC2154
-          printf '%s' "${slave}" | \
+          printf '%s' "${slave_id}" | \
             base64 -w0
         )"
       printf ' AND `package_sources`.`%s`=from_base64("%s")' \
@@ -83,6 +82,7 @@ if [ "$5" = 'ERROR' ]; then
     exit 2
   fi
   was_broken_before="${infos##* }"
+  build_assignment_id="${infos%% *}"
 
   # save sent build logs
   saved_build_logs=$(
@@ -112,7 +112,7 @@ if [ "$5" = 'ERROR' ]; then
           mysql_run_query
       )
       for saved_build_log in ${saved_build_logs}; do
-        printf '%s' "${fail_reason_identifiers}" | \
+        printf '%s\n' "${fail_reason_identifiers}" | \
           while read -r reason_id identifier; do
             if zgrep -q "^$(
                 printf '%s' "${identifier}" | \
@@ -141,27 +141,30 @@ if [ "$5" = 'ERROR' ]; then
         '
       printf 'INSERT INTO `failed_builds` (`build_slave`,`build_assignment`,`date`,`reason`,`log_file`)'
       printf ' SELECT '
-      printf '`build_slaves`.`%s`,' \
-        'id' 'currently_building'
+      printf 'from_base64("%s"),' \
+        "$(printf '%s' "${slave_id}" | base64 -w0)" \
+        "$(printf '%s' "${build_assignment_id}" | base64 -w0)"
       printf '`failures`.`%s`,' \
         'date' 'reason' 'log_file' | \
         sed 's/,$//'
-      printf ' FROM `build_slaves` JOIN `failures`'
-      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-        "$(
-          printf '%s' "${slave}" | \
-            base64 -w0
-        )"
-      printf 'DROP TABLE `failures`;\n'
+      printf ' FROM `failures`;\n'
+      printf 'DROP TEMPORARY TABLE `failures`;\n'
+      printf 'COMMIT;\n'
     fi
     printf 'UPDATE `build_assignments`'
-    mysql_join_build_assignments_build_slaves
-    printf ' SET `build_assignments`.`is_broken`=1,'
-    printf ' `build_slaves`.`currently_building`=NULL,'
-    printf ' `build_slaves`.`logged_lines`=NULL'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+    printf ' SET `build_assignments`.`is_broken`=1'
+    printf ' WHERE `build_assignments`.`id`=from_base64("%s");\n' \
       "$(
-        printf '%s' "${slave}" | \
+        printf '%s' "${build_assignment_id}" | \
+          base64 -w0
+      )"
+    printf 'COMMIT;\n'
+    printf 'UPDATE `build_slaves`'
+    printf ' SET `build_slaves`.`currently_building`=NULL,'
+    printf ' `build_slaves`.`logged_lines`=NULL'
+    printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
+      "$(
+        printf '%s' "${slave_id}" | \
           base64 -w0
       )"
   } | \
@@ -200,6 +203,7 @@ if [ "$5" = 'ERROR' ]; then
 
     # shellcheck disable=SC2119
     {
+      # shellcheck disable=SC2154
       printf '%s is broken (says %s).' \
         "$1" \
         "${slave}"
@@ -234,31 +238,40 @@ clean_up_lock_file() {
 }
 
 # shellcheck disable=SC2016
-if ! {
-    printf 'SELECT count(*)'
-    printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_build_assignments
-    mysql_join_build_assignments_build_slaves
-    mysql_join_binary_packages_repositories
+infos=$(
+  {
+    printf 'SELECT DISTINCT `build_assignments`.`id`,`upstream_repositories`.`id` FROM `build_slaves`'
+    mysql_join_build_slaves_build_assignments
     mysql_join_build_assignments_package_sources
     mysql_join_package_sources_upstream_repositories
-    printf ' WHERE `repositories`.`name`="build-list"'
-    printf ' AND `build_slaves`.`name`=from_base64("%s")' \
-      "$(printf '%s' "${slave}" | base64 -w0)"
+    mysql_join_build_assignments_binary_packages
+    mysql_join_binary_packages_repositories
+    printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
+      "$(
+        # shellcheck disable=SC2154
+        printf '%s' "${slave_id}" | \
+          base64 -w0
+      )"
     printf ' AND `package_sources`.`%s`=from_base64("%s")' \
       'pkgbase' "$(printf '%s' "$1" | base64 -w0)" \
       'git_revision' "$(printf '%s' "$2" | base64 -w0)" \
       'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
     printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
-    printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
+    printf ' AND `repositories`.`name`="build-list"'
+    printf ' AND `binary_packages`.`sub_pkgver`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
-    mysql_run_query | \
-    grep -qvxF '0'; then
+    mysql_run_query
+)
+
+if [ -z "${infos}" ]; then
   >&2 echo 'Sorry, the sent package is outdated.'
   exit 2
 fi
+
+build_assignment_id="${infos%% *}"
+upstream_repository_id="${infos##* }"
 
 clean_up_tmp_dir() {
   cd "${base_dir}"
@@ -312,7 +325,7 @@ missing_files=$(
     \) \
   \) | \
     sed '
-      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\.gz\|\.so\.\(provides\|needs\)\.gz\) /\1 /
+      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\|\.so\.\(provides\|needs\)\)\.gz /\1 /
     ' | \
     sort -k1,1 -k2,2 | \
     sed '
@@ -371,7 +384,7 @@ signatures=$(
     -exec gpg --batch --status-fd 1 -q --homedir /etc/pacman.d/gnupg --verify '{}.sig' '{}' \; 2> /dev/null
 )
 if [ -z "$(
-  echo "${signatures}" | \
+  printf '%s\n' "${signatures}" | \
     cut -d' ' -f2 | \
     grep -x 'file\|TRUST_FULLY' | \
     sort | \
@@ -380,7 +393,7 @@ if [ -z "$(
     uniq -d
 )" ]; then
   >&2 echo 'Signature(s) is/are not fully trusted:'
-  >&2 echo "${signatures}"
+  >&2 printf '%s\n' "${signatures}"
   exit 3
 fi
 
@@ -403,11 +416,10 @@ package_errors=$(
       printf ')'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
-      mysql_join_binary_packages_build_slaves
       mysql_join_binary_packages_repositories
-      printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+      printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
         "$(
-          printf '%s' "${slave}" | \
+          printf '%s' "${build_assignment_id}" | \
             base64 -w0
         )"
       printf ' AND `repositories`.`name`="build-list"'
@@ -425,6 +437,36 @@ if [ -n "${package_errors}" ]; then
   exit 4
 fi
 
+# shellcheck disable=SC2016
+infos=$(
+  {
+    printf 'SELECT `t`.`id`,`t`.`name`'
+    printf ' FROM `repository_moves`'
+    printf ' JOIN `repositories` as `%s` ON `%s`.`id`=`repository_moves`.`%s_repository`' \
+      't' 't' 'to' \
+      'f' 'f' 'from'
+    printf ' WHERE `f`.`name`="build-list"'
+    printf ' AND `repository_moves`.`upstream_package_repository`=from_base64("%s");\n' \
+      "$(
+        printf '%s' "${upstream_repository_id}" | \
+          base64 -w0
+      )"
+  } | \
+    mysql_run_query | \
+    tr '\t' ' '
+)
+if [ -z "${infos}" ]; then
+  >&2 echo 'I cannot determine, where this package should be published.'
+  >&2 echo 'This is some internal error and not (necessarily) your fault.'
+  # We give a temporary error (although resolving this needs manual
+  # intervention), because there is nothing wrong with the sent package
+  # whence it does not neet to be built again, but can simply be sent again.
+  exit 1
+fi
+
+destination="${infos##* }"
+destination_id="${infos%% *}"
+
 # generate checksums
 find . -maxdepth 1 -name '*.pkg.tar.xz' \
   -exec sha512sum {} \; | \
@@ -437,8 +479,6 @@ find . -maxdepth 1 -name '*.pkg.tar.xz' \
 find . -maxdepth 1 -name '*.pkg.tar.xz-namcap.log.gz' -execdir mv '{}' "${build_log_directory}/success/" \;
 
 # move packages
-destination=$(official_or_community "$1.$2.$3.$4" 'staging')
-
 ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.files."* \
@@ -464,17 +504,17 @@ trigger_mirror_refreshs
     "${tmp_dir}/sha512sums"
   printf 'UPDATE `binary_packages`'
   mysql_join_binary_packages_architectures
-  mysql_join_binary_packages_build_slaves
   mysql_join_binary_packages_repositories
   printf ' JOIN `pkg_hashes` ON `pkg_hashes`.`pkgfile`='
   mysql_package_name_query
   printf ' SET `binary_packages`.`sha512sum`=`pkg_hashes`.`sha512sum`'
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+  printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
     "$(
-      printf '%s' "${slave}" | \
+      printf '%s' "${build_assignment_id}" | \
         base64 -w0
     )"
   printf ' AND `repositories`.`name`="build-list";\n'
+  printf 'COMMIT;\n'
 
   # insert provided/needed libraries into database
   for lib_link in 'pl:provides' 'nl:needs'; do
@@ -513,11 +553,10 @@ trigger_mirror_refreshs
       "${lib_link%:*}" "${lib_link%:*}"
     printf ' JOIN `binary_packages`'
     mysql_join_binary_packages_architectures
-    mysql_join_binary_packages_build_slaves
     mysql_join_binary_packages_repositories
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+    printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
       "$(
-        printf '%s' "${slave}" | \
+        printf '%s' "${build_assignment_id}" | \
           base64 -w0
       )"
     printf ' AND `repositories`.`name`="build-list"'
@@ -526,42 +565,44 @@ trigger_mirror_refreshs
     printf '=`%s`.`pkgfile`' \
       "${lib_link%:*}"
     printf ';\n'
+    printf 'COMMIT;\n'
   done
 
   # remove from build-list
   printf 'UPDATE `build_assignments`'
-  mysql_join_build_assignments_build_slaves
   mysql_join_build_assignments_binary_packages
   mysql_join_binary_packages_repositories '' 'old_repo'
   printf ' SET'
   printf ' `build_assignments`.`is_broken`=0,'
   printf ' `build_assignments`.`priority`=0,'
   printf ' `build_assignments`.`return_date`=NOW(),'
-  printf ' `binary_packages`.`repository`=(SELECT `new_repo`.`id` FROM `repositories` AS `new_repo` WHERE `new_repo`.`name`=from_base64("%s")),' \
+  printf ' `binary_packages`.`repository`=from_base64("%s")' \
     "$(
-      printf '%s' "${destination}" | \
+      printf '%s' "${destination_id}" | \
         base64 -w0
     )"
   printf ' `binary_packages`.`has_issues`=0,'
   printf ' `binary_packages`.`is_tested`=0,'
   printf ' `binary_packages`.`last_moved`=NOW()'
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+  printf ' WHERE `build_assignments`.`id`=from_base64("%s")' \
     "$(
-      printf '%s' "${slave}" | \
+      printf '%s' "${build_assignment_id}" | \
         base64 -w0
     )"
   printf ' AND `old_repo`.`name`="build-list";\n'
+  printf 'COMMIT;\n'
+
   # remove from build slave's `currently_building`
-  printf 'UPDATE `build_slaves` AS `to_update`'
-  printf ' JOIN `build_slaves` AS `current_slave`'
-  printf ' ON `to_update`.`currently_building`=`current_slave`.`currently_building`'
-  printf ' SET `to_update`.`currently_building`=NULL,'
-  printf ' `to_update`.`logged_lines`=NULL'
-  printf ' WHERE `current_slave`.`name`=from_base64("%s");\n' \
+  printf 'UPDATE `build_slaves`'
+  printf ' SET `build_slaves`.`currently_building`=NULL,'
+  printf ' `build_slaves`.`logged_lines`=NULL'
+  printf ' WHERE `build_slaves`.`currently_building`=from_base64("%s");\n' \
     "$(
-      printf '%s' "${slave}" | \
+      printf '%s' "${build_assignment_id}" | \
         base64 -w0
     )"
+  printf 'COMMIT;\n'
+
   # remove broken loops
   printf 'CREATE TEMPORARY TABLE `loops_to_delete` (`loop` MEDIUMINT);\n'
   printf 'INSERT INTO `loops_to_delete`'
@@ -570,9 +611,10 @@ trigger_mirror_refreshs
   mysql_join_binary_packages_repositories
   printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
   printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('
-  printf 'SELECT * FROM `loops_to_delete` WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'
+    printf 'SELECT 1 FROM `loops_to_delete`'
+    printf ' WHERE `loops_to_delete`.`loop`=`build_dependency_loops`.`loop`'
   printf ');\n'
-  printf 'DROP TABLE `loops_to_delete`;\n'
+  printf 'DROP TEMPORARY TABLE `loops_to_delete`;\n'
 } | \
   mysql_run_query
 
@@ -582,7 +624,6 @@ trigger_mirror_refreshs
   printf ' `binary_packages`.`id`'
   printf ' FROM `binary_packages`'
   mysql_join_binary_packages_architectures
-  mysql_join_binary_packages_repositories
   printf ' WHERE '
   mysql_package_name_query
   printf ' IN ('
@@ -593,9 +634,9 @@ trigger_mirror_refreshs
       s/^/from_base64("/
       s/$/"),/
     '
-  printf '"") AND `repositories`.`name`=from_base64("%s");\n' \
+  printf '"") AND `binary_packages`.`repository`=from_base64("%s");\n' \
     "$(
-      printf '%s' "${destination}" | \
+      printf '%s' "${destination_id}" | \
         base64 -w0
     )"
 } | \
