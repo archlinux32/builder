@@ -129,6 +129,17 @@ delete_package() {
       printf ' WHERE `repositories`.`name` in ("build-list","to-be-decided")'
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' \
         "$(printf '%s' "$1" | base64 -w0)"
+      printf 'COMMIT;\n'
+      printf 'UPDATE `binary_packages_in_repositories`'
+      mysql_join_binary_packages_in_repositories_binary_packages
+      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_build_assignments
+      mysql_join_build_assignments_package_sources
+      printf ' SET `binary_packages`.`repository`=(SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="deletion-list")'
+      printf ' WHERE `repositories`.`name` in ("build-list","to-be-decided")'
+      printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' \
+        "$(printf '%s' "$1" | base64 -w0)"
+      printf 'COMMIT;\n'
       # other packages are marked as `is_to_be_deleted`
       printf 'UPDATE `binary_packages`'
       mysql_join_binary_packages_repositories
