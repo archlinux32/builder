@@ -123,24 +123,6 @@ repository_of_package() {
   esac
 }
 
-# official_or_community $package.$repo_revision.$mod_repo_revision.$repository $ending
-# print wether the specified package is an official package (print
-# $ending) or a community package (print 'community-$ending') or a
-# build-support package (print 'build-support')
-
-official_or_community() {
-  local prepo
-  prepo=$(repository_of_package "$1")
-
-  if [ "${prepo}" = 'community' ]; then
-    echo 'community-'"$2"
-  elif [ "${prepo}" = 'build-support' ]; then
-    echo 'build-support'
-  else
-    echo "$2"
-  fi
-}
-
 # ls_master_mirror $path
 # list content of $path on the master mirror (via rsync)
 
