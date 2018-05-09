@@ -98,31 +98,6 @@ find_git_repository_to_package_repository() {
 
 }
 
-# repository_of_package $package.$repo_revision.$mod_repo_revision.$repository
-# print which (stable) repository a package belongs to
-
-repository_of_package() {
-  local package="$1"
-  local repository="${package##*.}"
-  package="${package%.*}"
-  local a32_rev="${package##*.}"
-  package="${package%.*.*}"
-
-  case "${repository}" in
-    'multilib')
-      if git -C "${repo_paths__archlinux32}" archive --format=tar "${a32_rev}" -- 'extra-from-multilib' | \
-        tar -Ox | \
-        grep -qFx "${package%.*.*.*}"; then
-        echo 'extra'
-      else
-        echo 'community'
-      fi
-      ;;
-    *)
-      echo "${repository}"
-  esac
-}
-
 # ls_master_mirror $path
 # list content of $path on the master mirror (via rsync)
 
