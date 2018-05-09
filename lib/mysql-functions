@@ -487,6 +487,13 @@ mysql_generate_package_metadata() {
             'repositories' 'name' "${current_repository}" \
             'architectures' 'name' "${arch}"
           printf ';\n'
+          printf 'COMMIT;\n'
+          printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`)'
+          printf ' SELECT LAST_INSERT_ID(),`repositories`.`id`'
+          printf ' FROM `repositories`'
+          printf ' WHERE `repositories`.`name` = from_base64("%s");\n' \
+            "${current_repository}"
+          printf 'COMMIT;\n'
         } | \
           sed '
             s|,)|)|g
