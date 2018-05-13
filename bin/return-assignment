@@ -257,7 +257,7 @@ infos=$(
     printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
     printf ' AND `repositories`.`name`="build-list"'
-    printf ' AND `binary_packages`.`sub_pkgver`=from_base64("%s");\n' \
+    printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
     mysql_run_query
