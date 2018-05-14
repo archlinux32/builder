@@ -260,7 +260,8 @@ infos=$(
     printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
-    mysql_run_query
+    mysql_run_query | \
+    tr '\t' ' '
 )
 
 if [ -z "${infos}" ]; then
@@ -469,7 +470,7 @@ if [ -z "${infos}" ]; then
   >&2 echo 'This is some internal error and not (necessarily) your fault.'
   # We give a temporary error (although resolving this needs manual
   # intervention), because there is nothing wrong with the sent package
-  # whence it does not neet to be built again, but can simply be sent again.
+  # whence it does not need to be built again, but can simply be sent again.
   exit 1
 fi
 
@@ -572,7 +573,7 @@ trigger_mirror_refreshs
   # remove from build-list
   printf 'UPDATE `binary_packages`'
   printf ' SET'
-  printf ' `binary_packages`.`repository`=from_base64("%s")' \
+  printf ' `binary_packages`.`repository`=from_base64("%s"),' \
     "$(
       printf '%s' "${destination_id}" | \
         base64 -w0
