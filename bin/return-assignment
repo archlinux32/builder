@@ -323,7 +323,7 @@ missing_files=$(
     \) \
   \) | \
     sed '
-      s/\(\.pkg\.tar\.xz\)\(\.sig\|-namcap\.log\|\.so\.\(provides\|needs\)\)\.gz /\1 /
+      s/\(\.pkg\.tar\.xz\)\(\.sig\|\(-namcap\.log\|\.so\.\(provides\|needs\)\)\.gz\) /\1 /
     ' | \
     sort -k1,1 -k2,2 | \
     sed '
