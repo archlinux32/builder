@@ -1029,3 +1029,23 @@ for link in \
   mysql_join__generic "${table_a}" "${column_a}" "${table_b}" "${column_b}"
   mysql_join__generic "${table_b}" "${column_b}" "${table_a}" "${column_a}"
 done
+
+# mysql_show_binary_packages_in_repositories_issues
+# show issues of binary_packages_in_repositories
+mysql_show_binary_packages_in_repositories_issues() {
+  {
+    printf 'SELECT * FROM `binary_packages`'
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+      printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+      printf ' AND `binary_packages_in_repositories`.`repository`=`binary_packages`.`repository`'
+    printf ');\n'
+    printf 'SELECT * FROM `binary_packages_in_repositories`'
+    printf ' WHERE NOT EXISTS ('
+      printf 'SELECT 1 FROM `binary_packages`'
+      printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+      printf ' AND `binary_packages_in_repositories`.`repository`=`binary_packages`.`repository`'
+    printf ');\n'
+  } | \
+    mysql_run_query
+}
