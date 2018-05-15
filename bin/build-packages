@@ -162,7 +162,14 @@ if [ "${timeout}" -ne 0 ]; then
   timeout=$((timeout+$(date +%s)))
 fi
 
-while [ "${count}" -ne 0 ]; do
+checksum=$(
+  calculate_script_checksum
+)
+
+# When this script or a script in lib/ got updated, we do not request
+# any new assignments. This script should rather exit and be restarted.
+while [ "${count}" -ne 0 ] && \
+  [ "$(calculate_script_checksum)" = "${checksum}" ]; do
 
   if [ "${timeout}" -ne 0 ] && [ "${timeout}" -lt "$(date +%s)" ];
   then
