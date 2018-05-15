@@ -1049,3 +1049,21 @@ mysql_show_binary_packages_in_repositories_issues() {
   } | \
     mysql_run_query
 }
+
+# mysql_retrieve_repository_ids
+# retrieve the ids of all known repositories into $repository_ids__$arch_$repo
+mysql_retrieve_repository_ids() {
+  eval "$(
+    {
+      printf 'SELECT CONCAT('
+      printf '"repository_ids__",'
+      printf '`architectures`.`name`,"_",'
+      printf '`repositories`.`name`,"=",'
+      printf '`repositories`.`id`'
+      printf ') FROM `repositories`'
+      mysql_join_repositories_architectures
+    } | \
+      mysql_run_query | \
+      tr -- '-' '_'
+  )"
+}
