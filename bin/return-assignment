@@ -150,7 +150,8 @@ if [ "$5" = 'ERROR' ]; then
       printf 'COMMIT;\n'
     fi
     printf 'UPDATE `build_assignments`'
-    printf ' SET `build_assignments`.`is_broken`=1'
+    printf ' SET `build_assignments`.`is_broken`=1,'
+    printf '`build_assignments`.`priority`=0'
     printf ' WHERE `build_assignments`.`id`=from_base64("%s");\n' \
       "$(
         printf '%s' "${build_assignment_id}" | \
