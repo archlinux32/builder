@@ -23,13 +23,13 @@ usage() {
   >&2 echo ' and build a list in the proper build order'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:   If necessary, wait for lock blocking.'
   >&2 echo '  -d|--date $datetime:'
   >&2 echo '                Pull latest commit before $datetime'
   >&2 echo '                (yyyy-mm-ddThh:mm:ss). Conflicts -n.'
   >&2 echo '  -h|--help:    Show this help and exit.'
   >&2 echo '  -n|--no-pull: Do not pull git repos, merely reorder build list.'
   >&2 echo '                Conflicts -d.'
+  >&2 echo '  -w|--wait:    If necessary, wait for lock blocking.'
   >&2 echo '  -x|--test-exclusion $package:'
   >&2 echo '                Print additionally deleted/excluded packages if'
   >&2 echo '                "$package" would be black listed.'
@@ -37,12 +37,12 @@ usage() {
 }
 
 eval set -- "$(
-  getopt -o bd:hnx: \
-    --long block \
+  getopt -o d:hnwx: \
     --long date: \
     --long help \
     --long no-pull \
     --long test-exclusion: \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -55,9 +55,6 @@ pull=true
 while true
 do
   case "$1" in
-    -b|--block)
-      block_flag=''
-    ;;
     -d|--date)
       shift
       date_time="$1"
@@ -67,6 +64,9 @@ do
     ;;
     -n|--no-pull)
       pull=false
+    ;;
+    -w|--wait)
+      block_flag=''
     ;;
     -x|--test-exclusion)
       shift

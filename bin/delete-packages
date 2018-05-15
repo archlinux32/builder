@@ -25,17 +25,17 @@ usage() {
   >&2 echo ' delete obsolete binary packages.'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:       If necessary, wait for lock blocking.'
   >&2 echo '  -h|--help:        Show this help and exit.'
   >&2 echo '  -n|--no-action:   Only print what would be deleted.'
+  >&2 echo '  -w|--wait:        If necessary, wait for lock blocking.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bhn \
-    --long block \
+  getopt -o hnw \
     --long help \
     --long no-action \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -46,14 +46,14 @@ no_action=false
 while true
 do
   case "$1" in
-    -b|--block)
-      block_flag=''
-    ;;
     -h|--help)
       usage 0
     ;;
     -n|--no-action)
       no_action=true
+    ;;
+    -w|--wait)
+      block_flag=''
     ;;
     --)
       shift

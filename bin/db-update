@@ -30,8 +30,6 @@ usage() {
   >&2 echo ' move possible packages from staging to testing.'
   >&2 echo ''
   >&2 echo 'possible options:'
-  >&2 echo '  -b|--block:'
-  >&2 echo '    If necessary, wait for lock blocking.'
   >&2 echo '  -f|--force $package-id:'
   >&2 echo '    Force movement of Package with given id and move nothing else.'
   >&2 echo '  -h|--help:'
@@ -42,16 +40,18 @@ usage() {
   >&2 echo '    Move forward any package which replaces no package whose'
   >&2 echo '    dependencies are all available somewhere.'
   >&2 echo '    Note, that this _may_ move _less_ packages.'
+  >&2 echo '  -w|--wait:'
+  >&2 echo '    If necessary, wait for lock blocking.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
 eval set -- "$(
-  getopt -o bf:hnp \
-    --long block \
+  getopt -o f:hnpw \
     --long force \
     --long help \
     --long no-action \
     --long progressive \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
@@ -64,9 +64,6 @@ force_ids=''
 while true
 do
   case "$1" in
-    -b|--block)
-      block_flag=''
-    ;;
     -f|--force)
       shift
       force_ids=$(
@@ -83,6 +80,9 @@ do
     ;;
     -p|--progressive)
       progressive=true
+    ;;
+    -w|--wait)
+      block_flag=''
     ;;
     --)
       shift
