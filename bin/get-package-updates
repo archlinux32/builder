@@ -16,6 +16,9 @@
 
 # TODO: keep database clean in case of abort
 
+# TODO: Being on the deletion-list is not a reason not to be scheduled
+# if a dependency formerly on the deletion-list is now being built.
+
 # shellcheck disable=SC2016
 usage() {
   >&2 echo ''
