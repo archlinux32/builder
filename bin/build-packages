@@ -459,11 +459,12 @@ while [ "${count}" -ne 0 ]; do
                 ' > \
                 "${pkgfile}.so.provides"
             done
-          >&2 printf 'searching for required libraries\n'
+          >&2 printf 'searching for required and more provided libraries\n'
           package_content_dir=$(mktemp -d "${tmp_dir}/package-content.XXXXXX")
           find "${tar_content_dir}" -maxdepth 1 \
             -name '*.pkg.tar.xz' | \
             while read -r pkgfile; do
+              touch "${pkgfile}.so.needs"
               if printf '%s\n' "${pkgfile}" | \
                 grep -vq -- '-any\.pkg\.tar\.xz$'; then
                 # we do not check "any" packages for linked libraries
@@ -481,12 +482,22 @@ while [ "${count}" -ne 0 ]; do
                   sed '
                     /\.c32$/d
                     s,^.*/,,
-                  '
+                  ' | \
+                  sort -u > \
+                  "${pkgfile}.so.needs"
+                find "${package_content_dir}/${pkgfile##*/}" \
+                  -name 'opt' -prune , \
+                  -exec objdump -x '{}' \; 2>/dev/null | \
+                  sed '
+                    /^architecture:.* i386:x86-64, /,/^architecture:.* i386:x86-32, / d
+                  ' | \
+                  grep -w 'SONAME' | \
+                  awk '{print $2}' | \
+                  sort -u >> \
+                  "${pkgfile}.so.provides"
                 find "${package_content_dir:?}/${pkgfile##*/}" -xdev -exec chmod 777 '{}' \;
                 rm -rf --one-file-system "${package_content_dir:?}/${pkgfile##*/}"
-              fi | \
-                sort -u > \
-                "${pkgfile}.so.needs"
+              fi
             done
           >&2 printf 'running namcap ...'
           if [ "${repository}" = 'multilib' ]; then
