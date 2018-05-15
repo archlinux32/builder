@@ -367,6 +367,9 @@ mangle_pkgbuild() {
     s/^\(\s*pkgrel=\)['"'"'"]\?\([0-9.]\+\)['"'"'"]\?\s*\(#.*\)\?$/\1"\2'"${sub_pkgrel}"'"/
   ' "${PKGBUILD}"
 
+# TODO: this interferes with "makepkg --printsrcinfo" - while the PKGBUILD works as intended,
+# depends will/may become empty - see for example make_source_info python-numpy extra 206b8d75680b579f547b9d588e63eb6f7c6c58e6 5b5a33cf88d0bba4bb363f8cffe12c56c9771361 /tmp/bla/SRCINFO
+
   sed -i '
     /^\s*\(\(make\|check\|opt\|\)depends\)=(/ {
       :a
