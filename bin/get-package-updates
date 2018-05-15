@@ -400,7 +400,7 @@ trigger_rebuild_on_any_file_sed_expression=$(
         mysql_run_query
       # shellcheck disable=SC2154
       printf '%s ' "${package}" "${git_revision}" "${new_repo_revisions__archlinux32}" "${repository}" >&2
-      mysql_generate_package_metadata 'to-be-decided' "${package}" "${git_revision}" "${old_git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
+      mysql_generate_package_metadata "${repository_ids__any_to_be_decided}" "${package}" "${git_revision}" "${old_git_revision}" "${new_repo_revisions__archlinux32}" "${repository}"
       printf '\n' >&2
       continue
     fi

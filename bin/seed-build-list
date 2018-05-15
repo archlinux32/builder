@@ -371,10 +371,11 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   sort -u | \
   tr '\t' ' ' | \
   if ${update}; then
+    mysql_retrieve_repository_ids
     while read -r pkgbase git_rev mod_git_rev repo; do
       printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" | \
         sed 's/ $/\n/'
-      mysql_generate_package_metadata 'build-list' "${pkgbase}" "${git_rev}" '' "${mod_git_rev}" "${repo}"
+      mysql_generate_package_metadata "${repository_ids__any_build_list}" "${pkgbase}" "${git_rev}" '' "${mod_git_rev}" "${repo}"
     done
 
     rm -f "${build_list_lock_file}"

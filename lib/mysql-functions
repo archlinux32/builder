@@ -197,7 +197,7 @@ mysql_add_package_source() {
 
 # TODO: return ids on INSERT queries and use those in subsequent queries
 
-# mysql_generate_package_metadata $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
+# mysql_generate_package_metadata $current_repository_id $package $git_revision $old_git_revision $mod_git_revision $repository
 
 # generate the meta data of a package (dependencies, built packages, ...) in the database
 # $old_git_revision may be empty, in which case the whole history will be searched (slower)
@@ -205,12 +205,18 @@ mysql_add_package_source() {
 mysql_generate_package_metadata() {
 
   ( # new shell is intentional
-    current_repository="$1"
+    current_repository_id="$1"
     package="$2"
     git_revision="$3"
     old_git_revision="$4"
     mod_git_revision="$5"
     repository="$6"
+
+    if [[ "${current_repository_id}" = *[!0-9]* ]]; then
+      >&2 printf 'mysql_generate_package_metadata(): invalid current_repository_id="%s".\n' \
+        "${current_repository_id}"
+      exit 2
+    fi
 
     temp_dir=$(mktemp -d 'tmp.mysql-functions.mysql_generate_package_metadata.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${temp_dir}"' EXIT
@@ -246,12 +252,6 @@ mysql_generate_package_metadata() {
     # add the package source
     package_source_id=$(
       mysql_add_package_source "${pkgbase}" "${git_revision}" "${old_git_revision}" "${mod_git_revision}" "${repository}" "${temp_dir}/SRCINFO"
-    )
-
-    # now we encode everything in base64
-    current_repository=$(
-      printf '%s' "${current_repository}" | \
-        base64 -w0
     )
 
     # add the build assignment(s)
@@ -398,11 +398,10 @@ mysql_generate_package_metadata() {
         sub_pkgrel=$(
           printf '(SELECT COALESCE('
           # do not add binary packages which are currently on the
-          # build-list or in $current_repository (beware of split
+          # build-list or in $current_repository_id (beware of split
           # packages!)
           printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
           mysql_join_binary_packages_architectures
-          mysql_join_binary_packages_repositories
           printf ' WHERE'
           printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
             'epoch' "${epoch}" \
@@ -411,8 +410,9 @@ mysql_generate_package_metadata() {
             'pkgname' "${pkgname}"
           printf ' `architectures`.`name`=from_base64("%s")' \
             "${arch}"
-          printf ' AND `repositories`.`name` IN ("build-list",from_base64("%s"))),' \
-            "${current_repository}"
+          printf ' AND `binary_packages`.`repository` IN (%s,%s)),' \
+            "${repository_ids__any_build_list}" \
+            "${current_repository_id}"
           # max(sub_pkgrel)+1
           printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
           mysql_join_binary_packages_architectures
@@ -448,31 +448,26 @@ mysql_generate_package_metadata() {
             'is_tested' \
             'is_to_be_deleted'
           printf ') SELECT '
-          printf '%s,' "${build_assignment_id}"
+          printf '%s,' \
+            "${build_assignment_id}" \
+            "${current_repository_id}"
           printf '`%s`.`id`,' \
-            'repositories' \
             'architectures'
           printf 'from_base64("%s"),' \
             "${epoch}" \
             "${pkgver}" \
             "${pkgrel}" \
             "${pkgname}"
-          printf '%s,0,0,0 FROM' \
+          printf '%s,0,0,0 FROM `architectures`' \
             "${sub_pkgrel}"
-          printf ' `%s` JOIN' \
-            'repositories' \
-            'architectures'
           printf ' WHERE'
-          printf ' `%s`.`%s` = from_base64("%s") AND' \
-            'repositories' 'name' "${current_repository}" \
-            'architectures' 'name' "${arch}"
+          printf ' `architectures`.`name` = from_base64("%s")' \
+            "${arch}"
           printf ';\n'
           printf 'COMMIT;\n'
           printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`)'
-          printf ' SELECT LAST_INSERT_ID(),`repositories`.`id`'
-          printf ' FROM `repositories`'
-          printf ' WHERE `repositories`.`name` = from_base64("%s");\n' \
-            "${current_repository}"
+          printf ' SELECT LAST_INSERT_ID(),%s;\n' \
+            "${current_repository_id}"
           printf 'COMMIT;\n'
         } | \
           sed '
