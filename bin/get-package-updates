@@ -233,7 +233,7 @@ trigger_rebuild_on_any_file_sed_expression=$(
     mysql_join_build_assignments_architectures
     mysql_join_build_assignments_package_sources
     mysql_join_package_sources_upstream_repositories
-    printf ' WHERE `binary_packages`.`repositories`=%s;\n' \
+    printf ' WHERE `binary_packages`.`repository`=%s;\n' \
       "${repository_ids__any_build_list}"
   } | \
     mysql_run_query | \
@@ -383,7 +383,7 @@ trigger_rebuild_on_any_file_sed_expression=$(
             printf '%s' "${package}" | \
               base64 -w0
           )"
-        printf ' AND `binary_packages`.`repositories` IN (%s,%s);\n' \
+        printf ' AND `binary_packages`.`repository` IN (%s,%s);\n' \
           "${repository_ids__any_build_list}" \
           "${repository_ids__any_deletion_list}"
         # remove is-to-be-deleted marker from old binary packages
