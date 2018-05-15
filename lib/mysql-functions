@@ -198,10 +198,6 @@ mysql_add_package_source() {
 # TODO: return ids on INSERT queries and use those in subsequent queries
 
 # mysql_generate_package_metadata $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
-# if sub_pkgrel should be determined automatically
-# and
-# mysql_generate_package_metadata $sub_pkgrel $current_repository $package $git_revision $old_git_revision $mod_git_revision $repository
-# if $sub_pkgrel should be forced
 
 # generate the meta data of a package (dependencies, built packages, ...) in the database
 # $old_git_revision may be empty, in which case the whole history will be searched (slower)
@@ -209,18 +205,6 @@ mysql_add_package_source() {
 mysql_generate_package_metadata() {
 
   ( # new shell is intentional
-    case "$1" in
-      ''|*[!0-9]*)
-        unset forced_sub_pkgrel
-      ;;
-      *)
-        forced_sub_pkgrel=$(
-          printf '%s' "$1" | \
-            base64 -w0
-        )
-        shift
-      ;;
-    esac
     current_repository="$1"
     package="$2"
     git_revision="$3"
@@ -411,48 +395,44 @@ mysql_generate_package_metadata() {
             sed 's/[<>=].*$//' | \
             base64_encode_each
         )
-        if [ -n "${forced_sub_pkgrel}" ]; then
-          sub_pkgrel='from_base64("'"${forced_sub_pkgrel}"'")'
-        else
-          sub_pkgrel=$(
-            printf '(SELECT COALESCE('
-            # do not add binary packages which are currently on the
-            # build-list or in $current_repository (beware of split
-            # packages!)
-            printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
-            mysql_join_binary_packages_architectures
-            mysql_join_binary_packages_repositories
-            printf ' WHERE'
-            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
-              'epoch' "${epoch}" \
-              'pkgver' "${pkgver}" \
-              'pkgrel' "${pkgrel}" \
-              'pkgname' "${pkgname}"
-            printf ' `architectures`.`name`=from_base64("%s")' \
+        sub_pkgrel=$(
+          printf '(SELECT COALESCE('
+          # do not add binary packages which are currently on the
+          # build-list or in $current_repository (beware of split
+          # packages!)
+          printf '(SELECT `sub_pkgrel` FROM `binary_packages`'
+          mysql_join_binary_packages_architectures
+          mysql_join_binary_packages_repositories
+          printf ' WHERE'
+          printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+            'epoch' "${epoch}" \
+            'pkgver' "${pkgver}" \
+            'pkgrel' "${pkgrel}" \
+            'pkgname' "${pkgname}"
+          printf ' `architectures`.`name`=from_base64("%s")' \
+            "${arch}"
+          printf ' AND `repositories`.`name` IN ("build-list",from_base64("%s"))),' \
+            "${current_repository}"
+          # max(sub_pkgrel)+1
+          printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
+          mysql_join_binary_packages_architectures
+          printf ' WHERE'
+          printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
+            'epoch' "${epoch}" \
+            'pkgver' "${pkgver}" \
+            'pkgrel' "${pkgrel}" \
+            'pkgname' "${pkgname}"
+          if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
+            # 'any' gets higher sub_pkgrel than any architecture
+            printf ' 1'
+          else
+            # not-'any' gets higher sub_pkgrel than same or 'any' architecture
+            printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
               "${arch}"
-            printf ' AND `repositories`.`name` IN ("build-list",from_base64("%s"))),' \
-              "${current_repository}"
-            # max(sub_pkgrel)+1
-            printf '(SELECT 1+MAX(`binary_packages`.`sub_pkgrel`) FROM `binary_packages`'
-            mysql_join_binary_packages_architectures
-            printf ' WHERE'
-            printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
-              'epoch' "${epoch}" \
-              'pkgver' "${pkgver}" \
-              'pkgrel' "${pkgrel}" \
-              'pkgname' "${pkgname}"
-            if printf '%s' "${arch}" | base64 -d | grep -qxF 'any'; then
-              # 'any' gets higher sub_pkgrel than any architecture
-              printf ' 1'
-            else
-              # not-'any' gets higher sub_pkgrel than same or 'any' architecture
-              printf ' (`architectures`.`name`=from_base64("%s") OR `architectures`.`name`="any")' \
-                "${arch}"
-            fi
-            printf ')'
-            printf ',0))'
-          )
-        fi
+          fi
+          printf ')'
+          printf ',0))'
+        )
         {
           printf 'INSERT IGNORE INTO `binary_packages` ('
           printf '`%s`,' \
