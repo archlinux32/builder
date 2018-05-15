@@ -204,6 +204,11 @@ mysql_add_package_source() {
 
 mysql_generate_package_metadata() {
 
+  # retrieve repository_ids if not yet done
+  if [ -n "${repository_ids__any_build_list}" ]; then
+    mysql_retrieve_repository_ids
+  fi
+
   ( # new shell is intentional
     current_repository_id="$1"
     package="$2"
