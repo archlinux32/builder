@@ -704,3 +704,17 @@ irc_say() {
     fi
   fi
 }
+
+# calculate_script_checksum
+# calculate and print a checksum of the main script and all scripts in lib/
+calculate_script_checksum() {
+  {
+    sha512sum "$0"
+    find "${base_dir}/lib" -type f \
+      -exec sha512sum '{}' \;
+  } | \
+    sort | \
+    awk '{print $1}' | \
+    sha512sum | \
+    awk '{print $1}'
+}
