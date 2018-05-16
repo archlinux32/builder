@@ -15,7 +15,7 @@ usage() {
   >&2 echo '  -h|--help:             Show this help and exit.'
   >&2 echo '  -q|--quiet:            Only print errors found.'
   >&2 echo '  -r|--really-quiet:     Do not print anything.'
-  >&2 echo '  -w|--webserver:        Generate output suitable for webserver.'
+  >&2 echo '  -w|--wait:             If necessary, wait for lock blocking.'
   [ -z "$1" ] && exit 1 || exit "$1"
 }
 
@@ -37,15 +37,15 @@ eval set -- "$(
     --long help \
     --long quiet \
     --long really-quiet \
-    --long webserver \
+    --long wait \
     -n "$(basename "$0")" -- "$@" || \
   echo usage
 )"
 
+block_flag='-n'
 silence=0
 repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
 archs='i686'
-web=false
 
 while true
 do
@@ -59,8 +59,8 @@ do
     -r|--really-quiet)
       silence=2
     ;;
-    -w|--webserver)
-      web=true
+    -w|--wait)
+      block_flag=''
     ;;
     --)
       shift
@@ -75,30 +75,26 @@ do
 done
 
 exec 9> "${sanity_check_lock_file}"
-if ! flock -n 9; then
+if ! flock ${block_flag} 9; then
   >&2 echo 'Sanity check skipped, cannot acquire lock.'
   exit
 fi
 
 finish() {
-  if ${web}; then
-    {
-      printf '%s\n' \
-        '<html>' \
-        '<head>' \
-        '<title>result of archlinux32 build master'"'"'s sanity check</title>' \
-        '</head>' \
-        '<body>'
-      printf '%s<br>\n' "$(date)"
-      sed 's|$|<br>|' "${tmp_dir}/messages"
-      printf '%s\n' \
-        '</body>' \
-        '</html>'
-    } > \
-      "${webserver_directory}/master-sanity.html"
-  else
-    cat "${tmp_dir}/messages" >&2
-  fi
+  {
+    printf '%s\n' \
+      '<html>' \
+      '<head>' \
+      '<title>result of archlinux32 build master'"'"'s sanity check</title>' \
+      '</head>' \
+      '<body>'
+    printf '%s<br>\n' "$(date)"
+    sed 's|$|<br>|' "${tmp_dir}/messages"
+    printf '%s\n' \
+      '</body>' \
+      '</html>'
+  } > \
+    "${webserver_directory}/master-sanity.html"
   rm -rf --one-file-system "${tmp_dir}"
 }
 
