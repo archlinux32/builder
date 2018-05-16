@@ -25,8 +25,7 @@ usage() {
   >&2 echo '  -h|--help:   Show this help and exit.'
   >&2 echo '  -l|--local pkgname.git-revision.git-mod-revision.repository:'
   >&2 echo '               Build the given package without asking / reporting to the'
-  >&2 echo '               build master (except -u is given). Cannot be combined with'
-  >&2 echo '               -n, -p, -t or -x.'
+  >&2 echo '               build master. Cannot be combined with -n, -p, -t or -x.'
   >&2 echo '             where:'
   >&2 echo '               - git-revision: packages-HEAD or community-HEAD or a valid commit'
   >&2 echo '               - git-mod-revision: work-tree or a valid commit'
@@ -45,8 +44,6 @@ usage() {
   >&2 echo '               given multiple times to allow using multiple straws.'
   >&2 echo '  -t seconds:  Do not request new assignment(s) $seconds seconds after start.'
   >&2 echo '               Cannot be combined with -l.'
-  >&2 echo '  -u|--upload: Upload explicitely built package to build master.'
-  >&2 echo '               Can only be used with -l.'
   >&2 echo '  -x:          If package build fails, do not request new assignment(s).'
   >&2 echo '               Cannot be combined with -l.'
   [ -z "$1" ] && exit 1 || exit "$1"
@@ -68,7 +65,6 @@ unset forced_package
 unset forced_straws
 unset prefered_package
 exit_after_failure=false
-upload_to_build_master=false
 timeout=0
 
 while true
@@ -107,9 +103,6 @@ do
       shift
       timeout="$1"
     ;;
-    -u|--upload)
-      upload_to_build_master=true
-    ;;
     -x)
       exit_after_failure=true
     ;;
@@ -138,11 +131,8 @@ if [ -n "${forced_package}" ]; then
     >&2 echo 'Conflicting flags.'
     usage
   fi
+  upload_to_build_master=false
 else
-  if ${upload_to_build_master}; then
-    >&2 echo 'Conflicting flags.'
-    usage
-  fi
   upload_to_build_master=true
 fi
 
