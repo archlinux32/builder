@@ -469,8 +469,8 @@ while [ -n "${black_listed_new}" ]; do
         mysql_join_build_assignments_binary_packages 'a_ba' 'a_bp'
         mysql_join_binary_packages_dependencies 'a_bp'
         mysql_join_dependencies_dependency_types
-        printf ' AND `dependency_types`.`relevant_for_building`'
-        printf ' AND `dependency_types`.`relevant_for_binary_packages`'
+        printf ' AND (`dependency_types`.`relevant_for_building`'
+        printf ' OR `dependency_types`.`relevant_for_binary_packages`)'
         printf ' WHERE NOT EXISTS ('
           printf ' SELECT 1'
           printf ' FROM `install_target_providers`'
