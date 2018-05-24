@@ -690,8 +690,7 @@ while [ "${count}" -ne 0 ] && \
     *)
 
       >&2 echo "ERROR: Unknown exit code ${err} from 'get-assignment'."
-      wait_some_time 60
-      continue
+      exit ${err}
 
     ;;
 
