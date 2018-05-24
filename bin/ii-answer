@@ -8,7 +8,7 @@
 . "${0%/*}/../conf/default.conf"
 
 # welcome devs (in #archlinux32 only)
-welcome_user_regex='^\S\+ -!- \(abaumann\|deep42thought\|tyzoid\)(.* has joined \S\+$'
+welcome_user_regex='^\S\+ -!- \(abaumann\|deep42thought\|tyzoid\|phrik\)(.* has joined \S\+$'
 new_users=$(
   sed -n '
     s/'"${welcome_user_regex}"'/\1/
