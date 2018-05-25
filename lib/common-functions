@@ -732,8 +732,8 @@ verbose_flock() {
     lsof +c0 "/proc/$$/fd/$(
       printf '%s\n' "$@" | \
         grep -vm1 '^-'
-    )" || true
-    printf 'FYI: I am %s.\n' "$$"
+    )" >&2 || true
+    >&2 printf 'FYI: I am %s.\n' "$$"
     return ${err}
   }
 }
