@@ -10,7 +10,7 @@
 # shellcheck source=../lib/load-configuration
 . "${0%/*}/../lib/load-configuration"
 
-# TODO: receive/save some statistics about current build
+# TODO: receive and save number of trials so far
 
 if [ "$(
   # shellcheck disable=SC2016,SC2154
