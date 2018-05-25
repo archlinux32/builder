@@ -164,7 +164,8 @@ while [ $# -gt 0 ]; do
           mysql_join_build_assignments_architectures
           printf ' WHERE EXISTS('
             printf 'SELECT * FROM `binary_packages`'
-            mysql_join_binary_packages_repositories
+            mysql_join_binary_packages_binary_packages_in_repositories
+            mysql_join_binary_packages_in_repositories_repositories
             printf ' WHERE `repositories`.`name`="build-list"'
             printf ' AND `binary_packages`.`build_assignment`=`build_assignments`.`id`'
           printf ');\n'
@@ -186,10 +187,12 @@ while [ $# -gt 0 ]; do
         # shellcheck disable=SC2016
         {
           printf 'SELECT `a`.`pkgname` FROM `binary_packages` AS `a`'
-          mysql_join_binary_packages_repositories 'a' 'a_r'
+          mysql_join_binary_packages_binary_packages_in_repositories 'a' 'air'
+          mysql_join_binary_packages_in_repositories_repositories 'air' 'a_r'
           printf ' AND `a_r`.`name`="build-list"'
           printf ' JOIN `binary_packages` AS `b` ON `a`.`pkgname`=`b`.`pkgname`'
-          mysql_join_binary_packages_repositories 'b' 'b_r'
+          mysql_join_binary_packages_binary_packages_in_repositories 'b' 'bir'
+          mysql_join_binary_packages_in_repositories_repositories 'bir' 'b_r'
           printf ' AND `b_r`.`name`="deletion-list";\n'
         } | \
           mysql_run_query
@@ -366,7 +369,8 @@ while [ $# -gt 0 ]; do
             printf 'SELECT "mysql",CONCAT(`r_a`.`name`,"/",`repositories`.`name`,"/",'
             mysql_package_name_query
             printf ') FROM `binary_packages`'
-            mysql_join_binary_packages_repositories
+            mysql_join_binary_packages_binary_packages_in_repositories
+            mysql_join_binary_packages_in_repositories_repositories
             printf ' AND `repositories`.`is_on_master_mirror`'
             mysql_join_binary_packages_architectures
             mysql_join_repositories_architectures '' 'r_a'

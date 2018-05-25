@@ -149,7 +149,8 @@ while read -r a b; do
       # shellcheck disable=SC2016
       combiner=$(
         printf '`binary_packages`'
-        mysql_join_binary_packages_repositories
+        mysql_join_binary_packages_binary_packages_in_repositories
+        mysql_join_binary_packages_in_repositories_repositories
         mysql_join_repositories_repository_stabilities
         mysql_join_binary_packages_architectures
       )
@@ -177,7 +178,8 @@ while read -r a b; do
         mysql_join_build_assignments_package_sources
         mysql_join_package_sources_upstream_repositories
         mysql_join_build_assignments_binary_packages
-        mysql_join_binary_packages_repositories
+        mysql_join_binary_packages_binary_packages_in_repositories
+        mysql_join_binary_packages_in_repositories_repositories
         mysql_join_repositories_repository_stabilities
       )
       # shellcheck disable=SC2016

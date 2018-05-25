@@ -37,7 +37,8 @@ fi
   printf ' FROM `binary_packages`'
   mysql_join_binary_packages_build_assignments
   printf ' AND `build_assignments`.`is_broken`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' AND `repositories`.`name`="build-list";\n'
   printf 'REPEAT\n'
   printf 'INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`)'
@@ -51,7 +52,8 @@ fi
   printf ' AND `dependency_types`.`relevant_for_building`'
   mysql_join_dependencies_install_target_providers
   mysql_join_install_target_providers_binary_packages '' 'new_bp'
-  mysql_join_binary_packages_repositories 'new_bp' 'new_repo'
+  mysql_join_binary_packages_binary_packages_in_repositories 'new_bp' 'new_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'new_bpir' 'new_repo'
   printf ' AND `new_repo`.`name` IN ("build-list","deletion-list");\n'
   printf 'UNTIL ROW_COUNT()=0\n'
   printf 'END REPEAT;\n'
@@ -71,7 +73,8 @@ fi
   printf 'INSERT IGNORE INTO `relevant_binary_packages` (`id`)'
   printf ' SELECT `binary_packages`.`id`'
   printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' AND `repositories`.`name`="build-list"'
   mysql_join_binary_packages_build_assignments
   mysql_join_build_assignments_package_sources
@@ -83,7 +86,8 @@ fi
   printf ' SELECT `install_target_providers`.`package`'
   printf ' FROM `relevant_binary_packages_copy`'
   printf ' JOIN `binary_packages` ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' AND `repositories`.`name`="build-list"'
   mysql_join_binary_packages_dependencies
   mysql_join_dependencies_dependency_types
@@ -144,8 +148,10 @@ fi
   mysql_join_package_sources_build_assignments 'b_ps' 'b_ba'
   mysql_join_build_assignments_binary_packages 'a_ba' 'a_bp'
   mysql_join_build_assignments_binary_packages 'b_ba' 'b_bp'
-  mysql_join_binary_packages_repositories 'a_bp' 'a_r'
-  mysql_join_binary_packages_repositories 'b_bp' 'b_r'
+  mysql_join_binary_packages_binary_packages_in_repositories 'a_bp' 'a_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'a_bpir' 'a_r'
+  mysql_join_binary_packages_binary_packages_in_repositories 'b_bp' 'b_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'b_bpir' 'b_r'
   mysql_join_repositories_repository_stabilities 'a_r' 'a_rs'
   mysql_join_repositories_repository_stabilities 'b_r' 'b_rs'
   printf ' WHERE `a_rs`.`name` = `from_stability`'
@@ -154,7 +160,8 @@ fi
   printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
   printf ' SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`'
   printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   mysql_join_repositories_repository_stabilities
   mysql_join_binary_packages_build_assignments
   mysql_join_build_assignments_package_sources
@@ -177,7 +184,8 @@ fi
   printf ' SELECT `r_bp`.`id`,`m_bp`.`id`'
   printf ' FROM `moveable_binary_packages`'
   printf ' JOIN `binary_packages` AS `m_bp` ON `m_bp`.`id`=`moveable_binary_packages`.`id`'
-  mysql_join_binary_packages_repositories 'm_bp' 'm_r'
+  mysql_join_binary_packages_binary_packages_in_repositories 'm_bp' 'm_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'm_bpir' 'm_r'
   mysql_join_binary_packages_build_assignments 'm_bp' 'm_ba'
   mysql_join_build_assignments_package_sources 'm_ba' 'm_ps'
   mysql_join_package_sources_upstream_repositories 'm_ps' 'm_ur'
@@ -185,7 +193,8 @@ fi
   printf ' AND `repository_moves`.`from_repository`=`m_r`.`id`'
   # in its target repository
   printf ' JOIN `repositories` AS `r_r` ON `repository_moves`.`to_repository`=`r_r`.`id`'
-  mysql_join_repositories_binary_packages 'r_r' 'r_bp'
+  mysql_join_repositories_binary_packages_in_repositories 'r_r' 'r_bpir'
+  mysql_join_binary_packages_in_repositories_binary_packages 'r_bpir' 'r_bp'
   # all packages with identical names
   printf ' AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;\n'
   # now we delete all unreplaceable and unmoveable packages from the respective
@@ -220,7 +229,8 @@ fi
   printf ' WHERE NOT EXISTS ('
     printf 'SELECT 1 FROM `install_target_providers`'
     mysql_join_install_target_providers_binary_packages '' 'prov_bp'
-    mysql_join_binary_packages_repositories 'prov_bp' 'prov_r'
+    mysql_join_binary_packages_binary_packages_in_repositories 'prov_bp' 'prov_bpir'
+    mysql_join_binary_packages_in_repositories_repositories 'prov_bpir' 'prov_r'
     printf ' JOIN `repository_stability_relations` ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`'
     printf ' WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`'
     printf ' AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable`'
@@ -278,8 +288,10 @@ fi
   printf ' AND `dependency_types`.`relevant_for_binary_packages`'
   mysql_join_dependencies_binary_packages '' 'req_bp'
   # we need to check wether req_bp's dependency is (un)critical
-  mysql_join_binary_packages_repositories 'repl_bp' 'repl_r'
-  mysql_join_binary_packages_repositories 'req_bp' 'req_r'
+  mysql_join_binary_packages_binary_packages_in_repositories 'repl_bp' 'repl_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'repl_bpir' 'repl_r'
+  mysql_join_binary_packages_binary_packages_in_repositories 'req_bp' 'req_bpir'
+  mysql_join_binary_packages_in_repositories_repositories 'req_bpir' 'req_r'
   # dependent package is "less stable" than dependency
   printf ' JOIN `repository_stability_relations` AS `repl_rr`'
   printf ' ON `repl_rr`.`more_stable`=`repl_r`.`stability`'
@@ -299,7 +311,8 @@ fi
     printf ' FROM `binary_packages` AS `subst_bp`'
     mysql_join_binary_packages_install_target_providers 'subst_bp' 'subst_itp'
     # ... in a repository ...
-    mysql_join_binary_packages_repositories 'subst_bp' 'subst_r'
+    mysql_join_binary_packages_binary_packages_in_repositories 'subst_bp' 'subst_bpir'
+    mysql_join_binary_packages_in_repositories_repositories 'subst_bpir' 'subst_r'
     # ... more stable ...
     printf ' JOIN `repository_stability_relations` AS `subst_rr`'
     printf ' ON `subst_rr`.`more_stable`=`subst_r`.`stability`'

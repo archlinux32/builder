@@ -107,7 +107,8 @@ export TMPDIR="${tmp_dir}"
   printf 'INSERT IGNORE INTO `to_deletes`'
   printf ' SELECT DISTINCT `binary_packages`.`id`'
   printf ' FROM `binary_packages`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' LEFT' # should not be necessary, but is formally more correct
   mysql_join_binary_packages_install_target_providers
   printf ' WHERE `binary_packages`.`is_to_be_deleted`'
@@ -120,7 +121,8 @@ export TMPDIR="${tmp_dir}"
     mysql_join_dependencies_binary_packages '' 'd_bp'
     # deliberately break dependencies of deletion-list packages
     printf ' AND NOT `d_bp`.`is_to_be_deleted`'
-    mysql_join_binary_packages_repositories 'd_bp' 'd_r'
+    mysql_join_binary_packages_binary_packages_in_repositories 'd_bp' 'd_bpir'
+    mysql_join_binary_packages_in_repositories_repositories 'd_bpir' 'd_r'
     mysql_join_repositories_repository_stabilities 'd_r' 'd_rs'
     # this is deliberately less restrict than `d_r`.`is_on_master_mirror`
     printf ' AND `d_rs`.`name` NOT IN ("forbidden","virtual")'
@@ -129,7 +131,8 @@ export TMPDIR="${tmp_dir}"
       printf 'SELECT 1 FROM `binary_packages` AS `s_bp`'
       mysql_join_binary_packages_install_target_providers 's_bp' 's_itp'
       printf ' AND NOT `s_bp`.`is_to_be_deleted`'
-      mysql_join_binary_packages_repositories 's_bp' 's_r'
+      mysql_join_binary_packages_binary_packages_in_repositories 's_bp' 's_bpir'
+      mysql_join_binary_packages_in_repositories_repositories 's_bpir' 's_r'
       printf ' AND `s_r`.`is_on_master_mirror`'
       printf ' JOIN `repository_stability_relations`'
         printf ' ON `repository_stability_relations`.`more_stable`=`s_r`.`stability`'
@@ -141,20 +144,23 @@ export TMPDIR="${tmp_dir}"
   printf 'SELECT DISTINCT "repo",`repositories`.`name`'
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ';\n'
 
   printf 'SELECT "package",`repositories`.`name`,`binary_packages`.`pkgname`'
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ';\n'
 
   printf 'SELECT "package-file",`repositories`.`name`,'
   mysql_package_name_query
   printf ' FROM `to_deletes`'
   printf ' JOIN `binary_packages` ON `to_deletes`.`id`=`binary_packages`.`id`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   mysql_join_binary_packages_architectures
   printf ';\n'
 
@@ -254,7 +260,8 @@ fi
 
   printf 'UPDATE `binary_packages` '
   printf ' JOIN `to_deletes` ON `to_deletes`.`id`=`binary_packages`.`id`'
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   mysql_join_binary_packages_architectures
   printf ' SET `repository`=('
     printf 'SELECT `repositories`.`id`'

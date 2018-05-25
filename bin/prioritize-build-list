@@ -30,7 +30,8 @@ fi
   printf 'UPDATE `build_assignments`'
   mysql_join_build_assignments_package_sources
   mysql_join_build_assignments_binary_packages
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' SET `build_assignments`.`priority`=('
     printf 'SELECT COALESCE(MAX(`all_priorities`.`priority`),0)+1'
     printf ' FROM ('

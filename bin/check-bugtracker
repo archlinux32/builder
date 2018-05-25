@@ -31,7 +31,8 @@ bug_list=$(
   while read -r stability_id category; do
     for has_issues in '1:' '0:NOT '; do
       printf 'UPDATE `binary_packages`'
-      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_binary_packages_in_repositories
+      mysql_join_binary_packages_in_repositories_repositories
       printf ' SET `has_issues`=%s' \
         "${has_issues%:*}"
       printf ' WHERE `repositories`.`stability`=%s' \

@@ -62,7 +62,8 @@ case "${action}" in
         printf ' FROM `package_sources` AS `tb_ps`'
         mysql_join_package_sources_build_assignments 'tb_ps' 'tb_ba'
         mysql_join_build_assignments_binary_packages 'tb_ba' 'tb_bin'
-        mysql_join_binary_packages_repositories 'tb_bin' 'tb_rep'
+        mysql_join_binary_packages_binary_packages_in_repositories 'tb_bin' 'tb_bir'
+        mysql_join_binary_packages_in_repositories_repositories 'tb_bir' 'tb_rep'
         printf ' WHERE `tb_rep`.`name`="build-list"'
         printf ') AS `to_build`'
       printf ' ON `to_build`.`pkgbase`=`pkgbases`.`pkgbase`'
@@ -74,7 +75,8 @@ case "${action}" in
         printf ' FROM `package_sources` AS `dep_ps`'
         mysql_join_package_sources_build_assignments 'dep_ps' 'dep_ba'
         mysql_join_build_assignments_binary_packages 'dep_ba' 'dep_bin'
-        mysql_join_binary_packages_repositories 'dep_bin' 'dep_rep'
+        mysql_join_binary_packages_binary_packages_in_repositories 'dep_bin' 'dep_bir'
+        mysql_join_binary_packages_in_repositories_repositories 'dep_bir' 'dep_rep'
         # now we have some (=3) additional joins,
         # because we are interested in dependency relations to `to_build`
         mysql_join_binary_packages_install_target_providers 'dep_bin'

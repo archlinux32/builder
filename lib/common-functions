@@ -126,6 +126,8 @@ ls_master_mirror() {
 
 remove_old_package_versions() {
 
+# TODO: needs to remove binary_packages_in_repositories, too
+
   ( # the new shell is intentional
     tmp_dir=$(mktemp -d 'tmp.common-functions.remove_old_package_versions.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
@@ -152,12 +154,14 @@ remove_old_package_versions() {
       mysql_package_name_query 'd_bp' 'd_bpa'
       printf ')'
       printf ' FROM `binary_packages` AS `d_bp`'
-      mysql_join_binary_packages_repositories 'd_bp' 'd_r'
+      mysql_join_binary_packages_binary_packages_in_repositories 'd_bp' 'd_bpir'
+      mysql_join_binary_packages_in_repositories_repositories 'd_bpir' 'd_r'
       printf ' AND `d_r`.`is_on_master_mirror`'
       mysql_join_repositories_architectures 'd_r' 'd_ra'
       mysql_join_binary_packages_architectures 'd_bp' 'd_bpa'
       printf ' JOIN `binary_packages` AS `o_bp` ON `d_bp`.`pkgname`=`o_bp`.`pkgname`'
-      mysql_join_binary_packages_repositories 'o_bp' 'o_r'
+      mysql_join_binary_packages_binary_packages_in_repositories 'o_bp' 'o_bpir'
+      mysql_join_binary_packages_in_repositories_repositories 'o_bpir' 'o_r'
       printf ' AND `o_r`.`is_on_master_mirror`'
       printf ' AND `o_r`.`architecture`=`d_r`.`architecture`'
       printf ' JOIN `repository_stability_relations`'

@@ -106,7 +106,8 @@ fi
   {
     printf 'SELECT DISTINCT `binary_packages`.`pkgname`'
     printf ' FROM `binary_packages`'
-    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
     printf ' WHERE `repositories`.`is_on_master_mirror`'
     printf ' AND NOT `binary_packages`.`is_to_be_deleted`'
   } | \

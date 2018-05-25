@@ -57,7 +57,8 @@ if [ "$5" = 'ERROR' ]; then
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
       mysql_join_build_assignments_binary_packages
-      mysql_join_binary_packages_repositories
+      mysql_join_binary_packages_binary_packages_in_repositories
+      mysql_join_binary_packages_in_repositories_repositories
       printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
         "$(
           # shellcheck disable=SC2154
@@ -244,7 +245,8 @@ infos=$(
     mysql_join_build_assignments_package_sources
     mysql_join_package_sources_upstream_repositories
     mysql_join_build_assignments_binary_packages
-    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
     printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
       "$(
         # shellcheck disable=SC2154
@@ -408,7 +410,8 @@ packages=$(
   mysql_package_name_query
   printf ' FROM `binary_packages`'
   mysql_join_binary_packages_architectures
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' WHERE `binary_packages`.`build_assignment`=from_base64("%s")' \
     "$(
       printf '%s' "${build_assignment_id}" | \
@@ -618,7 +621,8 @@ trigger_mirror_refreshs
   printf 'INSERT INTO `loops_to_delete`'
   printf ' SELECT `build_dependency_loops`.`loop` FROM `build_dependency_loops`'
   mysql_join_build_dependency_loops_binary_packages
-  mysql_join_binary_packages_repositories
+  mysql_join_binary_packages_binary_packages_in_repositories
+  mysql_join_binary_packages_in_repositories_repositories
   printf ' WHERE NOT `repositories`.`name` = "build-list";\n'
   printf 'COMMIT;\n'
   printf 'DELETE FROM `build_dependency_loops` WHERE EXISTS ('

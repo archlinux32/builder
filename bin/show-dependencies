@@ -72,7 +72,8 @@ for target_package in "$@"; do
       printf ' FROM `repositories`'
       mysql_join_repositories_repository_stabilities
       printf ' AND `repository_stabilities`.`name` IN ("unbuilt","staging")'
-      mysql_join_repositories_binary_packages
+      mysql_join_repositories_binary_packages_in_repositories
+      mysql_join_binary_packages_in_repositories_binary_packages
       printf ';\n'
 
     else
@@ -113,7 +114,8 @@ for target_package in "$@"; do
     printf '`package_sources`.`pkgbase`'
     printf ' FROM `relevant_binary_packages`'
     printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
-    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
     mysql_join_repositories_repository_stabilities
     printf ' AND `repository_stabilities`.`name`="unbuilt"'
     mysql_join_binary_packages_build_assignments
@@ -127,7 +129,8 @@ for target_package in "$@"; do
     printf '`binary_packages`.`pkgname`'
     printf ' FROM `relevant_binary_packages`'
     printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
-    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
     mysql_join_repositories_repository_stabilities
     printf ';\n'
 
@@ -146,7 +149,8 @@ for target_package in "$@"; do
       'pkgname' 'binary_packages'
     printf ' FROM `relevant_binary_packages`'
     printf ' JOIN `binary_packages` ON `relevant_binary_packages`.`id`=`binary_packages`.`id`'
-    mysql_join_binary_packages_repositories
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
     mysql_join_repositories_repository_stabilities
     printf ' AND `repository_stabilities`.`name`="unbuilt"'
     mysql_join_binary_packages_build_assignments

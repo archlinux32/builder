@@ -87,7 +87,8 @@ sed -n '
       {
         printf 'SELECT `binary_packages`.`id`,`repositories`.`name`'
         printf ' FROM `binary_packages`'
-        mysql_join_binary_packages_repositories
+        mysql_join_binary_packages_binary_packages_in_repositories
+        mysql_join_binary_packages_in_repositories_repositories
         mysql_join_binary_packages_architectures
         printf ' WHERE'
         printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
