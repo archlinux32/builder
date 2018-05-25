@@ -418,7 +418,7 @@ mysql_generate_package_metadata() {
             'pkgname' "${pkgname}"
           printf ' `architectures`.`name`=from_base64("%s")' \
             "${arch}"
-          printf ' AND `binary_packages_in_repository`.`repository` IN (%s,%s)),' \
+          printf ' AND `binary_packages_in_repositories`.`repository` IN (%s,%s)),' \
             "${repository_ids__any_build_list}" \
             "${current_repository_id}"
           # max(sub_pkgrel)+1
