@@ -6,7 +6,7 @@
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
-  . '../conf/default.conf'
+  . '../lib/load-configuration'
 fi
 
 # TODO: replace most/all insert-select queries by separate select and insert

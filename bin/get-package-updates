@@ -6,8 +6,8 @@
 
 # shellcheck disable=SC2119,SC2120
 
-# shellcheck source=../conf/default.conf
-. "${0%/*}/../conf/default.conf"
+# shellcheck source=../lib/load-configuration
+. "${0%/*}/../lib/load-configuration"
 
 # TODO: Find out, why sometimes package updates are missed.
 

@@ -6,8 +6,8 @@
 
 # investigate, why a certain operation is not done with certain packages
 
-# shellcheck source=../conf/default.conf
-. "${0%/*}/../conf/default.conf"
+# shellcheck source=../lib/load-configuration
+. "${0%/*}/../lib/load-configuration"
 
 # TODO: reintrocude "keep", "stubbornly_keep", "stabilize" and "unstage"
 # using information from the database.

@@ -4,8 +4,8 @@
 
 # shellcheck disable=SC2119,SC2120
 
-# shellcheck source=../conf/default.conf
-. "${0%/*}/../conf/default.conf"
+# shellcheck source=../lib/load-configuration
+. "${0%/*}/../lib/load-configuration"
 
 tmp_dir=$(mktemp -d 'tmp.build-master-status.XXXXXXXXXX' --tmpdir)
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT

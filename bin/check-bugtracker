@@ -6,8 +6,8 @@
 
 # shellcheck disable=SC2039,SC2119,SC2120
 
-# shellcheck source=../conf/default.conf
-. "${0%/*}/../conf/default.conf"
+# shellcheck source=../lib/load-configuration
+. "${0%/*}/../lib/load-configuration"
 
 bug_list=$(
   curl -LSs 'https://bugs.archlinux32.org/index.php?export_list=Export%20Tasklist' | \

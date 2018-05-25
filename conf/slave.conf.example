@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# configurable variables used on the build slaves
+# default values are given as comments
+
+# To change variables from their default, copy this file to common.conf,
+# uncomment and change the desired variables.
+
+#master_build_server="buildmaster.archlinux32.org"
+#master_build_server_port="22"
+#master_build_server_user="slave"
+#master_build_server_identity="${work_dir}/.ssh/id_rsa"
+
+#package_key='0x15eebadc0de'
+
+# mirror of sources, identified (solely) by hash
+#source_by_hash_mirror='http://sources.archlinux32.org/'
+
+# what should be tried in what order to somehow repair a broken build
+#straws_that_might_repair_failing_builds=$(
+#  printf '%s\n' \
+#    ':' \
+#    ':clean_chroot:' \
+#    ':mirrored_source_by_hash:' \
+#    ':mirrored_source:' \
+#    ':with_build_support:' \
+#    ':with_build_support:clean_chroot:'
+#)
+
+# commands to run to update the i686 package mirror used for installing i686 packages,
+# e.g. the one from /etc/pacman.d/mirrorlist32 (useful on build slaves which do not
+# have the master mirror in the mirrorlist32)
+#mirror_update_command=''

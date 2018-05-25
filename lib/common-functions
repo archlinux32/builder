@@ -6,7 +6,7 @@
 
 if [ -z "${base_dir}" ]; then
   # just to make shellcheck happy
-  . '../conf/default.conf'
+  . '../lib/load-configuration'
 fi
 
 # find_pkgbuilds package repository git_repository git_revision mod_git_revision

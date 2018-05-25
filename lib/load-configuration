@@ -1,15 +1,11 @@
 #!/bin/sh
 
-# set up some common variables
+# load global variables
 
 # shellcheck disable=SC2034
 
 set -e
 export LANG=C
-
-# TODO: This should become lib/load-configuration to avoid confusion.
-# Additionally, there should be conf/common.conf.example,
-# conf/master.conf.example and conf/slave.conf.example.
 
 # dirty hack to get this stuff debugable from a bash
 if [ "x${0##*/}" = "x-bash" ] || [ "x${0##*/}" = "xbash" ] || [ "x${0##*/}" = "xdash" ]; then
@@ -27,8 +23,11 @@ work_dir="${base_dir}/work"
 # lib/mysql-functions or we're on the build master and something is wrong
 # anyway
 if pgrep -x mysqld >/dev/null 2>&1; then
+  i_am_the_master=true
   # shellcheck source=../lib/mysql-functions
   . "${base_dir}/lib/mysql-functions"
+else
+  i_am_the_master=false
 fi
 
 # TODO: some of this should be read from the database instead
@@ -103,8 +102,22 @@ mysql_command='mysql buildmaster'
 
 # possibly pull in custom modifications
 
-# shellcheck source=/dev/null
-[ -r "${base_dir}/conf/local.conf" ] && . "${base_dir}/conf/local.conf"
+if [ -r "${base_dir}/conf/common.conf" ]; then
+  # shellcheck source=/dev/null
+  "${base_dir}/conf/common.conf"
+fi
+
+if ${i_am_the_master} && \
+  [ -r "${base_dir}/conf/master.conf" ]; then
+  # shellcheck source=/dev/null
+  . "${base_dir}/conf/master.conf"
+fi
+
+if ! ${i_am_the_master} && \
+  [ -r "${base_dir}/conf/slave.conf" ]; then
+  # shellcheck source=/dev/null
+  . "${base_dir}/conf/slave.conf"
+fi
 
 # check / set up environment
 
