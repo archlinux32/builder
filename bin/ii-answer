@@ -38,7 +38,7 @@ find "${irc_dir}" \
     channel="${channel##*/}"
     if [ -z "${channel%%#*}" ]; then
       prefix='buildmaster: '
-      sloppy_salutation='buildmaster'
+      sloppy_salutation='\S\+\s\+\S\+\s.*buildmaster'
     else
       prefix=''
       sloppy_salutation=''
