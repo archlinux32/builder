@@ -26,6 +26,8 @@ if pgrep -x mysqld >/dev/null 2>&1; then
   i_am_the_master=true
   # shellcheck source=../lib/mysql-functions
   . "${base_dir}/lib/mysql-functions"
+  # TODO: maybe we should load some infos from the db in this case?
+  # e.g. mysql_retrieve_repository_ids
 else
   i_am_the_master=false
 fi
