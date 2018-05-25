@@ -14,7 +14,11 @@
 # TODO: The any_arch logic linking build_assignments and binary_packages
 # needs to be implemented here, too, so "any" binary_packages are only
 # built (or at least only uploaded) if they're expected from the build
-# master (e.g. when they're linked in the database).
+# master (e.g. when they're linked in the database). Or better:
+# the buildmaster should tell the slave which packages it expects back,
+# e.g. which packages do not need to be built/packaged.
+
+# TODO: report back memory and hdd stats to the build master on successful build
 
 # shellcheck disable=SC2016
 usage() {
