@@ -41,13 +41,13 @@ if pgrep -f '^\S+ '"$0"'.' | \
 fi
 
 exec 9> "${work_dir}/${0##*/}.lock"
-if ! flock -n 9; then
+if ! verbose_flock -n 9; then
   >&2 echo 'Cannot get show-dependencies lock.'
   exit
 fi
 
 exec 8> "${sanity_check_lock_file}"
-if ! flock -s -n 8; then
+if ! verbose_flock -s -n 8; then
   >&2 echo 'Cannot get sanity-check lock.'
   exit
 fi

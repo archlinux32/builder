@@ -70,13 +70,13 @@ fi
 # Create a lock file and a trap.
 
 exec 9> "${build_list_lock_file}"
-if ! flock -n 9; then
+if ! verbose_flock -n 9; then
   >&2 echo 'come back (shortly) later - I cannot lock build list.'
   exit 1
 fi
 
 exec 8> "${sanity_check_lock_file}"
-if ! flock -s -n 8; then
+if ! verbose_flock -s -n 8; then
   >&2 echo 'come back (shortly) later - sanity-check running.'
   exit 1
 fi

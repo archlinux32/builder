@@ -60,10 +60,10 @@ if [ "$#" -ne 1 ]; then
 fi
 
 exec 9> "${sanity_check_lock_file}"
-flock -s ${wait_for_lock} 9
+verbose_flock -s ${wait_for_lock} 9
 
 exec 8> "${package_database_lock_file}"
-flock ${wait_for_lock} 8
+verbose_flock ${wait_for_lock} 8
 
 tmp_dir=$(mktemp -d "${work_dir}/tmp.copy-to-build-support.0.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT

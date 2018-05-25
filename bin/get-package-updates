@@ -200,13 +200,13 @@ fi
 # Create a lock file for build list.
 
 exec 9> "${build_list_lock_file}"
-if ! flock ${block_flag} 9; then
+if ! verbose_flock ${block_flag} 9; then
   >&2 echo 'come back (shortly) later - I cannot lock build list.'
   exit
 fi
 
 exec 8> "${sanity_check_lock_file}"
-if ! flock -s ${block_flag} 8; then
+if ! verbose_flock -s ${block_flag} 8; then
   >&2 echo 'come back (shortly) later - sanity-check running.'
   exit
 fi

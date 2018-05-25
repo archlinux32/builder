@@ -129,13 +129,13 @@ if ! [ -r "${input_file}" ]; then
 fi
 
 exec 9> "${sanity_check_lock_file}"
-if ! flock -s ${wait_for_lock} 9; then
+if ! verbose_flock -s ${wait_for_lock} 9; then
   >&2 echo 'Cannot get sanity-check lock.'
   exit
 fi
 
 exec 8> "${package_database_lock_file}"
-if ! flock ${wait_for_lock} 8; then
+if ! verbose_flock ${wait_for_lock} 8; then
   >&2 echo 'Cannot get package-database lock.'
   exit
 fi

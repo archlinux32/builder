@@ -75,7 +75,7 @@ do
 done
 
 exec 9> "${sanity_check_lock_file}"
-if ! flock ${block_flag} 9; then
+if ! verbose_flock ${block_flag} 9; then
   >&2 echo 'Sanity check skipped, cannot acquire lock.'
   exit
 fi

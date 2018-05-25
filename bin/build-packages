@@ -282,7 +282,7 @@ while [ "${count}" -ne 0 ] && \
         # we get a lock on "${work_dir}/ping-build-master.lock",
         # if we release that lock, ping-to-master should stop _immediately_
         exec 9> "${work_dir}/ping-build-master.lock"
-        if ! flock -n 9; then
+        if ! verbose_flock -n 9; then
           >&2 echo 'ERROR: Cannot lock ping-to-master - this should not happen.'
           exit 2
         fi

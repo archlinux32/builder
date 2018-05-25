@@ -12,7 +12,7 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 # do not block if locked
 exec 9> "${sanity_check_lock_file}"
-if ! flock -n 9; then
+if ! verbose_flock -n 9; then
   >&2 echo 'Mysql-Sanity check skipped, cannot acquire lock.'
   exit
 fi

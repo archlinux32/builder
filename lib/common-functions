@@ -719,3 +719,18 @@ calculate_script_checksum() {
     sha512sum | \
     awk '{print $1}'
 }
+
+# verbose_flock
+# flock wrapper with some informational output on error
+verbose_flock() {
+  local err=0
+  flock "$@" || {
+    err=$?
+    lsof "/proc/$$/fd/$(
+      printf '%s\n' "$@" | \
+        grep -vm1 '^-'
+    )" || true
+    printf 'FYI: I am %s.\n' "$$"
+    return ${err}
+  }
+}
