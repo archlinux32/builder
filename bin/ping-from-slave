@@ -56,9 +56,22 @@ log_lines=$(cat)
     printf 'NULL'
   fi
 
-  printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+  printf ', `build_slaves`.`trials`='
+  if [ -n "${log_lines}" ]; then
+    printf 'from_base64("%s")' \
+      "$(
+        printf '%s\n' "${log_lines}" | \
+          wc -l | \
+          base64 -w0
+      )"
+  else
+    printf 'NULL'
+  fi
+
+  printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
     "$(
-      printf '%s' "${slave}" | \
+      # shellcheck disable=SC2154
+      printf '%s' "${slave_id}" | \
         base64 -w0
     )"
 } | \
