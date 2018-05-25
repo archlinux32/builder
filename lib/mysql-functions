@@ -624,6 +624,10 @@ mysql_generate_package_metadata() {
 # do a sanity check on the mysql database
 
 mysql_sanity_check() {
+  # retrieve repository_ids if not yet done
+  if [ -z "${repository_ids__any_build_list}" ]; then
+    mysql_retrieve_repository_ids
+  fi
   {
     printf 'SELECT CONCAT("\\"any\\" build-assignment building \\"",`bp_arch`.`name`,"\\" binary package: ",`binary_packages`.`pkgname`)'
     printf ' FROM `binary_packages`'
