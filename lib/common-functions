@@ -126,8 +126,6 @@ ls_master_mirror() {
 
 remove_old_package_versions() {
 
-# TODO: needs to remove binary_packages_in_repositories, too
-
   ( # the new shell is intentional
     tmp_dir=$(mktemp -d 'tmp.common-functions.remove_old_package_versions.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
@@ -230,6 +228,7 @@ remove_old_package_versions() {
         printf 'CREATE TEMPORARY TABLE `del` (`id` BIGINT NOT NULL AUTO_INCREMENT, PRIMARY KEY (`id`));\n'
         printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `del` (`id`);\n' "${tmp_dir}/db-removes"
         printf 'DELETE `binary_packages` FROM `binary_packages` JOIN `del` ON `binary_packages`.`id`=`del`.`id`;\n'
+        printf 'DELETE `binary_packages_in_repositories` FROM `binary_packages_in_repositories` JOIN `del` ON `binary_packages_in_repositories`.`package`=`del`.`id`;\n'
       } | \
         mysql_run_query
     fi
