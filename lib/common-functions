@@ -726,7 +726,7 @@ verbose_flock() {
   local err=0
   flock "$@" || {
     err=$?
-    lsof "/proc/$$/fd/$(
+    lsof +c0 "/proc/$$/fd/$(
       printf '%s\n' "$@" | \
         grep -vm1 '^-'
     )" || true
