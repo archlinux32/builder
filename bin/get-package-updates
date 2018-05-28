@@ -161,7 +161,7 @@ something_new=false
 for repo in ${repo_names}; do
   eval repo_path='"${repo_paths__'"${repo}"'}"'
   # Update git repositories (official packages, community packages and the repository of package customizations).
-  git -C "${repo_path}" fetch origin master:master
+  git -C "${repo_path}" remote update
   # read previous git revision numbers from database.
   # shellcheck disable=SC2016
   eval "old_repo_revisions__${repo}='$(

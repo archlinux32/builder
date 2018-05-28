@@ -244,7 +244,7 @@ while [ "${count}" -ne 0 ] && \
 
       for repo_name in ${repo_names}; do
         eval repo_path='"${repo_paths__'"${repo_name}"'}"'
-        git -C "${repo_path}" fetch
+        git -C "${repo_path}" remote update
       done
 
       git_repo=$(find_repository_with_commit "${git_revision}")
