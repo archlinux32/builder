@@ -59,6 +59,10 @@ auto=false
 update=true
 wait_for_lock='-n'
 
+if [ -r "${base_dir}/conf/seed-ignore-packages" ]; then
+  cp "${base_dir}/conf/seed-ignore-packages" "${tmp_dir}/ignore-packages"
+fi
+
 while true
 do
   case "$1" in
