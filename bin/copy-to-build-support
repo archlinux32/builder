@@ -70,6 +70,7 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 export TMPDIR="${tmp_dir}"
 
+mysql_retrieve_repository_ids
 to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
 sed -n '
   s/.\+/\0 \0/
@@ -139,7 +140,9 @@ sed -n '
       printf ',`%s`' ${to_copy}
       printf ')'
       printf ' SELECT'
-      printf ' (SELECT `repositories`.`id` FROM `repositories` WHERE `repositories`.`name`="build-support")'
+      # shellcheck disable=SC2154
+      printf ' %s' \
+        "${repository_ids__i686_build_support}"
       # shellcheck disable=SC2086
       printf ',`binary_packages`.`%s`' ${to_copy}
       printf ' FROM `binary_packages`'
@@ -147,6 +150,10 @@ sed -n '
       printf ' WHERE'
       printf ' `binary_packages`.`id`=%s;\n' \
         "${id}"
+      printf 'INSERT IGNORE INTO `binary_packages_in_repositories`'
+      printf ' (`repository`,`package`)'
+      printf ' SELECT %s,LAST_INSERT_ID();\n' \
+        "${repository_ids__i686_build_support}"
     } >> \
       "${tmp_dir}/mysql-command"
   done
