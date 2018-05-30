@@ -518,12 +518,12 @@ ${master_mirror_rsync_command} \
   ./*".pkg.tar.xz.sig" \
   "${master_mirror_rsync_directory}/pool/"
 
-# TODO: create symlinks
-#find . \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -printf '%f\n' | \
-#  while read -r file; do
-#    rm "${file}"
-#    ln -s "../../pool/${file}" "${file}"
-#  done
+# create symlinks
+find . \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -printf '%f\n' | \
+  while read -r file; do
+    rm "${file}"
+    ln -s "../../pool/${file}" "${file}"
+  done
 
 # upload the database and the symlinks into /$arch/$repo
 ${master_mirror_rsync_command} \
