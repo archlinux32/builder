@@ -73,20 +73,6 @@ webserver_directory='/srv/http'
 # directory to keep the build log files in
 build_log_directory='/srv/http/build-logs'
 
-# known package repositories
-standalone_package_repositories=$(
-  printf '%s\n' 'build-support' 'gnome-unstable' 'kde-unstable'
-)
-stable_package_repositories=$(
-  printf '%s\n' 'community' 'core' 'extra'
-)
-testing_package_repositories=$(
-  printf '%s\n' 'community-testing' 'testing'
-)
-staging_package_repositories=$(
-  printf '%s\n' 'community-staging' 'staging'
-)
-
 # irc client configuration
 irc_dir='/home/slave/irc/irc.freenode.net'
 irc_password='top_secret'
