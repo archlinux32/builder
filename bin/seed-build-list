@@ -131,7 +131,16 @@ if ${update}; then
   fi
 fi
 
-repos="${stable_package_repositories}"
+# shellcheck disable=SC2016
+repos=$(
+  {
+    printf 'SELECT DISTINCT `repositories`.`name`'
+    printf ' FROM `repositories`'
+    mysql_join_repositories_repository_stabilities
+    printf ' WHERE `repository_stabilities`.`name`="stable";\n'
+  } | \
+    mysql_run_query
+)
 
 # genereate must-haves query from mirror delta
 if [ -s "${tmp_dir}/mirrors" ]; then
