@@ -28,14 +28,12 @@ if pgrep -x mysqld >/dev/null 2>&1; then
   . "${base_dir}/lib/mysql-functions"
 else
   i_am_the_master=false
-fi
 
-# TODO: some of this should be read from the database instead
-# (in mysql_retrieve_static_information)
-repo_names='packages community archlinux32'
-repo_paths__packages="${work_dir}/repos/packages"
-repo_paths__community="${work_dir}/repos/community"
-repo_paths__archlinux32="${work_dir}/repos/packages32"
+  repo_names='packages community archlinux32'
+  repo_paths__packages="${work_dir}/repos/packages"
+  repo_paths__community="${work_dir}/repos/community"
+  repo_paths__archlinux32="${work_dir}/repos/packages32"
+fi
 
 master_build_server="buildmaster.archlinux32.org"
 master_build_server_port="22"

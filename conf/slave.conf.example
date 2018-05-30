@@ -13,6 +13,11 @@
 
 #package_key='0x15eebadc0de'
 
+#repo_names='packages community archlinux32'
+#repo_paths__packages="${work_dir}/repos/packages"
+#repo_paths__community="${work_dir}/repos/community"
+#repo_paths__archlinux32="${work_dir}/repos/packages32"
+
 # mirror of sources, identified (solely) by hash
 #source_by_hash_mirror='http://sources.archlinux32.org/'
 

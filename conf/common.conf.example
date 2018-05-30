@@ -7,8 +7,3 @@
 # uncomment and change the desired variables.
 
 #work_dir="${base_dir}/work"
-
-#repo_names='packages community archlinux32'
-#repo_paths__packages="${work_dir}/repos/packages"
-#repo_paths__community="${work_dir}/repos/community"
-#repo_paths__archlinux32="${work_dir}/repos/packages32"
