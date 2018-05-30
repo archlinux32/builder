@@ -456,7 +456,6 @@ mysql_generate_package_metadata() {
           printf 'INSERT IGNORE INTO `binary_packages` ('
           printf '`%s`,' \
             'build_assignment' \
-            'repository' \
             'architecture' \
             'epoch' \
             'pkgver' \
@@ -468,8 +467,7 @@ mysql_generate_package_metadata() {
             'is_to_be_deleted'
           printf ') SELECT '
           printf '%s,' \
-            "${build_assignment_id}" \
-            "${current_repository_id}"
+            "${build_assignment_id}"
           printf '`%s`.`id`,' \
             'architectures'
           printf 'from_base64("%s"),' \
@@ -483,7 +481,6 @@ mysql_generate_package_metadata() {
           printf ' `architectures`.`name` = from_base64("%s")' \
             "${arch}"
           printf ';\n'
-          printf 'COMMIT;\n'
           printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`)'
           printf ' SELECT LAST_INSERT_ID(),%s;\n' \
             "${current_repository_id}"
