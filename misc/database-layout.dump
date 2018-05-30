@@ -3,8 +3,10 @@ BEGIN
 INSERT IGNORE INTO `relevant_binary_packages` (`id`)
 	SELECT `binary_packages`.`id`
 	FROM `binary_packages`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`
 	JOIN `repositories`
-	ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list"
+	ON `binary_packages_in_repositories`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list"
 	JOIN `build_assignments`
 	ON `binary_packages`.`build_assignment`=`build_assignments`.`id`
 	JOIN `package_sources`
@@ -19,8 +21,10 @@ INSERT IGNORE INTO `relevant_binary_packages` (`id`)
 	FROM `relevant_binary_packages_copy`
 	JOIN `binary_packages`
 	ON `relevant_binary_packages_copy`.`id`=`binary_packages`.`id`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`
 	JOIN `repositories`
-	ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list"
+	ON `binary_packages_in_repositories`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list"
 	JOIN `dependencies`
 	ON `binary_packages`.`id`=`dependencies`.`dependent`
 	JOIN `dependency_types`
@@ -59,10 +63,14 @@ INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)
 	ON `a_ba`.`id`=`a_bp`.`build_assignment`
 	JOIN `binary_packages` AS `b_bp`
 	ON `b_ba`.`id`=`b_bp`.`build_assignment`
+	JOIN `binary_packages_in_repositories` AS `a_bpir`
+	ON `a_bp`.`id`=`a_bpir`.`package`
 	JOIN `repositories` AS `a_r`
-	ON `a_bp`.`repository`=`a_r`.`id`
+	ON `a_bpir`.`repository`=`a_r`.`id`
+	JOIN `binary_packages_in_repositories` AS `b_bpir`
+	ON `b_bp`.`id`=`b_bpir`.`package`
 	JOIN `repositories` AS `b_r`
-	ON `b_bp`.`repository`=`b_r`.`id`
+	ON `b_bpir`.`repository`=`b_r`.`id`
 	JOIN `repository_stabilities` AS `a_rs`
 	ON `a_r`.`stability`=`a_rs`.`id`
 	JOIN `repository_stabilities` AS `b_rs`
@@ -71,8 +79,10 @@ INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)
 INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)
 	SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`
 	FROM `binary_packages`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`
 	JOIN `repositories`
-	ON `binary_packages`.`repository`=`repositories`.`id`
+	ON `binary_packages_in_repositories`.`repository`=`repositories`.`id`
 	JOIN `repository_stabilities`
 	ON `repositories`.`stability`=`repository_stabilities`.`id`
 	JOIN `build_assignments`
@@ -82,15 +92,17 @@ INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)
 	JOIN `upstream_repositories`
 	ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`
 	JOIN `repository_moves`
-	ON `upstream_repositories`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`binary_packages`.`repository`
+	ON `upstream_repositories`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`
 	WHERE `repository_stabilities`.`name` = `from_stability` AND (`from_stability`="staging" OR `binary_packages`.`is_tested`) AND NOT `binary_packages`.`has_issues`;
 INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)
 	SELECT `r_bp`.`id`,`m_bp`.`id`
 	FROM `moveable_binary_packages`
 	JOIN `binary_packages` AS `m_bp`
 	ON `m_bp`.`id`=`moveable_binary_packages`.`id`
+	JOIN `binary_packages_in_repositories` AS `m_bpir`
+	ON `m_bp`.`id`=`m_bpir`.`package`
 	JOIN `repositories` AS `m_r`
-	ON `m_bp`.`repository`=`m_r`.`id`
+	ON `m_bpir`.`repository`=`m_r`.`id`
 	JOIN `build_assignments` AS `m_ba`
 	ON `m_bp`.`build_assignment`=`m_ba`.`id`
 	JOIN `package_sources` AS `m_ps`
@@ -101,8 +113,10 @@ INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)
 	ON `m_ur`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`m_r`.`id`
 	JOIN `repositories` AS `r_r`
 	ON `repository_moves`.`to_repository`=`r_r`.`id`
+	JOIN `binary_packages_in_repositories` AS `r_bpir`
+	ON `r_r`.`id`=`r_bpir`.`repository`
 	JOIN `binary_packages` AS `r_bp`
-	ON `r_r`.`id`=`r_bp`.`repository` AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;
+	ON `r_bpir`.`package`=`r_bp`.`id` AND `r_bp`.`pkgname`=`m_bp`.`pkgname`;
 REPEAT
 SET row_count_saved = 0;
 DELETE
@@ -137,8 +151,10 @@ SELECT 1
 	FROM `install_target_providers`
 	JOIN `binary_packages` AS `prov_bp`
 	ON `install_target_providers`.`package`=`prov_bp`.`id`
+	JOIN `binary_packages_in_repositories` AS `prov_bpir`
+	ON `prov_bp`.`id`=`prov_bpir`.`package`
 	JOIN `repositories` AS `prov_r`
-	ON `prov_bp`.`repository`=`prov_r`.`id`
+	ON `prov_bpir`.`repository`=`prov_r`.`id`
 	JOIN `repository_stability_relations`
 	ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`
 	WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable` AND NOT EXISTS (
@@ -183,10 +199,14 @@ SELECT 1
 	ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_binary_packages`
 	JOIN `binary_packages` AS `req_bp`
 	ON `dependencies`.`dependent`=`req_bp`.`id`
+	JOIN `binary_packages_in_repositories` AS `repl_bpir`
+	ON `repl_bp`.`id`=`repl_bpir`.`package`
 	JOIN `repositories` AS `repl_r`
-	ON `repl_bp`.`repository`=`repl_r`.`id`
+	ON `repl_bpir`.`repository`=`repl_r`.`id`
+	JOIN `binary_packages_in_repositories` AS `req_bpir`
+	ON `req_bp`.`id`=`req_bpir`.`package`
 	JOIN `repositories` AS `req_r`
-	ON `req_bp`.`repository`=`req_r`.`id`
+	ON `req_bpir`.`repository`=`req_r`.`id`
 	JOIN `repository_stability_relations` AS `repl_rr`
 	ON `repl_rr`.`more_stable`=`repl_r`.`stability` AND `repl_rr`.`less_stable`=`req_r`.`stability`
 	WHERE NOT EXISTS (
@@ -199,8 +219,10 @@ SELECT 1
 	FROM `binary_packages` AS `subst_bp`
 	JOIN `install_target_providers` AS `subst_itp`
 	ON `subst_bp`.`id`=`subst_itp`.`package`
+	JOIN `binary_packages_in_repositories` AS `subst_bpir`
+	ON `subst_bp`.`id`=`subst_bpir`.`package`
 	JOIN `repositories` AS `subst_r`
-	ON `subst_bp`.`repository`=`subst_r`.`id`
+	ON `subst_bpir`.`repository`=`subst_r`.`id`
 	JOIN `repository_stability_relations` AS `subst_rr`
 	ON `subst_rr`.`more_stable`=`subst_r`.`stability`
 	WHERE `subst_rr`.`less_stable`=`repl_r`.`stability` AND NOT EXISTS (
@@ -257,8 +279,10 @@ INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)
 	FROM `binary_packages`
 	JOIN `build_assignments`
 	ON `binary_packages`.`build_assignment`=`build_assignments`.`id` AND `build_assignments`.`is_broken`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`
 	JOIN `repositories`
-	ON `binary_packages`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list";
+	ON `binary_packages_in_repositories`.`repository`=`repositories`.`id` AND `repositories`.`name`="build-list";
 REPEAT
 INSERT IGNORE INTO `broken_packages_and_dependencies_old` (`id`)
 	SELECT `broken_packages_and_dependencies`.`id`
@@ -276,8 +300,10 @@ INSERT IGNORE INTO `broken_packages_and_dependencies` (`id`)
 	ON `dependencies`.`depending_on`=`install_target_providers`.`install_target`
 	JOIN `binary_packages` AS `new_bp`
 	ON `install_target_providers`.`package`=`new_bp`.`id`
+	JOIN `binary_packages_in_repositories` AS `new_bpir`
+	ON `new_bp`.`id`=`new_bpir`.`package`
 	JOIN `repositories` AS `new_repo`
-	ON `new_bp`.`repository`=`new_repo`.`id` AND `new_repo`.`name` IN ("build-list","deletion-list");
+	ON `new_bpir`.`repository`=`new_repo`.`id` AND `new_repo`.`name` IN ("build-list","deletion-list");
 UNTIL ROW_COUNT()=0
 END REPEAT;
 SELECT `package_sources`.`pkgbase`,`package_sources`.`git_revision`,`package_sources`.`mod_git_revision`,`upstream_repositories`.`name`
@@ -308,7 +334,6 @@ architectures	CREATE TABLE `architectures` (
 binary_packages	CREATE TABLE `binary_packages` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
 	 `build_assignment` bigint(20) NOT NULL,
-	 `repository` mediumint(9) NOT NULL,
 	 `epoch` mediumint(9) NOT NULL,
 	 `pkgver` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
 	 `pkgrel` mediumint(9) NOT NULL,
@@ -321,13 +346,11 @@ binary_packages	CREATE TABLE `binary_packages` (
 	 `sha512sum` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 	 `last_moved` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	 PRIMARY KEY (`id`),
-	 UNIQUE KEY `file_name` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`,`repository`),
-	 UNIQUE KEY `content` (`build_assignment`,`sub_pkgrel`,`pkgname`,`architecture`,`repository`),
-	 KEY `repository` (`repository`),
+	 UNIQUE KEY `file_name` (`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architecture`),
+	 UNIQUE KEY `content` (`build_assignment`,`sub_pkgrel`,`pkgname`,`architecture`),
 	 KEY `architecture` (`architecture`),
-	 CONSTRAINT `binary_packages_ibfk_1` FOREIGN KEY (`repository`) REFERENCES `repositories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-	 CONSTRAINT `binary_packages_ibfk_2` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-	 CONSTRAINT `binary_packages_ibfk_3` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+	 CONSTRAINT `binary_packages_ibfk_1` FOREIGN KEY (`architecture`) REFERENCES `architectures` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+	 CONSTRAINT `binary_packages_ibfk_2` FOREIGN KEY (`build_assignment`) REFERENCES `build_assignments` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 binary_packages_in_repositories	CREATE TABLE `binary_packages_in_repositories` (
 	 `id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -637,7 +660,9 @@ INSERT INTO `repositories` VALUES
   (8,'community-staging',3,'1',2),
   (9,'build-list',5,'\0',1),
   (10,'deletion-list',6,'\0',1),
-  (11,'to-be-decided',7,'\0',1);
+  (11,'to-be-decided',7,'\0',1),
+  (12,'gnome-unstable',8,'1',2),
+  (13,'kde-unstable',8,'1',2);
 INSERT INTO `repository_moves` VALUES
   (1,6,3,3),
   (2,6,3,4),
@@ -658,7 +683,8 @@ INSERT INTO `repository_stabilities` VALUES
   (4,'standalone',NULL),
   (5,'unbuilt','Packages: Build-list'),
   (6,'forbidden',NULL),
-  (7,'virtual',NULL);
+  (7,'virtual',NULL),
+  (8,'unstable',NULL);
 INSERT INTO `repository_stability_relations` VALUES
   (16,1,1),
   (7,1,2),

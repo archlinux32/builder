@@ -12,8 +12,6 @@ fi
 # TODO: replace most/all insert-select queries by separate select and insert
 # queries
 
-# TODO: remove all read references to `binary_packages`.`repositories`
-
 # TODO: remove all write references to `binary_packages`.`repositories`
 
 # TODO: remove `binary_packages`.`repositories` from the database
