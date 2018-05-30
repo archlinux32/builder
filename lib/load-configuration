@@ -104,12 +104,6 @@ mysql_command='mysql buildmaster'
 
 # possibly pull in custom modifications
 
-# TODO: remove this legacy part here
-if [ -r "${base_dir}/conf/local.conf" ]; then
-  # shellcheck source=/dev/null
-  . "${base_dir}/conf/local.conf"
-fi
-
 if [ -r "${base_dir}/conf/common.conf" ]; then
   # shellcheck source=/dev/null
   . "${base_dir}/conf/common.conf"
