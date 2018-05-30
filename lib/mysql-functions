@@ -12,6 +12,18 @@ fi
 # TODO: replace most/all insert-select queries by separate select and insert
 # queries
 
+# TODO: remove all references to `binary_packages`.`repositories`
+
+# TODO: remove `binary_packages`.`repositories` from the database
+
+# TODO: normally operate on `binary_packages_in_repositories` instead of
+# `binary_packages`
+
+# TODO: consider `binary_packages` as cache of
+# `binary_packages_in_repositories` (e.g. delete, when no
+# `binary_packages_in_repositories` needs `binary_packages` anymore,
+# otherwise let them untouched)
+
 # base64_encode_each encode each line of stdin with base64
 
 base64_encode_each() {
