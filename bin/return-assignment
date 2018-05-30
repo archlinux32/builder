@@ -500,6 +500,9 @@ while read -r package_id package_name; do
 done < \
   "${tmp_dir}/package-ids"
 
+# TODO: once we honestly want to have multiple architectures, this needs
+# to be changed fundamentally
+
 # move packages
 ${master_mirror_rsync_command} \
   "${master_mirror_rsync_directory}/i686/${destination}/${destination}.db."* \
@@ -509,6 +512,20 @@ ${master_mirror_rsync_command} \
 repo-add "${destination}.db.tar.gz" ${packages}
 # repo-add -v -s -k "${repo_key}" "${destination}.db.tar.gz" ${packages}
 
+# upload the packages into /pool
+${master_mirror_rsync_command} \
+  ./*".pkg.tar.xz" \
+  ./*".pkg.tar.xz.sig" \
+  "${master_mirror_rsync_directory}/pool/"
+
+# TODO: create symlinks
+#find . \( -name '*.pkg.tar.xz' -o -name '*.pkg.tar.xz.sig' \) -printf '%f\n' | \
+#  while read -r file; do
+#    rm "${file}"
+#    ln -s "../../pool/${file}" "${file}"
+#  done
+
+# upload the database and the symlinks into /$arch/$repo
 ${master_mirror_rsync_command} \
   "${destination}.db."* \
   "${destination}.files."* \
