@@ -26,8 +26,6 @@ if pgrep -x mysqld >/dev/null 2>&1; then
   i_am_the_master=true
   # shellcheck source=../lib/mysql-functions
   . "${base_dir}/lib/mysql-functions"
-
-  mysql_retrieve_static_information
 else
   i_am_the_master=false
 fi
@@ -106,6 +104,11 @@ if ! ${i_am_the_master} && \
   [ -r "${base_dir}/conf/slave.conf" ]; then
   # shellcheck source=/dev/null
   . "${base_dir}/conf/slave.conf"
+fi
+
+# load static values from the database
+if ${i_am_the_master}; then
+  mysql_retrieve_static_information
 fi
 
 # check / set up environment
