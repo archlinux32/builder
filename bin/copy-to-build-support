@@ -133,17 +133,15 @@ sed -n '
 
     # shellcheck disable=SC2016
     {
-      printf 'INSERT IGNORE INTO `binary_packages`'
-      printf ' (`repository`'
+      printf 'INSERT IGNORE INTO `binary_packages` ('
       # shellcheck disable=SC2086
-      printf ',`%s`' ${to_copy}
+      printf ',`%s`' ${to_copy} | \
+        sed 's/^,//'
       printf ')'
       printf ' SELECT'
-      # shellcheck disable=SC2154
-      printf ' %s' \
-        "${repository_ids__i686_build_support}"
       # shellcheck disable=SC2086
-      printf ',`binary_packages`.`%s`' ${to_copy}
+      printf ',`binary_packages`.`%s`' ${to_copy} | \
+        sed 's/^,//'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
       printf ' WHERE'
@@ -151,6 +149,7 @@ sed -n '
         "${id}"
       printf 'INSERT IGNORE INTO `binary_packages_in_repositories`'
       printf ' (`repository`,`package`)'
+      # shellcheck disable=SC2154
       printf ' SELECT %s,LAST_INSERT_ID();\n' \
         "${repository_ids__i686_build_support}"
     } >> \
