@@ -576,16 +576,9 @@ trigger_mirror_refreshs
 
   # remove from build-list
   printf 'UPDATE `binary_packages`'
-  printf ' LEFT'
   mysql_join_binary_packages_binary_packages_in_repositories
   printf ' SET'
-  printf ' `binary_packages%s`.`repository`=from_base64("%s"),' \
-    '' \
-    "$(
-      printf '%s' "${destination_id}" | \
-        base64 -w0
-    )" \
-    '_in_repositories' \
+  printf ' `binary_packages_in_repositories`.`repository`=from_base64("%s"),' \
     "$(
       printf '%s' "${destination_id}" | \
         base64 -w0
