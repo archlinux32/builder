@@ -167,7 +167,7 @@ fi
   mysql_join_build_assignments_package_sources
   mysql_join_package_sources_upstream_repositories
   mysql_join_upstream_repositories_repository_moves
-  printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+  printf ' AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`'
   # correct stability: "testing"/"staging" - as chosen
   printf ' WHERE `repository_stabilities`.`name` = `from_stability`'
   printf ' AND ('
