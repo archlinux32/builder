@@ -371,16 +371,16 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   fi
   if ${auto}; then
     printf 'EXISTS ('
-      printf 'SELECT * FROM `bin_ids`'
+      printf 'SELECT 1 FROM `bin_ids`'
       printf ' WHERE `bin_ids`.`id`=`binary_packages`.`id`'
     printf ')'
     printf ' OR '
   fi
   printf 'EXISTS ('
-    printf 'SELECT * FROM `must_haves`'
+    printf 'SELECT 1 FROM `must_haves`'
     printf ' WHERE `must_haves`.`pkgname`=`binary_packages`.`pkgname`'
   printf ')) AND NOT EXISTS ('
-    printf 'SELECT * FROM `ignore_packages`'
+    printf 'SELECT 1 FROM `ignore_packages`'
     printf ' WHERE `ignore_packages`.`pkgname`=`binary_packages`.`pkgname`'
   printf ');\n'
 } | \
