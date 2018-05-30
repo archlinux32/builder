@@ -17,6 +17,9 @@
 # TODO: restructure the layout of the master mirror: we should have
 # /pool (without subdirectories) and only symlinks in /$arch/$repo
 
+# TODO: operate on `binary_packages_in_repositories` instead of
+# `binary_packages`
+
 # shellcheck disable=SC2039,SC2119,SC2120
 
 # shellcheck source=../lib/load-configuration
@@ -160,7 +163,8 @@ for source_stability in 'testing' 'staging'; do
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
       mysql_join_upstream_repositories_repository_moves
-      printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+      mysql_join_binary_packages_binary_packages_in_repositories
+      printf ' AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`'
       printf ' SET `moveable_binary_packages`.`to_repository`=`repository_moves`.`to_repository`;\n'
       printf 'DELETE FROM `moveable_binary_packages` WHERE `moveable_binary_packages`.`to_repository` IS NULL;\n'
       printf 'INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)'
@@ -168,7 +172,8 @@ for source_stability in 'testing' 'staging'; do
       printf ' FROM `moveable_binary_packages`'
       printf ' JOIN `binary_packages` AS `subst_bp` ON `moveable_binary_packages`.`id`=`subst_bp`.`id`'
       printf ' JOIN `binary_packages` ON `binary_packages`.`pkgname`=`subst_bp`.`pkgname`'
-      printf ' AND `binary_packages`.`repository`=`moveable_binary_packages`.`to_repository`;\n'
+      mysql_join_binary_packages_binary_packages_in_repositories
+      printf ' AND `binary_packages_in_repositories`.`repository`=`moveable_binary_packages`.`to_repository`;\n'
     elif ${progressive}; then
       printf 'DROP TEMPORARY TABLE IF EXISTS `%s_binary_packages`;\n' \
         'moveable' 'replaced'
@@ -185,11 +190,12 @@ for source_stability in 'testing' 'staging'; do
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
       mysql_join_upstream_repositories_repository_moves
-      printf ' AND `repository_moves`.`to_repository`=`binary_packages`.`repository`'
+      mysql_join_binary_packages_binary_packages_in_repositories
+      printf ' AND `repository_moves`.`to_repository`=`binary_packages_in_repositories`.`repository`'
       printf ' JOIN `binary_packages` AS `subst_bp`'
       printf ' ON `binary_packages`.`pkgname`=`subst_bp`.`pkgname`'
-      printf ' AND `repository_moves`.`from_repository`=`subst_bp`.`repository`'
       mysql_join_binary_packages_binary_packages_in_repositories 'subst_bp' 'subst_bpir'
+      printf ' AND `repository_moves`.`from_repository`=`subst_bpir`.`repository`'
       mysql_join_binary_packages_in_repositories_repositories 'subst_bpir' 'subst_r'
       mysql_join_repositories_repository_stabilities 'subst_r' 'subst_rs'
       printf ' AND `subst_rs`.`name`="%s"' \
@@ -203,9 +209,9 @@ for source_stability in 'testing' 'staging'; do
       printf ');\n'
 
       printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
-      printf ' SELECT `replaced_binary_packages`.`replaced_by`,`binary_packages`.`repository`'
+      printf ' SELECT `replaced_binary_packages`.`replaced_by`,`binary_packages_in_repositories`.`repository`'
       printf ' FROM `replaced_binary_packages`'
-      printf ' JOIN `binary_packages` ON `binary_packages`.`id`=`replaced_binary_packages`.`id`'
+      printf ' JOIN `binary_packages_in_repositories` ON `binary_packages_in_repositories`.`package`=`replaced_binary_packages`.`id`'
       printf ';\n'
 
       printf 'INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)'
@@ -221,11 +227,13 @@ for source_stability in 'testing' 'staging'; do
       mysql_join_build_assignments_package_sources
       mysql_join_package_sources_upstream_repositories
       mysql_join_upstream_repositories_repository_moves
-      printf ' AND `repository_moves`.`from_repository`=`binary_packages`.`repository`'
+      mysql_join_binary_packages_binary_packages_in_repositories
+      printf ' AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`'
       printf ' WHERE NOT EXISTS ('
-        printf 'SELECT * FROM `binary_packages` AS `repl_bp`'
+        printf 'SELECT 1 FROM `binary_packages` AS `repl_bp`'
+        mysql_join_binary_packages_binary_packages_in_repositories 'repl_bp' 'repl_bpir'
         printf ' WHERE `repl_bp`.`pkgname`=`binary_packages`.`pkgname`'
-        printf ' AND `repl_bp`.`repository`=`repository_moves`.`to_repository`'
+        printf ' AND `repl_bpir`.`repository`=`repository_moves`.`to_repository`'
       printf ');\n'
     else
       printf 'CALL calculate_maximal_moveable_set("%s");\n' \
@@ -237,13 +245,13 @@ for source_stability in 'testing' 'staging'; do
     printf ' SELECT `moveable_binary_packages`.`to_repository`'
     printf ' FROM `moveable_binary_packages`;\n'
     printf 'INSERT IGNORE INTO `rps` (`id`)'
-    printf ' SELECT `binary_packages`.`repository`'
+    printf ' SELECT `binary_packages_in_repositories`.`repository`'
     printf ' FROM `moveable_binary_packages`'
-    printf ' JOIN `binary_packages` ON `moveable_binary_packages`.`id`=`binary_packages`.`id`;\n'
+    printf ' JOIN `binary_packages_in_repositories` ON `moveable_binary_packages`.`id`=`binary_packages_in_repositories`.`package`;\n'
     printf 'INSERT IGNORE INTO `rps` (`id`)'
-    printf ' SELECT `binary_packages`.`repository`'
+    printf ' SELECT `binary_packages_in_repositories`.`repository`'
     printf ' FROM `replaced_binary_packages`'
-    printf ' JOIN `binary_packages` ON `replaced_binary_packages`.`id`=`binary_packages`.`id`;\n'
+    printf ' JOIN `binary_packages_in_repositories` ON `replaced_binary_packages`.`id`=`binary_packages_in_repositories`.`package`;\n'
 
     printf 'SELECT "repositories",`repositories`.`name`'
     printf ' FROM `repositories`'
@@ -404,12 +412,11 @@ for source_stability in 'testing' 'staging'; do
     printf ' JOIN `replaced_binary_packages` ON `binary_packages`.`id`=`replaced_binary_packages`.`id`;\n'
     printf 'UPDATE `binary_packages`'
     printf ' JOIN `moved_binary_packages` ON `binary_packages`.`id`=`moved_binary_packages`.`id`'
-    printf ' LEFT'
     mysql_join_binary_packages_binary_packages_in_repositories
     printf ' SET `binary_packages`.`repository`=`moved_binary_packages`.`new_repository`,'
     printf '`binary_packages_in_repositories`.`repository`=`moved_binary_packages`.`new_repository`,'
     printf '`binary_packages`.`last_moved`=NOW()'
-    printf ' WHERE `binary_packages`.`repository`!=`moved_binary_packages`.`new_repository`;\n'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`!=`moved_binary_packages`.`new_repository`;\n'
   } | \
     mysql_run_query
 done
