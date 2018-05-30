@@ -44,8 +44,28 @@ eval set -- "$(
 
 block_flag='-n'
 silence=0
-repos="${standalone_package_repositories} ${stable_package_repositories} ${testing_package_repositories} ${staging_package_repositories}"
-archs='i686'
+# shellcheck disable=SC2016
+repos=$(
+  {
+    printf 'SELECT DISTINCT `repositories`.`name`'
+    printf ' FROM `repositories`'
+    printf ' WHERE `repositories`.`is_on_master_mirror`;\n'
+  } | \
+    mysql_run_query
+)
+# shellcheck disable=SC2016
+archs=$(
+  {
+    printf 'SELECT DISTINCT `architectures`.`name`'
+    printf ' FROM `architectures`'
+    printf ' WHERE EXISTS ('
+      printf 'SELECT 1 FROM `repositories`'
+      printf ' WHERE `repositories`.`architecture`=`architectures`.`id`'
+      printf ' AND `repositories`.`is_on_master_mirror`'
+    printf ');\n'
+  } | \
+    mysql_run_query
+)
 
 while true
 do
