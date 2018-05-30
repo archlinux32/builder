@@ -127,7 +127,6 @@ delete_package() {
       printf 'UPDATE `binary_packages`'
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
-      printf ' LEFT'
       mysql_join_binary_packages_binary_packages_in_repositories
       # shellcheck disable=SC2154
       printf ' SET `binary_packages`.`repository`=%s,' \
@@ -136,7 +135,7 @@ delete_package() {
       printf '`binary_packages_in_repositories`.`repository`=%s' \
         "${repository_ids__any_deletion_list}"
       # shellcheck disable=SC2154
-      printf ' WHERE `binary_packages`.`repository` in (%s,%s)' \
+      printf ' WHERE `binary_packages_in_repositories`.`repository` in (%s,%s)' \
         "${repository_ids__any_build_list}" \
         "${repository_ids__any_to_be_decided}"
       printf ' AND `package_sources`.`pkgbase`=from_base64("%s");\n' \
@@ -595,14 +594,12 @@ echo 'Done - mark decisions as final.'
   done
   # move binary_packages from "to-be-decided" to "build-list"
   printf 'UPDATE `binary_packages`'
-  mysql_join_binary_packages_binary_packages_in_repositories '' 'from_bir'
-  printf ' LEFT'
   mysql_join_binary_packages_binary_packages_in_repositories
   printf ' SET `binary_packages`.`repository`=%s,' \
     "${repository_ids__any_build_list}"
   printf '`binary_packages_in_repositories`.`repository`=%s' \
     "${repository_ids__any_build_list}"
-  printf ' WHERE `from_bir`.`repository`=%s;\n' \
+  printf ' WHERE `binary_packages_in_repositories`.`repository`=%s;\n' \
     "${repository_ids__any_to_be_decided}"
 } | \
   mysql_run_query
