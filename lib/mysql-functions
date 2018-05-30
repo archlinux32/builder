@@ -204,11 +204,6 @@ mysql_add_package_source() {
 
 mysql_generate_package_metadata() {
 
-  # retrieve repository_ids if not yet done
-  if [ -z "${repository_ids__any_build_list}" ]; then
-    mysql_retrieve_repository_ids
-  fi
-
   ( # new shell is intentional
     current_repository_id="$1"
     package="$2"
@@ -624,10 +619,6 @@ mysql_generate_package_metadata() {
 # do a sanity check on the mysql database
 
 mysql_sanity_check() {
-  # retrieve repository_ids if not yet done
-  if [ -z "${repository_ids__any_build_list}" ]; then
-    mysql_retrieve_repository_ids
-  fi
   {
     printf 'SELECT CONCAT("\\"any\\" build-assignment building \\"",`bp_arch`.`name`,"\\" binary package: ",`binary_packages`.`pkgname`)'
     printf ' FROM `binary_packages`'
@@ -1046,9 +1037,10 @@ mysql_show_binary_packages_in_repositories_issues() {
     mysql_run_query
 }
 
-# mysql_retrieve_repository_ids
-# retrieve the ids of all known repositories into $repository_ids__$arch_$repo
-mysql_retrieve_repository_ids() {
+# mysql_retrieve_static_information
+# retrieve some static information from the database:
+# - ids of all known repositories -> $repository_ids__$arch_$repo
+mysql_retrieve_static_information() {
   eval "$(
     {
       printf 'SELECT CONCAT('

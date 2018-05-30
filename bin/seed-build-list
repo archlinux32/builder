@@ -388,7 +388,6 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   sort -u | \
   tr '\t' ' ' | \
   if ${update}; then
-    mysql_retrieve_repository_ids
     while read -r pkgbase git_rev mod_git_rev repo; do
       printf '%s ' "${pkgbase}" "${git_rev}" "${mod_git_rev}" "${repo}" | \
         sed 's/ $/\n/'

@@ -70,7 +70,6 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 export TMPDIR="${tmp_dir}"
 
-mysql_retrieve_repository_ids
 to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
 sed -n '
   s/.\+/\0 \0/

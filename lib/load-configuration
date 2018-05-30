@@ -26,13 +26,14 @@ if pgrep -x mysqld >/dev/null 2>&1; then
   i_am_the_master=true
   # shellcheck source=../lib/mysql-functions
   . "${base_dir}/lib/mysql-functions"
-  # TODO: maybe we should load some infos from the db in this case?
-  # e.g. mysql_retrieve_repository_ids
+
+  mysql_retrieve_static_information
 else
   i_am_the_master=false
 fi
 
 # TODO: some of this should be read from the database instead
+# (in mysql_retrieve_static_information)
 repo_names='packages community archlinux32'
 repo_paths__packages="${work_dir}/repos/packages"
 repo_paths__community="${work_dir}/repos/community"

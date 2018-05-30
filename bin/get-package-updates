@@ -107,8 +107,6 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-mysql_retrieve_repository_ids
-
 # TODO: How should new deletion-list packages be handled?
 # - packages deleted upstream should be marked as to-be-deleted if
 #   existent and otherwise be ignored
