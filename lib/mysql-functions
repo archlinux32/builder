@@ -646,7 +646,7 @@ mysql_sanity_check() {
     printf ' AND `a`.`id`!=`b`.`id`'
     printf ' WHERE `a_bir`.`repository`=%s;\n' \
       "${repository_ids__any_build_list}"
-    printf 'SELECT DISTINCT CONCAT("\\"split-package with differing sub_pkgrels on the build-list: ",`a`.`pkgname`)'
+    printf 'SELECT DISTINCT CONCAT("split-package with differing sub_pkgrels on the build-list: ",`a`.`pkgname`)'
     printf ' FROM `binary_packages` AS `a`'
     printf ' JOIN `binary_packages` AS `b` ON `a`.`build_assignment`=`b`.`build_assignment`'
     mysql_join_binary_packages_binary_packages_in_repositories 'a' 'a_bir'
