@@ -70,7 +70,6 @@ trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
 export TMPDIR="${tmp_dir}"
 
-to_copy='build_assignment epoch pkgver pkgrel sub_pkgrel has_issues is_tested pkgname architecture'
 sed -n '
   s/.\+/\0 \0/
   T
@@ -85,10 +84,8 @@ sed -n '
     # shellcheck disable=SC2016
     id=$(
       {
-        printf 'SELECT `binary_packages`.`id`,`repositories`.`name`'
+        printf 'SELECT `binary_packages`.`id`'
         printf ' FROM `binary_packages`'
-        mysql_join_binary_packages_binary_packages_in_repositories
-        mysql_join_binary_packages_in_repositories_repositories
         mysql_join_binary_packages_architectures
         printf ' WHERE'
         printf ' `binary_packages`.`%s`=from_base64("%s") AND' \
@@ -101,29 +98,24 @@ sed -n '
           "$(printf '%s' "${architecture}" | base64 -w0)"
         printf ' LIMIT 1;\n'
       } | \
-        mysql_run_query | \
-        tr '\t' ' '
+        mysql_run_query
     )
     if [ -z "${id}" ]; then
       continue
     fi
-    repository="${id#* }"
-    id="${id%% *}"
 
-    printf '%s\n' "${id}" >> \
-      "${tmp_dir}/package-ids"
+    printf '%s\n' "${package}" >> \
+      "${tmp_dir}/packages"
     for suffix in '' '.sig'; do
-      printf 'ln "i686/%s/%s%s" "i686/build-support/%s%s"\n' \
-        "${repository}" \
+      printf 'ln -s "pool/%s%s" "i686/build-support/%s%s"\n' \
         "${package}" \
         "${suffix}" \
         "${package}" \
         "${suffix}"
     done >> \
       "${tmp_dir}/sftp-command"
-    printf '%s/i686/%s/%s\n' \
+    printf '%s/pool/%s\n' \
       "${master_mirror_rsync_directory}" \
-      "${repository}" \
       "${package}" | \
       sed '
         p
@@ -133,25 +125,13 @@ sed -n '
 
     # shellcheck disable=SC2016
     {
-      printf 'INSERT IGNORE INTO `binary_packages` ('
-      # shellcheck disable=SC2086
-      printf ',`%s`' ${to_copy} | \
-        sed 's/^,//'
-      printf ')'
-      printf ' SELECT'
-      # shellcheck disable=SC2086
-      printf ',`binary_packages`.`%s`' ${to_copy} | \
-        sed 's/^,//'
-      printf ' FROM `binary_packages`'
-      mysql_join_binary_packages_architectures
-      printf ' WHERE'
-      printf ' `binary_packages`.`id`=%s;\n' \
-        "${id}"
       printf 'INSERT IGNORE INTO `binary_packages_in_repositories`'
       printf ' (`repository`,`package`)'
       # shellcheck disable=SC2154
-      printf ' SELECT %s,LAST_INSERT_ID();\n' \
-        "${repository_ids__i686_build_support}"
+      printf ' VALUES (%s,%s);\n' \
+        "${repository_ids__i686_build_support}" \
+        "${id}"
+      printf 'SELECT LAST_INSERT_ID();\n'
     } >> \
       "${tmp_dir}/mysql-command"
   done
@@ -183,17 +163,14 @@ ${master_mirror_rsync_command} \
 
 if [ -s "${tmp_dir}/mysql-command" ]; then
   mysql_run_query < \
-    "${tmp_dir}/mysql-command"
-fi
-
-if [ -s "${tmp_dir}/package-ids" ]; then
-  while read -r package_id; do
-    remove_old_package_versions "${package_id}"
-  done < \
-    "${tmp_dir}/package-ids"
+    "${tmp_dir}/mysql-command" | \
+    sort -u | \
+    while read -r bpir_id; do
+      remove_old_package_versions "${bpir_id}"
+    done
 fi
 
 if [ -w "$1" ]; then
-  cat "${tmp_dir}/package-ids" > \
+  cat "${tmp_dir}/packages" > \
     "$1"
 fi

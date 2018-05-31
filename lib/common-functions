@@ -112,10 +112,7 @@ ls_master_mirror() {
 
 }
 
-# TODO: once binary_packages_in_repositories is funcitonal, we should
-# use the id of that
-
-# remove_old_package_versions $binary_package_id
+# remove_old_package_versions $binary_package_in_repository_id
 
 # removes all older versions of the given package from all repositories
 # less[1] stable than the current repository, as well as any different
@@ -130,13 +127,13 @@ remove_old_package_versions() {
     tmp_dir=$(mktemp -d 'tmp.common-functions.remove_old_package_versions.XXXXXXXXXX' --tmpdir)
     trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
-    binary_package_id="$1"
+    bpir_id="$1"
 
     # shellcheck disable=SC2016
     {
       printf 'SELECT '
-      printf '`d_bp`.`id`,'
-      printf 'IF(`d_r`.`stability`=`o_r`.`stability` AND `d_bp`.`id`!=`o_bp`.`id`,1,0),'
+      printf '`d_bpir`.`id`,'
+      printf 'IF(`d_r`.`stability`=`o_r`.`stability` AND `d_bpir`.`id`!=`o_bpir`.`id`,1,0),'
       printf 'CONCAT('
         printf 'IF(`d_bp`.`epoch`=0,"",CONCAT(`d_bp`.`epoch`,":")),'
         printf '`d_bp`.`pkgver`,"-",'
@@ -165,9 +162,9 @@ remove_old_package_versions() {
       printf ' JOIN `repository_stability_relations`'
       printf ' ON `repository_stability_relations`.`less_stable`=`d_r`.`stability`'
       printf ' AND `repository_stability_relations`.`more_stable`=`o_r`.`stability`'
-      printf ' WHERE `o_bp`.`id`=from_base64("%s")' \
+      printf ' WHERE `o_bpir`.`id`=from_base64("%s")' \
         "$(
-          printf '%s' "${binary_package_id}" | \
+          printf '%s' "${bpir_id}" | \
             base64 -w0
         )"
       printf ';\n'
@@ -178,7 +175,7 @@ remove_old_package_versions() {
       sort -k3V,3 -k2r,2 | \
       shrink_version 3 | \
       sed -n '
-        /^'"${binary_package_id}"' /q
+        /^'"${bpir_id}"' /q
         s/^\([0-9]\+ \)\(\S\+ \)\{2\}/\1/
         h
         /^[0-9]\+ 0 / {
@@ -212,6 +209,34 @@ remove_old_package_versions() {
     done < \
       "${tmp_dir}/repo-removes"
 
+    # db-remove packages
+    if [ -s "${tmp_dir}/db-removes" ]; then
+      # shellcheck disable=SC2016
+      {
+        printf 'CREATE TEMPORARY TABLE `del` (`id` BIGINT NOT NULL AUTO_INCREMENT, PRIMARY KEY (`id`));\n'
+        printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `del` (`id`);\n' \
+          "${tmp_dir}/db-removes"
+        printf 'DELETE `binary_packages_in_repositories` FROM `binary_packages_in_repositories`'
+        printf ' JOIN `del` ON `binary_packages_in_repositories`.`id`=`del`.`id`;\n'
+        printf 'SELECT CONCAT("pool/",'
+        mysql_package_name_query
+        printf ') FROM `binary_packages`'
+        mysql_join_binary_packages_architectures
+        printf ' WHERE NOT EXISTS ('
+          printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+          printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+        printf ');\n'
+        printf 'DELETE `binary_packages` FROM `binary_packages`'
+        printf ' WHERE NOT EXISTS ('
+          printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+          printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+        printf ');\n'
+      } | \
+        mysql_run_query | \
+        sort -u >> \
+        "${tmp_dir}/sftp-removes"
+    fi
+
     # sftp-remove packages
     if [ -s "${tmp_dir}/sftp-removes" ]; then
       sed '
@@ -219,18 +244,6 @@ remove_old_package_versions() {
         s|$|"|
       ' "${tmp_dir}/sftp-removes" | \
         ${master_mirror_sftp_command}
-    fi
-
-    # db-remove packages
-    if [ -s "${tmp_dir}/db-removes" ]; then
-      # shellcheck disable=SC2016
-      {
-        printf 'CREATE TEMPORARY TABLE `del` (`id` BIGINT NOT NULL AUTO_INCREMENT, PRIMARY KEY (`id`));\n'
-        printf 'LOAD DATA LOCAL INFILE "%s" INTO TABLE `del` (`id`);\n' "${tmp_dir}/db-removes"
-        printf 'DELETE `binary_packages` FROM `binary_packages` JOIN `del` ON `binary_packages`.`id`=`del`.`id`;\n'
-        printf 'DELETE `binary_packages_in_repositories` FROM `binary_packages_in_repositories` JOIN `del` ON `binary_packages_in_repositories`.`package`=`del`.`id`;\n'
-      } | \
-        mysql_run_query
     fi
 
   )

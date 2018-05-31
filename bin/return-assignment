@@ -600,15 +600,14 @@ trigger_mirror_refreshs
     )"
   printf 'COMMIT;\n'
 
-  # insert into appropriate repositories
-  printf 'INSERT INTO `binary_packages_in_repositories` (`package`,`repository`) VALUES '
-  cut -d' ' -f1 < \
-    "${tmp_dir}/package-ids" | \
-    sed '
-      s/^/(/
-      s/$/,'"${destination_id}"'),/
-      $ s/,$/;/
-    '
+  # insert into appropriate repositories and retrieve ids
+  while read -r package_id _; do
+    printf 'INSERT INTO `binary_packages_in_repositories` (`package`,`repository`) VALUES '
+    printf '(%s,%s);\n' \
+      "${package_id}" "${destination_id}"
+    printf 'SELECT LAST_INSERT_ID();\n'
+  done < \
+    "${tmp_dir}/package-ids"
   printf 'COMMIT;\n'
 
   # remove from build-list
@@ -670,10 +669,8 @@ trigger_mirror_refreshs
   printf ');\n'
   printf 'DROP TEMPORARY TABLE `loops_to_delete`;\n'
 } | \
-  mysql_run_query
-
-cut -d' ' -f1 < \
-  "${tmp_dir}/package-ids" | \
-  while read -r package_id; do
-    remove_old_package_versions "${package_id}"
+  mysql_run_query | \
+  sort -u | \
+  while read -r bpir_id; do
+    remove_old_package_versions "${bpir_id}"
   done
