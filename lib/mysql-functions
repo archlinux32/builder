@@ -708,6 +708,50 @@ mysql_sanity_check() {
     diff -u \
       "${temp_dir}/master-mirror-listing" \
       "${temp_dir}/mysql-packages"
+
+    # shellcheck disable=SC2041
+    ls_master_mirror 'pool' | \
+      sed -n '
+        s/\.pkg\.tar\.xz\(\.sig\)\?$//
+        T
+        s/-\([0-9]\+\)-\([^-]\+\)$/-\1.0-\2/
+        s/-\([^-:]\+-[^-]\+-[^-]\+\)$/-0:\1/
+        p
+      ' | \
+      sort | \
+      uniq -c | \
+      grep '^\s*2\s' | \
+      awk '{print $2}' > \
+      "${temp_dir}/master-mirror-pool"
+
+    {
+      printf 'SELECT '
+      printf '`binary_packages`.`%s`,' \
+        'pkgname' \
+        'epoch' \
+        'pkgver' \
+        'pkgrel' \
+        'sub_pkgrel'
+      printf '`architectures`.`name`'
+      printf ' FROM `binary_packages`'
+      mysql_join_binary_packages_architectures
+      printf ' WHERE `binary_packages`.`sha512sum` IS NOT NULL'
+    } | \
+      mysql_run_query | \
+      sed '
+        s,\t,-,
+        s,\t,:,
+        s,\t,-,
+        s,\t,.,
+        s,\t,-,
+      ' | \
+      sort > \
+      "${temp_dir}/mysql-packages-pool"
+
+# TODO: activate that check
+    diff -u \
+      "${temp_dir}/master-mirror-pool" \
+      "${temp_dir}/mysql-packages-pool" >&2
   )
 }
 
