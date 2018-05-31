@@ -21,6 +21,7 @@ if [ "$(
     mysql_run_query 'unimportant' || \
     echo '1'
   )" -ne 1 ]; then
+  # TODO: say the same in irc (if not yet said)
   >&2 echo 'You do not build anything currently - abort whatever you are doing.'
   exit 2
 fi
