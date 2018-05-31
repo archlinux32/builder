@@ -13,7 +13,7 @@
 if [ "$(
   # shellcheck disable=SC2016,SC2154
   {
-    printf 'SELECT count(*) FROM `build_slaves`'
+    printf 'SELECT COUNT(1) FROM `build_slaves`'
     mysql_join_build_slaves_build_assignments
     printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"

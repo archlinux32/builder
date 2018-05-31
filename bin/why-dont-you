@@ -44,7 +44,7 @@ case "${action}" in
       printf 'SELECT DISTINCT `to_build`.`ba_id`,'
       printf 'If(`to_build`.`is_broken`,1,0),'
       printf '('
-        printf 'SELECT count(*) FROM `failed_builds`'
+        printf 'SELECT COUNT(1) FROM `failed_builds`'
         printf 'WHERE `failed_builds`.`build_assignment`=`to_build`.`ba_id`'
       printf ')'
       printf ',replace(to_base64(`%s`.`%s`),"\\n","")' \

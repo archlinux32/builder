@@ -176,7 +176,7 @@ fi
 count_pending=$(
   # shellcheck disable=SC2016
   {
-    printf 'SELECT count(*)'
+    printf 'SELECT COUNT(1)'
     printf ' FROM `build_assignments`'
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories

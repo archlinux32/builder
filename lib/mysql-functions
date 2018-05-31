@@ -828,7 +828,7 @@ mysql_cleanup() {
   if [ "$#" = '0' ]; then
     operator='DELETE'
   elif [ "$#" = '1' ] && [ "x$1" = 'xdry' ]; then
-    operator='SELECT COUNT(*)'
+    operator='SELECT COUNT(1)'
   else
     >&2 echo 'Unknown parameter'
     >&2 echo 'Call "mysql_clean_up" or "mysql_clean_up dry".'
@@ -892,7 +892,7 @@ mysql_cleanup() {
       printf 'UPDATE `build_slaves`'
       printf ' SET `build_slaves`.`currently_building`=NULL'
     else
-      printf 'SELECT COUNT(*) FROM `build_slaves`'
+      printf 'SELECT COUNT(1) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NOT NULL'
     printf ' AND TIMEDIFF(NOW(),('
@@ -905,7 +905,7 @@ mysql_cleanup() {
       printf ' SET `build_slaves`.`last_action`=NULL,'
       printf ' `build_slaves`.`logged_lines`=NULL'
     else
-      printf 'SELECT COUNT(*) FROM `build_slaves`'
+      printf 'SELECT COUNT(1) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NULL'
     printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
