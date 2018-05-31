@@ -126,9 +126,9 @@ sed -n '
     # shellcheck disable=SC2016
     {
       printf 'INSERT IGNORE INTO `binary_packages_in_repositories`'
-      printf ' (`repository`,`package`)'
+      printf ' (`repository`,`package`,`is_to_be_deleted`)'
       # shellcheck disable=SC2154
-      printf ' VALUES (%s,%s);\n' \
+      printf ' VALUES (%s,%s,0);\n' \
         "${repository_ids__i686_build_support}" \
         "${id}"
       printf 'SELECT LAST_INSERT_ID();\n'

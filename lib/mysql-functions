@@ -477,8 +477,8 @@ mysql_generate_package_metadata() {
           printf ' `architectures`.`name` = from_base64("%s")' \
             "${arch}"
           printf ';\n'
-          printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`)'
-          printf ' SELECT LAST_INSERT_ID(),%s;\n' \
+          printf 'INSERT IGNORE INTO `binary_packages_in_repositories` (`package`,`repository`,`is_to_be_deleted`)'
+          printf ' SELECT LAST_INSERT_ID(),%s,0;\n' \
             "${current_repository_id}"
           printf 'COMMIT;\n'
         } | \

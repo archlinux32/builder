@@ -128,9 +128,13 @@ delete_package() {
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
       mysql_join_binary_packages_binary_packages_in_repositories
+      printf ' SET '
       # shellcheck disable=SC2154
-      printf ' SET `binary_packages_in_repositories`.`repository`=%s' \
-        "${repository_ids__any_deletion_list}"
+      printf '`binary_packages_in_repositories`.`%s`=%s,' \
+        'repository' "${repository_ids__any_deletion_list}" \
+        'is_to_be_deleted' '1' \
+        'last_moved' 'NOW()' | \
+        sed 's/,$//'
       # shellcheck disable=SC2154
       printf ' WHERE `binary_packages_in_repositories`.`repository` in (%s,%s)' \
         "${repository_ids__any_build_list}" \

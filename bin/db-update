@@ -411,7 +411,8 @@ for source_stability in 'testing' 'staging'; do
     printf ' JOIN `moved_binary_packages` ON `binary_packages`.`id`=`moved_binary_packages`.`id`'
     mysql_join_binary_packages_binary_packages_in_repositories
     printf ' SET `binary_packages_in_repositories`.`repository`=`moved_binary_packages`.`new_repository`,'
-    printf '`binary_packages`.`last_moved`=NOW()'
+    printf '`binary_packages`.`last_moved`=NOW(),'
+    printf '`binary_packages_in_repositories`.`last_moved`=NOW()'
     printf ' WHERE `binary_packages_in_repositories`.`repository`!=`moved_binary_packages`.`new_repository`;\n'
   } | \
     mysql_run_query
