@@ -14,9 +14,6 @@
 
 # TODO: enable separate repositories for each architecture
 
-# TODO: restructure the layout of the master mirror: we should have
-# /pool (without subdirectories) and only symlinks in /$arch/$repo
-
 # TODO: operate on `binary_packages_in_repositories` instead of
 # `binary_packages`
 
