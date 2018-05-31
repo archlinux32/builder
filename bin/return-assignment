@@ -98,7 +98,7 @@ if [ "$5" = 'ERROR' ]; then
     if [ -n "${saved_build_logs}" ]; then
       printf 'CREATE TEMPORARY TABLE `failures` ('
       printf '`%s` %s,' \
-        'date' 'DATETIME' \
+        'date' 'TIMESTAMP' \
         'reason' 'SMALLINT' \
         'log_file' 'VARCHAR(512)' | \
         sed 's/,$//'
