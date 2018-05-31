@@ -742,7 +742,12 @@ mysql_sanity_check() {
       printf '`architectures`.`name`'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
-      printf ' WHERE `binary_packages`.`sha512sum` IS NOT NULL'
+      printf ' WHERE NOT EXISTS ('
+        printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+        mysql_join_binary_packages_in_repositories_repositories
+        printf ' WHERE NOT `repositories`.`is_on_master_mirror`'
+        printf ' AND `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+      printf ')'
     } | \
       mysql_run_query | \
       sed '
