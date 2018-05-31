@@ -684,7 +684,14 @@ mysql_sanity_check() {
       "${temp_dir}/master-mirror-listing"
 
     {
-      printf 'SELECT `r_a`.`name`,`repositories`.`name`,`pkgname`,`epoch`,`pkgver`,`pkgrel`,`sub_pkgrel`,`architectures`.`name`'
+      printf 'SELECT `r_a`.`name`,`repositories`.`name`,'
+      printf '`binary_packages`.`%s`,' \
+        'pkgname' \
+        'epoch' \
+        'pkgver' \
+        'pkgrel' \
+        'sub_pkgrel'
+      printf '`architectures`.`name`'
       printf ' FROM `binary_packages`'
       mysql_join_binary_packages_architectures
       mysql_join_binary_packages_binary_packages_in_repositories
