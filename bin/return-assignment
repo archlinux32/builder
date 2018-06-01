@@ -161,7 +161,9 @@ if [ "$5" = 'ERROR' ]; then
     printf 'COMMIT;\n'
     printf 'UPDATE `build_slaves`'
     printf ' SET `build_slaves`.`currently_building`=NULL,'
-    printf ' `build_slaves`.`logged_lines`=NULL'
+    printf ' `build_slaves`.`last_action`=NULL,'
+    printf ' `build_slaves`.`logged_lines`=NULL,'
+    printf ' `build_slaves`.`trials`=NULL'
     printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
       "$(
         printf '%s' "${slave_id}" | \
@@ -645,7 +647,9 @@ trigger_mirror_refreshs
   # remove from build slave's `currently_building`
   printf 'UPDATE `build_slaves`'
   printf ' SET `build_slaves`.`currently_building`=NULL,'
-  printf ' `build_slaves`.`logged_lines`=NULL'
+  printf ' `build_slaves`.`last_action`=NULL,'
+  printf ' `build_slaves`.`logged_lines`=NULL,'
+  printf ' `build_slaves`.`trials`=NULL'
   printf ' WHERE `build_slaves`.`currently_building`=from_base64("%s");\n' \
     "$(
       printf '%s' "${build_assignment_id}" | \

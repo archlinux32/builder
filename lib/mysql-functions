@@ -900,17 +900,19 @@ mysql_cleanup() {
       printf 'SELECT MAX(`ssh_log`.`date`) FROM `ssh_log`'
       printf ' WHERE `ssh_log`.`build_slave`=`build_slaves`.`id`'
     printf ')) > "1:00:00";\n'
-    # remove `last_action` and `logged_lines` from buildslaves without an assignment
+    # remove `last_action`, `trials` and `logged_lines` from buildslaves without an assignment
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `build_slaves`'
       printf ' SET `build_slaves`.`last_action`=NULL,'
-      printf ' `build_slaves`.`logged_lines`=NULL'
+      printf ' `build_slaves`.`logged_lines`=NULL,'
+      printf ' `build_slaves`.`trials`=NULL'
     else
       printf 'SELECT COUNT(1) FROM `build_slaves`'
     fi
     printf ' WHERE `build_slaves`.`currently_building` IS NULL'
     printf ' AND (`build_slaves`.`last_action` IS NOT NULL'
-    printf ' OR `build_slaves`.`logged_lines` IS NOT NULL);\n'
+    printf ' OR `build_slaves`.`logged_lines` IS NOT NULL'
+    printf ' OR `build_slaves`.`trials` IS NOT NULL);\n'
   } | \
     mysql_run_query 'unimportant'
 }
