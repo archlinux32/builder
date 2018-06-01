@@ -211,10 +211,11 @@ fi
   printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list")'
   # packages with no not-to-be-deleted and at least on to-be-deleted version should be ignored
   printf ' OR ('
-  printf '`ignore_bin`.`is_to_be_deleted`'
+  printf '`binary_packages_in_repositories`.`is_to_be_deleted`'
   printf ' AND NOT EXISTS ('
-    printf 'SELECT * FROM `binary_packages` AS `other_bin`'
-    printf ' WHERE NOT `other_bin`.`is_to_be_deleted`'
+    printf 'SELECT 1 FROM `binary_packages` AS `other_bin`'
+    mysql_join_binary_packages_binary_packages_in_repositories 'other_bin' 'other_bpir'
+    printf ' WHERE NOT `other_bpir`.`is_to_be_deleted`'
     printf ' AND `other_bin`.`pkgname`=`ignore_bin`.`pkgname`'
   printf '));\n'
 } | \
@@ -245,10 +246,10 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   cat "${tmp_dir}/must-haves" "${tmp_dir}/ignore-packages"
   printf 'SELECT `must_haves`.`pkgname` FROM `must_haves`'
   printf ' WHERE NOT EXISTS ('
-    printf 'SELECT * FROM `binary_packages`'
+    printf 'SELECT 1 FROM `binary_packages`'
     printf ' WHERE `binary_packages`.`pkgname`=`must_haves`.`pkgname`'
   printf ') AND NOT EXISTS ('
-    printf 'SELECT * FROM `ignore_packages`'
+    printf 'SELECT 1 FROM `ignore_packages`'
     printf ' WHERE `ignore_packages`.`pkgname`=`must_haves`.`pkgname`'
   printf ') AND NOT `must_haves`.`pkgname` LIKE "lib32-%%";\n'
 } | \
@@ -318,7 +319,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
       printf ' AND `subst_bp`.`id`!=`binary_packages`.`id`'
       printf ' AND `subst_bp`.`pkgname`=`binary_packages`.`pkgname`'
     printf ') AND NOT EXISTS ('
-      printf 'SELECT * FROM `install_target_providers`'
+      printf 'SELECT 1 FROM `install_target_providers`'
       mysql_join_install_target_providers_binary_packages '' 'subst_bp'
       mysql_join_binary_packages_binary_packages_in_repositories 'subst_bp' 'subst_bir'
       mysql_join_binary_packages_in_repositories_repositories 'subst_bir' 'subst_r'

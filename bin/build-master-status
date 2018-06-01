@@ -79,7 +79,7 @@ if [ -s "${tmp_dir}/todos" ]; then
     printf ' WHERE `td`.`id` IS NULL;\n'
 
     printf 'DELETE FROM `todos` WHERE NOT EXISTS ('
-    printf 'SELECT * FROM `td`'
+    printf 'SELECT 1 FROM `td`'
     printf ' AND `td`.`%s`=`todos`.`%s`' \
       'file' 'file' \
       'line' 'line' \
@@ -88,10 +88,10 @@ if [ -s "${tmp_dir}/todos" ]; then
     printf ');\n'
     printf 'DROP TEMPORARY TABLE `td`;\n'
     printf 'DELETE FROM `todo_links` WHERE NOT EXISTS ('
-      printf 'SELECT * FROM `todos` '
+      printf 'SELECT 1 FROM `todos` '
       printf 'WHERE `todos`.`id`=`todo_links`.`depending_on`'
     printf ') OR NOT EXISTS ('
-      printf 'SELECT * FROM `todos` '
+      printf 'SELECT 1 FROM `todos` '
       printf 'WHERE `todos`.`id`=`todo_links`.`dependent`'
     printf ');\n'
   } | \

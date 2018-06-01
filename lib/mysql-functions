@@ -455,8 +455,7 @@ mysql_generate_package_metadata() {
             'pkgname' \
             'sub_pkgrel' \
             'has_issues' \
-            'is_tested' \
-            'is_to_be_deleted'
+            'is_tested'
           printf ') SELECT '
           printf '%s,' \
             "${build_assignment_id}"
@@ -467,7 +466,7 @@ mysql_generate_package_metadata() {
             "${pkgver}" \
             "${pkgrel}" \
             "${pkgname}"
-          printf '%s,0,0,0 FROM `architectures`' \
+          printf '%s,0,0 FROM `architectures`' \
             "${sub_pkgrel}"
           printf ' WHERE'
           printf ' `architectures`.`name` = from_base64("%s")' \
@@ -852,7 +851,7 @@ mysql_cleanup() {
       "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
-      printf 'SELECT * FROM `binary_packages` '
+      printf 'SELECT 1 FROM `binary_packages` '
       printf 'WHERE `binary_packages`.`build_assignment`=`build_assignments`.`id`'
     printf ');\n'
     # remove failed_builds with unbroken build_assignments
@@ -940,7 +939,7 @@ mysql_query_has_pending_dependencies() {
 # print a mysql query giving wether the package is part of a loop
 mysql_query_is_part_of_loop() {
   printf 'EXISTS ('
-    printf 'SELECT * FROM `build_dependency_loops`'
+    printf 'SELECT 1 FROM `build_dependency_loops`'
     printf ' WHERE `build_dependency_loops`.`build_assignment`=%s' \
       "$1"
   printf ')'
