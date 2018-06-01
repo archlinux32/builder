@@ -920,18 +920,18 @@ mysql_cleanup() {
 # print a mysql query giving wether dependencies are pending
 mysql_query_has_pending_dependencies() {
   printf 'EXISTS ('
-    printf 'SELECT 1 FROM `binary_packages_in_repositories` as `to_dos_bpir`'
-    mysql_join_binary_packages_in_repositories_binary_packages 'to_dos_bpir' 'to_dos'
-    mysql_join_binary_packages_dependencies 'to_dos'
+    printf 'SELECT 1 FROM `binary_packages_in_repositories` as `todos_bpir`'
+    mysql_join_binary_packages_in_repositories_binary_packages 'todos_bpir' 'todos'
+    mysql_join_binary_packages_dependencies 'todos'
     mysql_join_dependencies_install_target_providers
-    mysql_join_install_target_providers_binary_packages '' 'bin_deps'
-    mysql_join_binary_packages_binary_packages_in_repositories 'bin_deps' 'binir_deps'
+    mysql_join_install_target_providers_binary_packages '' 'deps'
+    mysql_join_binary_packages_binary_packages_in_repositories 'deps' 'deps_bpir'
     printf ' WHERE'
     printf ' `%s`.`repository`=%s AND' \
-      'dep_bpir' "${repository_ids__any_build_list}" \
-      'to_do_repos' "${repository_ids__any_build_list}"
-    printf ' `bin_deps`.`build_assignment`!=`to_dos`.`build_assignment` AND'
-    printf ' `to_dos`.`build_assignment`=%s' \
+      'deps_bpir' "${repository_ids__any_build_list}" \
+      'todos_bpir' "${repository_ids__any_build_list}"
+    printf ' `deps`.`build_assignment`!=`todos`.`build_assignment` AND'
+    printf ' `todos`.`build_assignment`=%s' \
       "$1"
   printf ')'
 }
