@@ -309,7 +309,7 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
     printf ' AND `dependency_types`.`relevant_for_binary_packages`'
     # nothing "less stable" has the same name
     printf ' WHERE NOT EXISTS ('
-      printf 'SELECT * FROM `binary_packages` AS `subst_bp`'
+      printf 'SELECT 1 FROM `binary_packages` AS `subst_bp`'
       mysql_join_binary_packages_binary_packages_in_repositories 'subst_bp' 'subst_bir'
       mysql_join_binary_packages_in_repositories_repositories 'subst_bir' 'subst_r'
       printf ' AND `subst_r`.`name`!="build-support"'
@@ -339,13 +339,12 @@ printf 'CREATE TEMPORARY TABLE `pkgbases` (`pkgbase` VARCHAR(64), `repository` V
   printf ' JOIN `upstream_repositories` ON `upstream_repositories`.`name`=`pkgbases`.`repository`'
   mysql_join_upstream_repositories_git_repositories
   printf ' WHERE NOT EXISTS ('
-    printf 'SELECT * FROM `ignore_packages`'
+    printf 'SELECT 1 FROM `ignore_packages`'
     printf ' JOIN `binary_packages` AS `i_bp` ON `ignore_packages`.`pkgname`=`i_bp`.`pkgname`'
     mysql_join_binary_packages_build_assignments 'i_bp' 'i_ba'
     mysql_join_build_assignments_package_sources 'i_ba' 'i_ps'
     printf ' WHERE `i_ps`.`pkgbase`=`pkgbases`.`pkgbase`'
   printf ');\n'
-  printf ';\n'
   printf 'SELECT '
   printf '`package_sources`.`pkgbase`,'
   printf '`git_repositories`.`head`,'
