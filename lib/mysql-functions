@@ -444,7 +444,7 @@ mysql_generate_package_metadata() {
           printf ')'
           printf ',0))'
         )
-        { # TODO: fix this mess, I'm tired
+        { # TODO: identify arch by id
           printf 'INSERT IGNORE INTO `binary_packages` ('
           printf '`%s`,' \
             'build_assignment' \
@@ -581,6 +581,7 @@ mysql_generate_package_metadata() {
               printf ' `dependency_types`.`name` = "%s" AND' \
                 "${link%depends}"
             fi
+            # TODO: identify binary_packages by id
             printf ' `binary_packages`.`%s` = from_base64("%s") AND' \
               'epoch' "${epoch}" \
               'pkgver' "${pkgver}" \
@@ -632,16 +633,18 @@ mysql_sanity_check() {
     mysql_join_build_assignments_architectures '' 'ba_arch'
     printf ' WHERE `bp_arch`.`name`!="any"'
     printf ' AND `ba_arch`.`name`="any";\n'
-    printf 'SELECT DISTINCT CONCAT("package multiple times on build list: ",`a`.`pkgname`)'
+    printf 'SELECT DISTINCT CONCAT("package multiple times in the same repository: ",`repositories`.`name`,"/",`a`.`pkgname`)'
     printf ' FROM `binary_packages` AS `a`'
     mysql_join_binary_packages_binary_packages_in_repositories 'a' 'a_bir'
-    printf ' JOIN `binary_packages_in_repositories` AS `b_bir`'
-    printf ' ON `b_bir`.`repository`=`a_bir`.`repository`'
+    mysql_join_binary_packages_in_repositories_repositories 'a_bir'
+    mysql_join_repositories_binary_packages_in_repositories '' 'b_bir'
     mysql_join_binary_packages_in_repositories_binary_packages 'b_bir' 'b'
     printf ' AND `a`.`pkgname`=`b`.`pkgname`'
+    printf ' AND `a`.`architecture`=`b`.`architecture`'
     printf ' AND `a`.`id`!=`b`.`id`'
-    printf ' WHERE `a_bir`.`repository`=%s;\n' \
-      "${repository_ids__any_build_list}"
+    printf ' WHERE `repositories`.`id` NOT IN (%s,%s);\n' \
+      "${repository_ids__any_deletion_list}" \
+      "${repository_ids__any_to_be_decided}"
     printf 'SELECT DISTINCT CONCAT("split-package with differing sub_pkgrels on the build-list: ",`a`.`pkgname`)'
     printf ' FROM `binary_packages` AS `a`'
     printf ' JOIN `binary_packages` AS `b` ON `a`.`build_assignment`=`b`.`build_assignment`'
@@ -656,12 +659,10 @@ mysql_sanity_check() {
     mysql_package_name_query
     printf ') FROM `binary_packages`'
     mysql_join_binary_packages_architectures
-    printf ' WHERE NOT EXISTS ('
-      printf 'SELECT 1 FROM `binary_packages_in_repositories`'
-      mysql_join_binary_packages_in_repositories_repositories
-      printf ' WHERE NOT `repositories`.`is_on_master_mirror`'
-      printf ' AND `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
-    printf ') AND `binary_packages`.`sha512sum` IS NULL;\n'
+    mysql_join_binary_packages_binary_packages_in_repositories
+    mysql_join_binary_packages_in_repositories_repositories
+    printf ' WHERE `repositories`.`is_on_master_mirror`'
+    printf ' AND `binary_packages`.`sha512sum` IS NULL;\n'
   } | \
     mysql_run_query | \
     sed '
@@ -698,9 +699,9 @@ mysql_sanity_check() {
         'pkgrel' \
         'sub_pkgrel'
       printf '`architectures`.`name`'
-      printf ' FROM `binary_packages`'
+      printf ' FROM `binary_packages_in_repositories`'
+      mysql_join_binary_packages_in_repositories_binary_packages
       mysql_join_binary_packages_architectures
-      mysql_join_binary_packages_binary_packages_in_repositories
       mysql_join_binary_packages_in_repositories_repositories
       mysql_join_repositories_architectures '' 'r_a'
       printf ' WHERE `repositories`.`is_on_master_mirror`'
@@ -752,6 +753,11 @@ mysql_sanity_check() {
         printf 'SELECT 1 FROM `binary_packages_in_repositories`'
         mysql_join_binary_packages_in_repositories_repositories
         printf ' WHERE NOT `repositories`.`is_on_master_mirror`'
+        printf ' AND `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+      printf ') OR EXISTS ('
+        printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+        mysql_join_binary_packages_in_repositories_repositories
+        printf ' WHERE `repositories`.`is_on_master_mirror`'
         printf ' AND `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
       printf ')'
     } | \
@@ -831,11 +837,11 @@ mysql_cleanup() {
     exit 2
   fi
   {
-    # remove to-be-decided binary_packages
+    # remove to-be-decided binary_packages and binary_packages_in_repositories
     printf '%s ' \
       "${operator}"
     if [ "${operator}" = 'DELETE' ]; then
-      printf '`binary_packages` '
+      printf '`binary_packages`,`binary_packages_in_repositories` '
     fi
     printf 'FROM `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
@@ -864,7 +870,7 @@ mysql_cleanup() {
       "${operator}"
     printf 'WHERE NOT EXISTS '
     printf '('
-      printf 'SELECT * FROM `build_assignments` '
+      printf 'SELECT 1 FROM `build_assignments` '
       printf 'WHERE `build_assignments`.`package_source`=`package_sources`.`id`'
     printf ');\n'
     # remove jobs from build slaves that are not on the build-list
@@ -914,17 +920,16 @@ mysql_cleanup() {
 # print a mysql query giving wether dependencies are pending
 mysql_query_has_pending_dependencies() {
   printf 'EXISTS ('
-    printf 'SELECT * FROM `binary_packages` as `to_dos`'
-    mysql_join_binary_packages_binary_packages_in_repositories 'to_dos' 'to_dos_pir'
-    mysql_join_binary_packages_in_repositories_repositories 'to_dos_pir' 'to_do_repos'
+    printf 'SELECT 1 FROM `binary_packages_in_repositories` as `to_dos_bpir`'
+    mysql_join_binary_packages_in_repositories_binary_packages 'to_dos_bpir' 'to_dos'
     mysql_join_binary_packages_dependencies 'to_dos'
     mysql_join_dependencies_install_target_providers
     mysql_join_install_target_providers_binary_packages '' 'bin_deps'
     mysql_join_binary_packages_binary_packages_in_repositories 'bin_deps' 'binir_deps'
-    mysql_join_binary_packages_in_repositories_repositories 'binir_deps' 'dep_repos'
     printf ' WHERE'
-    printf ' `%s`.`name`="build-list" AND' \
-      'dep_repos' 'to_do_repos'
+    printf ' `%s`.`repository`=%s AND' \
+      'dep_bpir' "${repository_ids__any_build_list}" \
+      'to_do_repos' "${repository_ids__any_build_list}"
     printf ' `bin_deps`.`build_assignment`!=`to_dos`.`build_assignment` AND'
     printf ' `to_dos`.`build_assignment`=%s' \
       "$1"
