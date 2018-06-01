@@ -20,10 +20,6 @@ fi
 # `binary_packages_in_repositories` needs `binary_packages` anymore,
 # otherwise let them untouched)
 
-# TODO: `has_issues`,`is_tested`,`is_to_be_deleted`,`last_moved` should
-# be columns of `binary_packages_in_repositories` instead of
-# `binary_packages`
-
 # base64_encode_each encode each line of stdin with base64
 
 base64_encode_each() {
