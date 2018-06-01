@@ -123,7 +123,9 @@ fi
       sed '
         s/^/from_base64("/
         s/$/"),/
-        1 s/^/UPDATE `binary_packages` SET `is_to_be_deleted`=1 WHERE `binary_packages`.`pkgname` IN (/
+        1 s/^/UPDATE `binary_packages_in_repositories` '"$(
+          mysql_join_binary_packages_in_repositories_binary_packages
+        )"' SET `binary_packages_in_repositories`.`is_to_be_deleted`=1 WHERE `binary_packages`.`pkgname` IN (/
         $ s/,$/);/
       ' | \
       mysql_run_query
