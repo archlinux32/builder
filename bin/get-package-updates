@@ -124,10 +124,10 @@ delete_package() {
     # shellcheck disable=SC2016
     {
       # packages from the build-list/to-be-decided go straight to the deletion-list
-      printf 'UPDATE `binary_packages`'
+      printf 'UPDATE `binary_packages_in_repositories`'
+      mysql_join_binary_packages_in_repositories_binary_packages
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
-      mysql_join_binary_packages_binary_packages_in_repositories
       printf ' SET '
       # shellcheck disable=SC2154
       printf '`binary_packages_in_repositories`.`%s`=%s,' \
@@ -143,10 +143,11 @@ delete_package() {
         "$(printf '%s' "$1" | base64 -w0)"
       printf 'COMMIT;\n'
       # other packages are marked as `is_to_be_deleted`
-      printf 'UPDATE `binary_packages`'
+      printf 'UPDATE `binary_packages_in_repositories`'
+      mysql_join_binary_packages_in_repositories_binary_packages
       mysql_join_binary_packages_build_assignments
       mysql_join_build_assignments_package_sources
-      printf ' SET `binary_packages`.`is_to_be_deleted`=1'
+      printf ' SET `binary_packages_in_repositories`.`is_to_be_deleted`=1'
       printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");' \
         "$(printf '%s' "$1" | base64 -w0)"
     } | \
@@ -376,7 +377,7 @@ trigger_rebuild_on_any_file_sed_expression=$(
       {
         # delete old build assignment and associated binary packages
         # which are not yet built or on the deletion list
-        printf 'DELETE `build_assignments`,`binary_packages`'
+        printf 'DELETE `build_assignments`,`binary_packages`,`binary_packages_in_repositories`'
         printf ' FROM `binary_packages`'
         mysql_join_binary_packages_build_assignments
         mysql_join_build_assignments_package_sources
@@ -390,10 +391,11 @@ trigger_rebuild_on_any_file_sed_expression=$(
           "${repository_ids__any_build_list}" \
           "${repository_ids__any_deletion_list}"
         # remove is-to-be-deleted marker from old binary packages
-        printf 'UPDATE `binary_packages`'
+        printf 'UPDATE `binary_packages_in_repositories`'
+        mysql_join_binary_packages_in_repositories_binary_packages
         mysql_join_binary_packages_build_assignments
         mysql_join_build_assignments_package_sources
-        printf ' SET `is_to_be_deleted`=0'
+        printf ' SET `binary_packages_in_repositories`.`is_to_be_deleted`=0'
         printf ' WHERE `package_sources`.`pkgbase`=from_base64("%s");\n' \
           "$(
             printf '%s' "${package}" | \
@@ -594,8 +596,8 @@ echo 'Done - mark decisions as final.'
       "$(printf '%s' "${repo}" | base64 -w0)"
   done
   # move binary_packages from "to-be-decided" to "build-list"
-  printf 'UPDATE `binary_packages`'
-  mysql_join_binary_packages_binary_packages_in_repositories
+  printf 'UPDATE `binary_packages_in_repositories`'
+  mysql_join_binary_packages_in_repositories_binary_packages
   printf ' SET `binary_packages_in_repositories`.`repository`=%s' \
     "${repository_ids__any_build_list}"
   printf ' WHERE `binary_packages_in_repositories`.`repository`=%s;\n' \
