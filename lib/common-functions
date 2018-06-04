@@ -718,7 +718,8 @@ irc_say() {
     [ "$(date '+%s')" -gt "$(cat "${work_dir}/irc-shut-up")" ]; then
     rm "${work_dir}/irc-shut-up"
   fi
-  if [ -s "${work_dir}/irc-shut-up" ]; then
+  if [ -s "${work_dir}/irc-shut-up" ] && \
+    [ -z "$1" ]; then
     channel_in_pipe='/dev/null'
   else
     channel_in_pipe="${irc_dir}/${channel}/in"
