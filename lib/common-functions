@@ -708,16 +708,26 @@ extract_pkgname_epoch_pkgver_pkgrel_sub_pkgrel_arch_from_package_name() {
 # shellcheck disable=SC2120
 irc_say() {
   local channel
+  local channel_in_pipe
   if [ -z "$1" ]; then
     channel='#archlinux32'
   else
     channel="$1"
   fi
+  if [ -s "${work_dir}/irc-shut-up" ] && \
+    [ "$(date '+%s')" -gt "$(cat "${work_dir}/irc-shut-up")" ]; then
+    rm "${work_dir}/irc-shut-up"
+  fi
+  if [ -s "${work_dir}/irc-shut-up" ]; then
+    channel_in_pipe='/dev/null'
+  else
+    channel_in_pipe="${irc_dir}/${channel}/in"
+  fi
   if [ -p "${irc_dir}/${channel}/in" ]; then
     if [ "$2" = 'copy' ]; then
-      pee cat 'sponge '"${irc_dir}/${channel}/in"
+      pee cat 'sponge '"${channel_in_pipe}"
     else
-      sponge "${irc_dir}/${channel}/in"
+      sponge "${channel_in_pipe}"
     fi
   fi
 }

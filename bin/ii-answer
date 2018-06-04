@@ -115,4 +115,17 @@ find "${irc_dir}" \
       printf 'np\n' | \
         irc_say "${channel}" 'copy'
     fi
+    if [ -z "${channel%%#*}" ]; then
+      # answer "Shut up!"
+      regex='^\S\+ <\S\+> .* [Ss][Hh][Uu][Tt] \?[Uu][Pp]'
+      if grep "${regex}" "${out_file}" | \
+        grep -q "${sloppy_salutation}"; then
+        sed -i "/${regex}/d" "${out_file}"
+        printf '%s\n' "$((
+          $(date '+%s') + 3600
+        ))" > "${work_dir}/irc-shut-up"
+        printf 'Sorry, I will do.\n' | \
+          irc_say "${channel}" 'copy'
+      fi
+    fi
   done
