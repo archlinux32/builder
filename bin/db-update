@@ -374,7 +374,7 @@ for source_stability in 'testing' 'staging'; do
   # create real file names of packages, because
   # mysql_query_and_delete_unneeded_binary_packages does so, too
   sed -i '
-    s,^\(\S\+\) \(\S\+\)$,i686/\2/\1",
+    s,^\(\S\+\) \(\S\+\)$,i686/\2/\1,
   ' "${tmp_dir}/rm"
 
   # shellcheck disable=SC2016
