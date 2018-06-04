@@ -385,7 +385,7 @@ for source_stability in 'testing' 'staging'; do
       "${tmp_dir}/mv.id" 'moved_bpir' \
       "${tmp_dir}/rm.id" 'replaced_bpir'
     printf 'DELETE `binary_packages_in_repositories` FROM `binary_packages_in_repositories`'
-    printf ' JOIN `replaced_bpir` ON `binary_packages_in_repositories`.`id`=`replaced_binary_packages`.`id`;\n'
+    printf ' JOIN `replaced_bpir` ON `binary_packages_in_repositories`.`id`=`replaced_bpir`.`id`;\n'
     mysql_query_and_delete_unneeded_binary_packages
     printf 'UPDATE `binary_packages_in_repositories`'
     printf ' JOIN `moved_bpir` ON `binary_packages_in_repositories`.`id`=`moved_bpir`.`id`'
