@@ -203,7 +203,7 @@ fi
     printf ' JOIN `binary_packages_in_repositories` AS `repl_bpir_copy` ON `repl_bpir_copy`.`id`=`replaced_bpir_copy`.`id`'
     mysql_join_binary_packages_in_repositories_repositories 'repl_bpir_copy' 'repl_r_copy'
     printf ' WHERE `repl_bpir_copy`.`package`=`dependencies`.`dependent`'
-    printf ' AND `repl_r_copy`.`architecture`=``repl_r`.`architecture`'
+    printf ' AND `repl_r_copy`.`architecture`=`repl_r`.`architecture`'
   printf ')'
   mysql_join_dependencies_dependency_types
   # consider only runtime dependencies
