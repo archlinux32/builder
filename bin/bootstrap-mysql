@@ -93,6 +93,13 @@ fi
   printf ' AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`'
   # correct stability: "testing"/"staging" - as chosen
   printf ' WHERE `repository_stabilities`.`name`=`from_stability`'
+  printf ' AND ('
+    printf '`from_stability`="staging"'
+    # "testing" packages must be tested
+    printf ' OR `binary_packages`.`is_tested`'
+  printf ')'
+  # no open issues
+  printf ' AND NOT `binary_packages`.`has_issues`'
   printf ';\n'
   # these packages are considered for being replaced:
   # for each moved package
