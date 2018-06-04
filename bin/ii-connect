@@ -43,10 +43,11 @@ if [ "$1" = 'watch' ]; then
     # this avoids missing modifications during our last execution
     if [ -z "${said}" ]; then
       # shellcheck disable=SC2046
-      inotifywait -e 'CLOSE_WRITE,CLOSE' $(
+      inotifywait -e 'CLOSE_WRITE,CLOSE' -e 'CREATE,ISDIR' $(
         find "${irc_dir}" \
           -type f \
-          -name 'out'
+          -name 'out' -o \
+          -type d
         )
     fi
     said=$(
