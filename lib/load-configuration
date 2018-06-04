@@ -133,7 +133,7 @@ for repo in ${repo_names}; do
 
   if ! git -C "${repo_path}" rev-parse --git-dir > /dev/null 2>&1; then
     if [ "${repo}" = "archlinux32" ]; then
-      repo_source='https://github.com/archlinux32/packages.git'
+      repo_source='https://git.archlinux32.org/archlinux32/packages.git'
     else
       repo_source="git://git.archlinux.org/svntogit/${repo}.git"
     fi
