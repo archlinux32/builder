@@ -719,7 +719,7 @@ irc_say() {
     rm "${work_dir}/irc-shut-up"
   fi
   if [ -s "${work_dir}/irc-shut-up" ] && \
-    [ -z "$1" ]; then
+    [ -z "${channel%%#*}" ]; then
     channel_in_pipe='/dev/null'
   else
     channel_in_pipe="${irc_dir}/${channel}/in"
