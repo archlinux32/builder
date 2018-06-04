@@ -1,8 +1,6 @@
 #!/bin/sh
 
 # check for packages that need to be built
-# Details:
-#  https://github.com/archlinux32/builder/wiki/Build-system#get-package-updates
 
 # shellcheck disable=SC2119,SC2120
 

@@ -1,8 +1,6 @@
 #!/bin/sh
 
 # build packages one by one, then upload the binary package to the repository server
-# Details:
-#  https://github.com/archlinux32/builder/wiki/Build-system#build-packages
 
 # shellcheck disable=SC2119,SC2120
 
