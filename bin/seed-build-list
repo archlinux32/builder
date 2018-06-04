@@ -207,8 +207,9 @@ fi
   printf ' SELECT DISTINCT `ignore_bin`.`pkgname`'
   printf ' FROM `binary_packages` AS `ignore_bin`'
   mysql_join_binary_packages_binary_packages_in_repositories 'ignore_bin'
-  mysql_join_binary_packages_in_repositories_repositories
-  printf ' WHERE `repositories`.`name` IN ("build-list","deletion-list")'
+  printf ' WHERE `binary_packages_in_repositories`.`repository` IN (%s,%s)' \
+    "${repository_ids__any_build_list}" \
+    "${repository_ids__any_deletion_list}"
   # packages with no not-to-be-deleted and at least on to-be-deleted version should be ignored
   printf ' OR ('
   printf '`binary_packages_in_repositories`.`is_to_be_deleted`'
