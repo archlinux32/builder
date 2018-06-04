@@ -112,20 +112,22 @@ if [ -s "${work_dir}/build-master-sanity" ]; then
   exit
 fi
 
-# Create tmp_dir, lock and trap.
+if ! ${no_action}; then
+  # Create lock.
+  exec 9> "${package_database_lock_file}"
+  if ! verbose_flock ${block_flag} 9; then
+    >&2 echo 'come back (shortly) later - I cannot lock package database.'
+    exit 0
+  fi
 
-exec 9> "${package_database_lock_file}"
-if ! verbose_flock ${block_flag} 9; then
-  >&2 echo 'come back (shortly) later - I cannot lock package database.'
-  exit 0
+  exec 8> "${sanity_check_lock_file}"
+  if ! verbose_flock -s ${block_flag} 8; then
+    >&2 echo 'come back (shortly) later - sanity-check currently running.'
+    exit 0
+  fi
 fi
 
-exec 8> "${sanity_check_lock_file}"
-if ! verbose_flock -s ${block_flag} 8; then
-  >&2 echo 'come back (shortly) later - sanity-check currently running.'
-  exit 0
-fi
-
+# Create tmp_dir and trap.
 tmp_dir=$(mktemp -d "${work_dir}/tmp.db-update.XXXXXXXXXX")
 trap 'rm -rf --one-file-system "${tmp_dir}"' EXIT
 
