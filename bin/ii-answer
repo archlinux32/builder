@@ -117,7 +117,7 @@ find "${irc_dir}" \
     fi
     if [ -z "${channel%%#*}" ]; then
       # answer "Shut up!"
-      regex='^\S\+ <\S\+> .* [Ss][Hh][Uu][Tt] \?[Uu][Pp]'
+      regex='^\S\+ <\S\+> \(.* \)\?[Ss][Hh][Uu][Tt] \?[Uu][Pp]'
       if grep "${regex}" "${out_file}" | \
         grep -q "${sloppy_salutation}"; then
         sed -i "/${regex}/d" "${out_file}"
