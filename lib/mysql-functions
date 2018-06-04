@@ -1040,6 +1040,7 @@ for link in \
   'gpg_keys:owner:persons' \
   \
   'install_target_providers:package:binary_packages' \
+  'install_target_providers:package package:binary_packages_in_repositories' \
   'install_target_providers:install_target:install_targets' \
   'install_target_providers:install_target depending_on:dependencies' \
   \
@@ -1103,4 +1104,23 @@ mysql_retrieve_static_information() {
     } | \
       mysql_run_query
   )"
+}
+
+# mysql_query_and_delete_unneeded_binary_packages
+# print a query which lists and deletes binary_packages which are not
+# linked from binary_packages_in_repositories
+mysql_query_and_delete_unneeded_binary_packages() {
+  printf 'SELECT CONCAT("pool/",'
+  mysql_package_name_query
+  printf ') FROM `binary_packages`'
+  mysql_join_binary_packages_architectures
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+    printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+  printf ');\n'
+  printf 'DELETE `binary_packages` FROM `binary_packages`'
+  printf ' WHERE NOT EXISTS ('
+    printf 'SELECT 1 FROM `binary_packages_in_repositories`'
+    printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
+  printf ');\n'
 }

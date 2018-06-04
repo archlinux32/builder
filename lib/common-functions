@@ -218,19 +218,7 @@ remove_old_package_versions() {
           "${tmp_dir}/db-removes"
         printf 'DELETE `binary_packages_in_repositories` FROM `binary_packages_in_repositories`'
         printf ' JOIN `del` ON `binary_packages_in_repositories`.`id`=`del`.`id`;\n'
-        printf 'SELECT CONCAT("pool/",'
-        mysql_package_name_query
-        printf ') FROM `binary_packages`'
-        mysql_join_binary_packages_architectures
-        printf ' WHERE NOT EXISTS ('
-          printf 'SELECT 1 FROM `binary_packages_in_repositories`'
-          printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
-        printf ');\n'
-        printf 'DELETE `binary_packages` FROM `binary_packages`'
-        printf ' WHERE NOT EXISTS ('
-          printf 'SELECT 1 FROM `binary_packages_in_repositories`'
-          printf ' WHERE `binary_packages_in_repositories`.`package`=`binary_packages`.`id`'
-        printf ');\n'
+        mysql_query_and_delete_unneeded_binary_packages
       } | \
         mysql_run_query | \
         sort -u >> \
