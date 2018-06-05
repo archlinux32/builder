@@ -178,6 +178,18 @@ while [ "${count}" -ne 0 ] && \
         "${master_build_server_user}@${master_build_server}" \
         'get-assignment' "${prefered_package}"
     ) || err=$?
+    if [ "$(printf '%s\n' "${package}" | wc -l)" -ne 1 ]; then
+      expected_packages=$(
+        printf '%s\n' "${package}" | \
+          sed '1d'
+      )
+      package=$(
+        printf '%s\n' "${package}" | \
+          sed -n '1p'
+      )
+    else
+      expected_packages=''
+    fi
   else
     package=$(
       echo "${forced_package}" | \
@@ -185,6 +197,7 @@ while [ "${count}" -ne 0 ] && \
           s|\.\([^.]\+\)\.\([^.]\+\)\.\([^.]\+\)$| \1 \2 \3|
         '
     )
+    expected_packages=''
   fi
 
   case ${err} in
@@ -409,6 +422,19 @@ while [ "${count}" -ne 0 ] && \
           tar_content_dir=$(mktemp -d "${tmp_dir}/tar-content.XXXXXX")
           find . -maxdepth 1 -type f -name '*-debug-*.pkg.tar.xz*' -delete
           echo 'post-build' > "${tmp_dir}/.ping-build-master"
+          # remove unexpected packages
+          if [ -n "${expected_packages}" ]; then
+            {
+              find . -maxdepth 1 -type f -name '*.pkg.tar.xz' -printf '%f\n'
+              printf '%s\n' "${expected_packages}" | \
+                sed 'p'
+            } | \
+              sort | \
+              uniq -u | \
+              while read -r unexpected_package; do
+                rm "${unexpected_package}"*
+              done
+          fi
           >&2 printf 'signing package(s)\n'
           find . -maxdepth 1 -type f -name '*.pkg.tar.xz' \
             -execdir gpg --local-user="${package_key}" --detach-sign '{}' \; \
