@@ -675,5 +675,6 @@ trigger_mirror_refreshs
   mysql_run_query | \
   sort -u | \
   while read -r bpir_id; do
+    # TODO: this needs to get faster, it is currently the bottleneck
     remove_old_package_versions "${bpir_id}"
   done
