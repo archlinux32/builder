@@ -52,8 +52,9 @@ hand_out_assignment() {
     printf ';\n'
 
     printf 'UPDATE `build_slaves`'
-    printf ' SET `currently_building`=%s' \
+    printf ' SET `build_slaves`.`currently_building`=%s,' \
       "$1"
+    printf ' `build_slaves`.`is_sane`=1'
     # shellcheck disable=SC2154
     printf ' WHERE `build_slaves`.`id`=from_base64("%s");\n' \
       "$(printf '%s' "${slave_id}" | base64 -w0)"
