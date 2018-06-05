@@ -30,25 +30,28 @@ if [ -z "${status}" ]; then
 fi
 
 if [ "${status% *}" != '1' ]; then
-  >&2 echo 'You do not build anything currently - abort whatever you are doing.'
-  if [ "${status#* }" = '1' ]; then
-    # shellcheck disable=SC2016
-    {
-      printf 'UPDATE `build_slaves`'
-      printf ' SET `build_slaves`.`is_sane`=0'
-      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-        "$(printf '%s' "${slave}" | base64 -w0)"
-      printf 'SELECT CONCAT('
-      printf '`persons`.`name`,": Your buildslave \\"",'
-      printf '`build_slaves`.`name`,"\\" builds some outdated package."'
-      printf ') FROM `build_slaves`'
-      mysql_join_build_slaves_ssh_keys
-      mysql_join_ssh_keys_persons
-      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
-        "$(printf '%s' "${slave}" | base64 -w0)"
-    } | \
-      mysql_run_query | \
-      irc_say
+  # during upload, the job might already have been deleted from the database
+  if [ 'uploading' != "$1" ]; then
+    >&2 echo 'You do not build anything currently - abort whatever you are doing.'
+    if [ "${status#* }" = '1' ]; then
+      # shellcheck disable=SC2016
+      {
+        printf 'UPDATE `build_slaves`'
+        printf ' SET `build_slaves`.`is_sane`=0'
+        printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+          "$(printf '%s' "${slave}" | base64 -w0)"
+        printf 'SELECT CONCAT('
+        printf '`persons`.`name`,": Your buildslave \\"",'
+        printf '`build_slaves`.`name`,"\\" builds some outdated package."'
+        printf ') FROM `build_slaves`'
+        mysql_join_build_slaves_ssh_keys
+        mysql_join_ssh_keys_persons
+        printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+          "$(printf '%s' "${slave}" | base64 -w0)"
+      } | \
+        mysql_run_query | \
+        irc_say
+    fi
   fi
   exit 2
 fi
