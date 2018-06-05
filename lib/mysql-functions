@@ -771,10 +771,9 @@ mysql_sanity_check() {
       sort > \
       "${temp_dir}/mysql-packages-pool"
 
-# TODO: activate that check
     diff -u \
       "${temp_dir}/master-mirror-pool" \
-      "${temp_dir}/mysql-packages-pool" >&2
+      "${temp_dir}/mysql-packages-pool"
   )
 }
 
