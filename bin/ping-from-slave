@@ -14,9 +14,9 @@ if [ "$(
   # shellcheck disable=SC2016,SC2154
   {
     printf 'SELECT COUNT(1) FROM `build_slaves`'
-    mysql_join_build_slaves_build_assignments
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
       "$(printf '%s' "${slave}" | base64 -w0)"
+    printf ' AND `build_slaves`.`currently_building` IS NOT NULL;\n'
   } | \
     mysql_run_query 'unimportant' || \
     echo '1'
