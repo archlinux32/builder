@@ -1100,6 +1100,11 @@ mysql_retrieve_static_information() {
       printf '`git_repositories`.`name`,"=",'
       printf '"\\"",`git_repositories`.`directory`,"\\"")'
       printf ' FROM `git_repositories`;\n'
+      printf 'SELECT CONCAT('
+      printf '"repository_stability_ids__",'
+      printf '`repository_stabilities`.`name`,"=",'
+      printf '`repository_stabilities`.`id`)'
+      printf ' FROM `repository_stabilities`;\n'
     } | \
       mysql_run_query
   )"
