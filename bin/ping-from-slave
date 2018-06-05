@@ -10,19 +10,46 @@
 # shellcheck source=../lib/load-configuration
 . "${0%/*}/../lib/load-configuration"
 
-if [ "$(
+status=$(
   # shellcheck disable=SC2016,SC2154
   {
-    printf 'SELECT COUNT(1) FROM `build_slaves`'
-    printf ' WHERE `build_slaves`.`name`=from_base64("%s")' \
+    printf 'SELECT'
+    printf ' IF(`build_slaves`.`currently_building` IS NULL,0,1),'
+    printf 'IF(`build_slaves`.`is_sane`,1,0)'
+    printf ' FROM `build_slaves`'
+    printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
       "$(printf '%s' "${slave}" | base64 -w0)"
-    printf ' AND `build_slaves`.`currently_building` IS NOT NULL;\n'
   } | \
-    mysql_run_query 'unimportant' || \
-    echo '1'
-  )" -ne 1 ]; then
-  # TODO: say the same in irc (if not yet said)
+    mysql_run_query 'unimportant' | \
+    tr '\t' ' '
+)
+
+# mysql errors are uncritical for us
+if [ -z "${status}" ]; then
+  exit
+fi
+
+if [ "${status% *}" != '1' ]; then
   >&2 echo 'You do not build anything currently - abort whatever you are doing.'
+  if [ "${status#* }" = '1' ]; then
+    # shellcheck disable=SC2016
+    {
+      printf 'UPDATE `build_slaves`'
+      printf ' SET `build_slaves`.`is_sane`=0'
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+        "$(printf '%s' "${slave}" | base64 -w0)"
+      printf 'SELECT CONCAT('
+      printf '`persons`.`name`,": Your buildslave \\"",'
+      printf '`build_slaves`.`name`,"\\" builds some outdated package."'
+      printf ') FROM `build_slaves`'
+      mysql_join_build_slaves_ssh_keys
+      mysql_join_ssh_keys_persons
+      printf ' WHERE `build_slaves`.`name`=from_base64("%s");\n' \
+        "$(printf '%s' "${slave}" | base64 -w0)"
+    } | \
+      mysql_run_query | \
+      irc_say
+  fi
   exit 2
 fi
 
