@@ -39,6 +39,16 @@ hand_out_assignment() {
     printf ' AND `build_assignments`.`id`=%s' \
       "$1"
     printf ' LIMIT 1;\n'
+    printf 'SELECT '
+    mysql_package_name_query
+    printf ' FROM `binary_packages`'
+    mysql_join_binary_packages_architectures
+    mysql_join_binary_packages_binary_packages_in_repositories
+    printf ' WHERE `binary_packages`.`build_assignment`=%s' \
+      "$1"
+    printf ' AND `binary_packages_in_repositories`.`repository`=%s' \
+      "${repository_ids__any_build_list}"
+    printf ';\n'
   } | \
     mysql_run_query | \
     tr '\t' ' '
