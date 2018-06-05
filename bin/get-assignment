@@ -39,6 +39,7 @@ hand_out_assignment() {
     printf ' AND `build_assignments`.`id`=%s' \
       "$1"
     printf ' LIMIT 1;\n'
+
     printf 'SELECT '
     mysql_package_name_query
     printf ' FROM `binary_packages`'
@@ -49,12 +50,7 @@ hand_out_assignment() {
     printf ' AND `binary_packages_in_repositories`.`repository`=%s' \
       "${repository_ids__any_build_list}"
     printf ';\n'
-  } | \
-    mysql_run_query | \
-    tr '\t' ' '
 
-  # shellcheck disable=SC2016
-  {
     printf 'UPDATE `build_slaves`'
     printf ' SET `currently_building`=%s' \
       "$1"
@@ -67,7 +63,8 @@ hand_out_assignment() {
     printf ' WHERE `build_assignments`.`id`=%s;\n' \
       "$1"
   } | \
-    mysql_run_query
+    mysql_run_query | \
+    tr '\t' ' '
 
   exit 0
 
