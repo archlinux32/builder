@@ -58,7 +58,6 @@ if [ "$5" = 'ERROR' ]; then
       mysql_join_package_sources_upstream_repositories
       mysql_join_build_assignments_binary_packages
       mysql_join_binary_packages_binary_packages_in_repositories
-      mysql_join_binary_packages_in_repositories_repositories
       printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
         "$(
           # shellcheck disable=SC2154
@@ -71,7 +70,8 @@ if [ "$5" = 'ERROR' ]; then
         'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
       printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
         "$(printf '%s' "$4" | base64 -w0)"
-      printf ' AND `repositories`.`name`="build-list"'
+      printf ' AND `binary_packages_in_repositories`.`repository`=%s;\n' \
+        "${repository_ids__any_build_list}"
     } | \
       mysql_run_query | \
       tr '\t' ' '
@@ -248,7 +248,6 @@ infos=$(
     mysql_join_package_sources_upstream_repositories
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
     printf ' WHERE `build_slaves`.`id`=from_base64("%s")' \
       "$(
         # shellcheck disable=SC2154
@@ -261,7 +260,8 @@ infos=$(
       'mod_git_revision' "$(printf '%s' "$3" | base64 -w0)"
     printf ' AND `upstream_repositories`.`name`=from_base64("%s")' \
       "$(printf '%s' "$4" | base64 -w0)"
-    printf ' AND `repositories`.`name`="build-list"'
+    printf ' AND `binary_packages_in_repositories`.`repository`=%s' \
+      "${repository_ids__any_build_list}"
     printf ' AND `binary_packages`.`sub_pkgrel`=from_base64("%s");\n' \
       "$(printf '%s' "$5" | base64 -w0)"
   } | \
@@ -453,15 +453,16 @@ if [ ! -s "${tmp_dir}/package-ids" ]; then
   exit 4
 fi
 
+# TODO: moving from build-list to *staging needs to depend on the architecture
+
 # shellcheck disable=SC2016
 infos=$(
   {
     printf 'SELECT `t`.`id`,`t`.`name`'
     printf ' FROM `repository_moves`'
-    printf ' JOIN `repositories` as `%s` ON `%s`.`id`=`repository_moves`.`%s_repository`' \
-      't' 't' 'to' \
-      'f' 'f' 'from'
-    printf ' WHERE `f`.`name`="build-list"'
+    printf ' JOIN `repositories` as `t` ON `t`.`id`=`repository_moves`.`to_repository`'
+    printf ' WHERE `repository_moves`.`from_repository`=%s' \
+      "${repository_ids__any_build_list}"
     printf ' AND `repository_moves`.`upstream_package_repository`=from_base64("%s");\n' \
       "$(
         printf '%s' "${upstream_repository_id}" | \
