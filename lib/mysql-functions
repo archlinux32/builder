@@ -786,10 +786,11 @@ mysql_find_build_assignment_loops() {
       mysql_join_install_target_providers_binary_packages '' 'packages_dependency'
       mysql_join_dependencies_binary_packages '' 'packages_dependent'
       mysql_join_binary_packages_binary_packages_in_repositories 'packages_dependency' 'packages_in_repository_dependency'
-      mysql_join_binary_packages_in_repositories_repositories 'packages_in_repository_dependency' 'repositories_dependency'
       mysql_join_binary_packages_binary_packages_in_repositories 'packages_dependent' 'packages_in_repository_dependent'
-      mysql_join_binary_packages_in_repositories_repositories 'packages_in_repository_dependent' 'repositories_dependent'
-      printf ' WHERE `repositories_dependent`.`name`="build-list" AND `repositories_dependency`.`name`="build-list"'
+      printf ' WHERE `packages_in_repositories_dependent`.`repository`=%s' \
+        "${repository_ids__any_build_list}"
+      printf ' AND `packages_in_repositories_dependency`.`repository`=%s;\n' \
+        "${repository_ids__any_build_list}"
     } | \
       mysql_run_query | \
       tr '\t' ' ' | \
