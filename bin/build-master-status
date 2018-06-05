@@ -144,51 +144,54 @@ if [ ! -s "${work_dir}/build-master-sanity" ]; then
     printf ' `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
     mysql_join_binary_packages_in_repositories_repositories
-    mysql_join_repositories_repository_stabilities
-    printf ' WHERE `repository_stabilities`.`name`="stable"),'
+    # shellcheck disable=SC2154
+    printf ' WHERE `repositories`.`stability`=%s),' \
+      "${repository_stability_ids__stable}"
     # pending_tasks_count
     printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
     printf ' `build_assignments`'
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"),'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s),' \
+      "${repository_ids__any_build_list}"
     # pending_packages_count
     printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
     printf ' `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"),'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s),' \
+      "${repository_ids__any_build_list}"
     # staging_packages_count
     printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
     printf ' `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
     mysql_join_binary_packages_in_repositories_repositories
-    mysql_join_repositories_repository_stabilities
-    printf ' WHERE `repository_stabilities`.`name`="staging"),'
+    # shellcheck disable=SC2154
+    printf ' WHERE `repositories`.`stability`=%s),' \
+      "${repository_stability_ids__staging}"
     # testing_packages_count
     printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
     printf ' `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
     mysql_join_binary_packages_in_repositories_repositories
-    mysql_join_repositories_repository_stabilities
-    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    # shellcheck disable=SC2154
+    printf ' WHERE `repositories`.`stability`=%s' \
+      "${repository_stability_ids__testing}"
     printf ' AND NOT `binary_packages`.`is_tested`),'
     # tested_packages_count
     printf '(SELECT COUNT(DISTINCT `binary_packages`.`id`) FROM'
     printf ' `binary_packages`'
     mysql_join_binary_packages_binary_packages_in_repositories
     mysql_join_binary_packages_in_repositories_repositories
-    mysql_join_repositories_repository_stabilities
-    printf ' WHERE `repository_stabilities`.`name`="testing"'
+    printf ' WHERE `repositories`.`stability`=%s' \
+      "${repository_stability_ids__testing}"
     printf ' AND `binary_packages`.`is_tested`),'
     # broken_tasks_count
     printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
     printf ' `build_assignments`'
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s' \
+      "${repository_ids__any_build_list}"
     printf ' AND `build_assignments`.`is_broken`),'
     # dependency_loops_count
     printf '(SELECT COUNT(DISTINCT `build_dependency_loops`.`loop`) FROM'
@@ -202,23 +205,23 @@ if [ ! -s "${work_dir}/build-master-sanity" ]; then
     mysql_join_build_slaves_build_assignments
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"),'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s),' \
+      "${repository_ids__any_build_list}"
     # blocked_tasks_count
     printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
     printf ' `build_assignments`'
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s' \
+      "${repository_ids__any_build_list}"
     printf ' AND `build_assignments`.`is_blocked` IS NOT NULL),'
     # next_tasks_count
     printf '(SELECT COUNT(DISTINCT `build_assignments`.`id`) FROM'
     printf ' `build_assignments`'
     mysql_join_build_assignments_binary_packages
     mysql_join_binary_packages_binary_packages_in_repositories
-    mysql_join_binary_packages_in_repositories_repositories
-    printf ' WHERE `repositories`.`name`="build-list"'
+    printf ' WHERE `binary_packages_in_repositories`.`repository`=%s' \
+      "${repository_ids__any_build_list}"
     printf ' AND ('
       printf 'NOT EXISTS ('
         printf 'SELECT 1 FROM `dependencies`'
@@ -227,8 +230,8 @@ if [ ! -s "${work_dir}/build-master-sanity" ]; then
         mysql_join_dependencies_install_target_providers
         mysql_join_install_target_providers_binary_packages '' 'prov_bp'
         mysql_join_binary_packages_binary_packages_in_repositories 'prov_bp' 'prov_bpir'
-        mysql_join_binary_packages_in_repositories_repositories 'prov_bpir' 'prov_r'
-        printf ' WHERE `prov_r`.`name`="build-list"'
+        printf ' WHERE `prov_bpir`.`repository`=%s' \
+          "${repository_ids__any_build_list}"
         printf ' AND `dependencies`.`dependent`=`binary_packages`.`id`'
       printf ') OR EXISTS ('
         printf 'SELECT 1 FROM `build_dependency_loops`'
