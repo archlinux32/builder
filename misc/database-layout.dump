@@ -37,17 +37,17 @@ END	utf8mb4	utf8mb4_unicode_ci	utf8mb4_unicode_ci
 calculate_maximal_moveable_set	NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION	CREATE DEFINER=`root`@`localhost` PROCEDURE `calculate_maximal_moveable_set`(IN `from_stability` VARCHAR(32))
 BEGIN
 DECLARE row_count_saved INT DEFAULT 0;
-DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages`;
-DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages`;
-CREATE TEMPORARY TABLE `replaced_binary_packages` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
-CREATE TEMPORARY TABLE `moveable_binary_packages` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
-DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages_copy`;
-DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages_copy`;
-CREATE TEMPORARY TABLE `replaced_binary_packages_copy` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
-CREATE TEMPORARY TABLE `moveable_binary_packages_copy` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
-DROP TEMPORARY TABLE IF EXISTS `moveable_binary_packages_copy2`;
-DROP TEMPORARY TABLE IF EXISTS `replaced_binary_packages_copy2`;
-CREATE TEMPORARY TABLE `replaced_binary_packages_copy2` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `moveable_bpir`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_bpir`;
+CREATE TEMPORARY TABLE `replaced_bpir` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+CREATE TEMPORARY TABLE `moveable_bpir` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `moveable_bpir_copy`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_bpir_copy`;
+CREATE TEMPORARY TABLE `replaced_bpir_copy` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
+CREATE TEMPORARY TABLE `moveable_bpir_copy` (`id` BIGINT, `to_repository` MEDIUMINT, UNIQUE KEY (`id`));
+DROP TEMPORARY TABLE IF EXISTS `moveable_bpir_copy2`;
+DROP TEMPORARY TABLE IF EXISTS `replaced_bpir_copy2`;
+CREATE TEMPORARY TABLE `replaced_bpir_copy2` (`id` BIGINT, `replaced_by` BIGINT, UNIQUE KEY (`id`));
 DROP TEMPORARY TABLE IF EXISTS `package_blobs`;
 CREATE TEMPORARY TABLE `package_blobs` (`ps_a` BIGINT, `ps_b` BIGINT, UNIQUE KEY `content` (`ps_a`,`ps_b`));
 INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)
@@ -76,11 +76,11 @@ INSERT IGNORE INTO `package_blobs` (`ps_a`,`ps_b`)
 	JOIN `repository_stabilities` AS `b_rs`
 	ON `b_r`.`stability`=`b_rs`.`id`
 	WHERE `a_rs`.`name` = `from_stability` AND `b_rs`.`name` = `from_stability`;
-INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)
-	SELECT `binary_packages`.`id`,`repository_moves`.`to_repository`
-	FROM `binary_packages`
-	JOIN `binary_packages_in_repositories`
-	ON `binary_packages`.`id`=`binary_packages_in_repositories`.`package`
+INSERT IGNORE INTO `moveable_bpir` (`id`,`to_repository`)
+	SELECT `binary_packages_in_repositories`.`id`,`repository_moves`.`to_repository`
+	FROM `binary_packages_in_repositories`
+	JOIN `binary_packages`
+	ON `binary_packages_in_repositories`.`package`=`binary_packages`.`id`
 	JOIN `repositories`
 	ON `binary_packages_in_repositories`.`repository`=`repositories`.`id`
 	JOIN `repository_stabilities`
@@ -93,14 +93,14 @@ INSERT IGNORE INTO `moveable_binary_packages` (`id`,`to_repository`)
 	ON `package_sources`.`upstream_package_repository`=`upstream_repositories`.`id`
 	JOIN `repository_moves`
 	ON `upstream_repositories`.`id`=`repository_moves`.`upstream_package_repository` AND `repository_moves`.`from_repository`=`binary_packages_in_repositories`.`repository`
-	WHERE `repository_stabilities`.`name` = `from_stability` AND (`from_stability`="staging" OR `binary_packages`.`is_tested`) AND NOT `binary_packages`.`has_issues`;
-INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)
-	SELECT `r_bp`.`id`,`m_bp`.`id`
-	FROM `moveable_binary_packages`
-	JOIN `binary_packages` AS `m_bp`
-	ON `m_bp`.`id`=`moveable_binary_packages`.`id`
+	WHERE `repository_stabilities`.`name`=`from_stability` AND (`from_stability`="staging" OR `binary_packages`.`is_tested`) AND NOT `binary_packages`.`has_issues`;
+INSERT IGNORE INTO `replaced_bpir` (`id`,`replaced_by`)
+	SELECT `r_bpir`.`id`,`m_bpir`.`id`
+	FROM `moveable_bpir`
 	JOIN `binary_packages_in_repositories` AS `m_bpir`
-	ON `m_bp`.`id`=`m_bpir`.`package`
+	ON `m_bpir`.`id`=`moveable_bpir`.`id`
+	JOIN `binary_packages` AS `m_bp`
+	ON `m_bpir`.`package`=`m_bp`.`id`
 	JOIN `repositories` AS `m_r`
 	ON `m_bpir`.`repository`=`m_r`.`id`
 	JOIN `build_assignments` AS `m_ba`
@@ -120,28 +120,30 @@ INSERT IGNORE INTO `replaced_binary_packages` (`id`,`replaced_by`)
 REPEAT
 SET row_count_saved = 0;
 DELETE
-	FROM `replaced_binary_packages_copy`;
-INSERT IGNORE INTO `replaced_binary_packages_copy`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy`;
+INSERT IGNORE INTO `replaced_bpir_copy`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `replaced_binary_packages_copy2`;
-INSERT IGNORE INTO `replaced_binary_packages_copy2`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy2`;
+INSERT IGNORE INTO `replaced_bpir_copy2`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `moveable_binary_packages_copy`;
-INSERT IGNORE INTO `moveable_binary_packages_copy`
-	SELECT `moveable_binary_packages`.*
-	FROM `moveable_binary_packages`;
-DELETE `replaced_binary_packages`,`moveable_binary_packages`
-	FROM `replaced_binary_packages`
-	RIGHT JOIN `moveable_binary_packages`
-	ON `moveable_binary_packages`.`id`=`replaced_binary_packages`.`replaced_by`
-	JOIN `binary_packages`
-	ON `binary_packages`.`id`=`moveable_binary_packages`.`id`
+	FROM `moveable_bpir_copy`;
+INSERT IGNORE INTO `moveable_bpir_copy`
+	SELECT `moveable_bpir`.*
+	FROM `moveable_bpir`;
+DELETE `replaced_bpir`,`moveable_bpir`
+	FROM `replaced_bpir`
+	RIGHT JOIN `moveable_bpir`
+	ON `moveable_bpir`.`id`=`replaced_bpir`.`replaced_by`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages_in_repositories`.`id`=`moveable_bpir`.`id`
 	JOIN `repositories` AS `target_repositories`
-	ON `moveable_binary_packages`.`to_repository`=`target_repositories`.`id`
+	ON `moveable_bpir`.`to_repository`=`target_repositories`.`id`
+	JOIN `binary_packages`
+	ON `binary_packages_in_repositories`.`package`=`binary_packages`.`id`
 	JOIN `dependencies`
 	ON `binary_packages`.`id`=`dependencies`.`dependent`
 	JOIN `dependency_types`
@@ -159,50 +161,54 @@ SELECT 1
 	ON `prov_r`.`stability`=`repository_stability_relations`.`more_stable`
 	WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND `target_repositories`.`stability`=`repository_stability_relations`.`less_stable` AND NOT EXISTS (
 SELECT 1
-	FROM `replaced_binary_packages_copy`
-	WHERE `replaced_binary_packages_copy`.`id`=`prov_bp`.`id`)) AND NOT EXISTS (
+	FROM `replaced_bpir_copy`
+	WHERE `replaced_bpir_copy`.`id`=`prov_bpir`.`id`)) AND NOT EXISTS (
 SELECT 1
 	FROM `install_target_providers`
-	JOIN `moveable_binary_packages_copy`
-	ON `moveable_binary_packages_copy`.`id`=`install_target_providers`.`package`
+	JOIN `binary_packages_in_repositories` AS `itp_bpir`
+	ON `install_target_providers`.`package`=`itp_bpir`.`package`
+	JOIN `moveable_bpir_copy`
+	ON `moveable_bpir_copy`.`id`=`itp_bpir`.`id`
 	WHERE `install_target_providers`.`install_target`=`dependencies`.`depending_on`);
 SET row_count_saved = row_count_saved + ROW_COUNT();
 DELETE
-	FROM `replaced_binary_packages_copy`;
-INSERT IGNORE INTO `replaced_binary_packages_copy`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy`;
+INSERT IGNORE INTO `replaced_bpir_copy`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `replaced_binary_packages_copy2`;
-INSERT IGNORE INTO `replaced_binary_packages_copy2`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy2`;
+INSERT IGNORE INTO `replaced_bpir_copy2`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `moveable_binary_packages_copy`;
-INSERT IGNORE INTO `moveable_binary_packages_copy`
-	SELECT `moveable_binary_packages`.*
-	FROM `moveable_binary_packages`;
-DELETE `replaced_binary_packages`,`moveable_binary_packages`
-	FROM `replaced_binary_packages`
-	JOIN `moveable_binary_packages`
-	ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`
-	JOIN `binary_packages` AS `repl_bp`
-	ON `repl_bp`.`id`=`replaced_binary_packages`.`id`
+	FROM `moveable_bpir_copy`;
+INSERT IGNORE INTO `moveable_bpir_copy`
+	SELECT `moveable_bpir`.*
+	FROM `moveable_bpir`;
+DELETE `replaced_bpir`,`moveable_bpir`
+	FROM `replaced_bpir`
+	JOIN `moveable_bpir`
+	ON `replaced_bpir`.`replaced_by`=`moveable_bpir`.`id`
+	JOIN `binary_packages_in_repositories` AS `repl_bpir`
+	ON `repl_bpir`.`id`=`replaced_bpir`.`id`
 	JOIN `install_target_providers`
-	ON `repl_bp`.`id`=`install_target_providers`.`package`
+	ON `repl_bpir`.`package`=`install_target_providers`.`package`
+	JOIN `repositories` AS `repl_r`
+	ON `repl_bpir`.`repository`=`repl_r`.`id`
 	JOIN `dependencies`
 	ON `install_target_providers`.`install_target`=`dependencies`.`depending_on` AND NOT EXISTS (
 SELECT 1
-	FROM `replaced_binary_packages_copy`
-	WHERE `replaced_binary_packages_copy`.`id`=`dependencies`.`dependent`)
+	FROM `replaced_bpir_copy`
+	JOIN `binary_packages_in_repositories` AS `repl_bpir_copy`
+	ON `repl_bpir_copy`.`id`=`replaced_bpir_copy`.`id`
+	JOIN `repositories` AS `repl_r_copy`
+	ON `repl_bpir_copy`.`repository`=`repl_r_copy`.`id`
+	WHERE `repl_bpir_copy`.`package`=`dependencies`.`dependent` AND `repl_r_copy`.`architecture`=`repl_r`.`architecture`)
 	JOIN `dependency_types`
 	ON `dependencies`.`dependency_type`=`dependency_types`.`id` AND `dependency_types`.`relevant_for_binary_packages`
 	JOIN `binary_packages` AS `req_bp`
 	ON `dependencies`.`dependent`=`req_bp`.`id`
-	JOIN `binary_packages_in_repositories` AS `repl_bpir`
-	ON `repl_bp`.`id`=`repl_bpir`.`package`
-	JOIN `repositories` AS `repl_r`
-	ON `repl_bpir`.`repository`=`repl_r`.`id`
 	JOIN `binary_packages_in_repositories` AS `req_bpir`
 	ON `req_bp`.`id`=`req_bpir`.`package`
 	JOIN `repositories` AS `req_r`
@@ -211,46 +217,50 @@ SELECT 1
 	ON `repl_rr`.`more_stable`=`repl_r`.`stability` AND `repl_rr`.`less_stable`=`req_r`.`stability`
 	WHERE NOT EXISTS (
 SELECT 1
-	FROM `moveable_binary_packages_copy`
-	JOIN `install_target_providers` AS `subst_itp`
-	ON `moveable_binary_packages_copy`.`id`=`subst_itp`.`package`
-	WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target`) AND NOT EXISTS (
-SELECT 1
-	FROM `binary_packages` AS `subst_bp`
-	JOIN `install_target_providers` AS `subst_itp`
-	ON `subst_bp`.`id`=`subst_itp`.`package`
+	FROM `moveable_bpir_copy`
 	JOIN `binary_packages_in_repositories` AS `subst_bpir`
-	ON `subst_bp`.`id`=`subst_bpir`.`package`
+	ON `subst_bpir`.`id`=`moveable_bpir_copy`.`id`
+	JOIN `install_target_providers` AS `subst_itp`
+	ON `subst_bpir`.`package`=`subst_itp`.`package`
+	JOIN `repositories` AS `subst_r`
+	ON `subst_bpir`.`repository`=`subst_r`.`id`
+	WHERE `subst_itp`.`install_target`=`install_target_providers`.`install_target` AND `subst_r`.`architecture`=`repl_r`.`architecture`) AND NOT EXISTS (
+SELECT 1
+	FROM `binary_packages_in_repositories` AS `subst_bpir`
+	JOIN `install_target_providers` AS `subst_itp`
+	ON `subst_bpir`.`package`=`subst_itp`.`package`
 	JOIN `repositories` AS `subst_r`
 	ON `subst_bpir`.`repository`=`subst_r`.`id`
 	JOIN `repository_stability_relations` AS `subst_rr`
 	ON `subst_rr`.`more_stable`=`subst_r`.`stability`
 	WHERE `subst_rr`.`less_stable`=`repl_r`.`stability` AND NOT EXISTS (
 SELECT 1
-	FROM `replaced_binary_packages_copy2`
-	WHERE `replaced_binary_packages_copy2`.`id`=`subst_bp`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
+	FROM `replaced_bpir_copy2`
+	WHERE `replaced_bpir_copy2`.`id`=`subst_bpir`.`id`) AND `subst_itp`.`install_target`=`install_target_providers`.`install_target`);
 SET row_count_saved = row_count_saved + ROW_COUNT();
 DELETE
-	FROM `replaced_binary_packages_copy`;
-INSERT IGNORE INTO `replaced_binary_packages_copy`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy`;
+INSERT IGNORE INTO `replaced_bpir_copy`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `replaced_binary_packages_copy2`;
-INSERT IGNORE INTO `replaced_binary_packages_copy2`
-	SELECT `replaced_binary_packages`.*
-	FROM `replaced_binary_packages`;
+	FROM `replaced_bpir_copy2`;
+INSERT IGNORE INTO `replaced_bpir_copy2`
+	SELECT `replaced_bpir`.*
+	FROM `replaced_bpir`;
 DELETE
-	FROM `moveable_binary_packages_copy`;
-INSERT IGNORE INTO `moveable_binary_packages_copy`
-	SELECT `moveable_binary_packages`.*
-	FROM `moveable_binary_packages`;
-DELETE `replaced_binary_packages`,`moveable_binary_packages`
-	FROM `replaced_binary_packages`
-	RIGHT JOIN `moveable_binary_packages`
-	ON `replaced_binary_packages`.`replaced_by`=`moveable_binary_packages`.`id`
+	FROM `moveable_bpir_copy`;
+INSERT IGNORE INTO `moveable_bpir_copy`
+	SELECT `moveable_bpir`.*
+	FROM `moveable_bpir`;
+DELETE `replaced_bpir`,`moveable_bpir`
+	FROM `replaced_bpir`
+	RIGHT JOIN `moveable_bpir`
+	ON `replaced_bpir`.`replaced_by`=`moveable_bpir`.`id`
+	JOIN `binary_packages_in_repositories`
+	ON `binary_packages_in_repositories`.`id`=`moveable_bpir`.`id`
 	JOIN `binary_packages`
-	ON `binary_packages`.`id`=`moveable_binary_packages`.`id`
+	ON `binary_packages_in_repositories`.`package`=`binary_packages`.`id`
 	JOIN `build_assignments`
 	ON `binary_packages`.`build_assignment`=`build_assignments`.`id`
 	JOIN `package_blobs`
@@ -259,16 +269,18 @@ DELETE `replaced_binary_packages`,`moveable_binary_packages`
 	ON `bl_ba`.`package_source`=`package_blobs`.`ps_b`
 	JOIN `binary_packages` AS `bl_bp`
 	ON `bl_ba`.`id`=`bl_bp`.`build_assignment`
+	JOIN `binary_packages_in_repositories` AS `bl_bpir`
+	ON `bl_bp`.`id`=`bl_bpir`.`package`
 	WHERE NOT EXISTS (
 SELECT 1
-	FROM `moveable_binary_packages_copy`
-	WHERE `moveable_binary_packages_copy`.`id`=`bl_bp`.`id`);
+	FROM `moveable_bpir_copy`
+	WHERE `moveable_bpir_copy`.`id`=`bl_bpir`.`id`);
 SET row_count_saved = row_count_saved + ROW_COUNT();
 UNTIL row_count_saved=0
 END REPEAT;
-DROP TEMPORARY TABLE `moveable_binary_packages_copy`;
-DROP TEMPORARY TABLE `replaced_binary_packages_copy`;
-DROP TEMPORARY TABLE `replaced_binary_packages_copy2`;
+DROP TEMPORARY TABLE `moveable_bpir_copy`;
+DROP TEMPORARY TABLE `replaced_bpir_copy`;
+DROP TEMPORARY TABLE `replaced_bpir_copy2`;
 END	utf8mb4	utf8mb4_unicode_ci	utf8mb4_unicode_ci
 show_broken_packages_and_dependencies	NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION	CREATE DEFINER=`root`@`localhost` PROCEDURE `show_broken_packages_and_dependencies`()
 BEGIN
