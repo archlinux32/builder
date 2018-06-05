@@ -2,13 +2,13 @@
 <diagram xmlns="http://oxygene.sk/ns/diagram/1/">
   <notation>Relational</notation>
   <item-list>
-    <item type="database-table" id="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}">
+    <item type="database-table" id="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}">
       <position>
-        <x>543</x>
-        <y>182</y>
+        <x>237</x>
+        <y>40</y>
       </position>
       <table>
-        <name>binary_packages_in_repositories</name>
+        <name>ssh_keys</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -18,67 +18,13 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>package</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>repository</name>
+            <name>owner</name>
             <data-type>MEDIUMINT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>is_to_be_deleted</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>last_moved</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{5f12db03-a8bb-4467-bab6-a57e545b9081}">
-      <position>
-        <x>42</x>
-        <y>135</y>
-      </position>
-      <table>
-        <name>ssh_log</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>date</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>build_slave</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>action</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>parameters</name>
+            <name>fingerprint</name>
             <data-type>TEXT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
@@ -86,13 +32,37 @@
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{5cbe15f1-fea8-48eb-a84f-97f7e22060f6}">
+    <item type="database-table" id="{6180fcbf-5069-4d86-8919-fd39394f1813}">
       <position>
-        <x>-55</x>
-        <y>-72</y>
+        <x>-68</x>
+        <y>71</y>
       </position>
       <table>
-        <name>email_log</name>
+        <name>email_actions</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{b5671c08-e24a-4293-b983-3c86b1a6d622}">
+      <position>
+        <x>68</x>
+        <y>49</y>
+      </position>
+      <table>
+        <name>allowed_email_actions</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -100,53 +70,59 @@
             <data-type>BIGINT</data-type>
             <required>True</required>
             <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>date</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>success</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>action</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>count</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
           </column>
           <column>
             <name>gpg_key</name>
             <data-type>BIGINT</data-type>
-            <required>False</required>
+            <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>comment</name>
-            <data-type>TEXT</data-type>
-            <required>False</required>
+            <name>action</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
             <primary-key>False</primary-key>
           </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{d823ab09-1c04-44ee-ad4b-6802208967ff}">
+    <item type="database-table" id="{f31249ea-ab19-45a4-9427-1854379ad8e7}">
       <position>
-        <x>494</x>
-        <y>427</y>
+        <x>106</x>
+        <y>-51</y>
       </position>
       <table>
-        <name>repository_moves</name>
+        <name>gpg_keys</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>fingerprint</name>
+            <data-type>VARCHAR(40)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>owner</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{75e4ebd8-5915-4aff-8316-0c542d3953da}">
+      <position>
+        <x>258</x>
+        <y>-44</y>
+      </position>
+      <table>
+        <name>persons</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -156,137 +132,23 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>from_repository</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>to_repository</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>upstream_package_repository</name>
-            <data-type>SMALLINT</data-type>
+            <name>name</name>
+            <data-type>VARCHAR(32)</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}">
+    <item type="database-table" id="{36980651-4f03-4748-aee8-1f9211aaafde}">
       <position>
         <x>788</x>
-        <y>281</y>
-      </position>
-      <table>
-        <name>repository_stabilities</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>bugtracker_category</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{04b6fdc5-85ae-4416-8db5-034ad05be93a}">
-      <position>
-        <x>53</x>
-        <y>501</y>
-      </position>
-      <table>
-        <name>build_dependency_loops</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>loop</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>build_assignment</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{be821d83-a9b4-4c0c-8e1b-433730200714}">
-      <position>
-        <x>540</x>
-        <y>-64</y>
-      </position>
-      <table>
-        <name>dependency_types</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>relevant_for_building</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>relevant_for_binary_packages</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{caab4a73-46dc-49dc-ac51-d8ae916827c5}">
-      <position>
-        <x>348</x>
         <y>-60</y>
       </position>
       <table>
-        <name>dependencies</name>
+        <name>todo_links</name>
         <color>#ffffff</color>
         <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
           <column>
             <name>dependent</name>
             <data-type>BIGINT</data-type>
@@ -299,22 +161,16 @@
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
-          <column>
-            <name>dependency_type</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}">
+    <item type="database-table" id="{dc01c567-d657-4db7-8a55-d2763ed00cee}">
       <position>
-        <x>557</x>
-        <y>30</y>
+        <x>945</x>
+        <y>-70</y>
       </position>
       <table>
-        <name>install_targets</name>
+        <name>todos</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -324,549 +180,27 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>name</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{04f424bf-6465-478b-9529-0038615b51d9}">
-      <position>
-        <x>415</x>
-        <y>321</y>
-      </position>
-      <table>
-        <name>architectures</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(16)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{7c210122-c51d-4724-b7cc-22f143bc47ac}">
-      <position>
-        <x>226</x>
-        <y>473</y>
-      </position>
-      <table>
-        <name>package_sources</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>pkgbase</name>
+            <name>file</name>
             <data-type>VARCHAR(64)</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>git_revision</name>
-            <data-type>VARCHAR(40)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>mod_git_revision</name>
-            <data-type>VARCHAR(40)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>upsream_package_repository</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>uses_upstream</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>uses_modification</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>commit_time</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}">
-      <position>
-        <x>539</x>
-        <y>533</y>
-      </position>
-      <table>
-        <name>upstream_repositories</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>git_repository</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{b3c86235-971a-4d3e-873c-c4179aa96cbc}">
-      <position>
-        <x>770</x>
-        <y>508</y>
-      </position>
-      <table>
-        <name>git_repositories</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>url</name>
-            <data-type>VARCHAR(128)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>directory</name>
-            <data-type>VARCHAR(128)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>head</name>
-            <data-type>VARCHAR(40)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{844766fc-c5af-4f61-b51b-d3f9393c60ca}">
-      <position>
-        <x>549</x>
-        <y>301</y>
-      </position>
-      <table>
-        <name>repositories</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>stability</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>is_on_master_mirror</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>architecture</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{f8caa2d5-11ba-485c-b273-8183713896bf}">
-      <position>
-        <x>549</x>
-        <y>105</y>
-      </position>
-      <table>
-        <name>install_target_providers</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>package</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>install_target</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}">
-      <position>
-        <x>360</x>
-        <y>56</y>
-      </position>
-      <table>
-        <name>binary_packages</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>build_assignment</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>epoch</name>
+            <name>line</name>
             <data-type>MEDIUMINT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>pkgver</name>
-            <data-type>VARCHAR(64)</data-type>
+            <name>description</name>
+            <data-type>TEXT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>pkgrel</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>sub_pkgrel</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>has_issues</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>is_tested</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>pkgname</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>architecture</name>
+            <name>importance</name>
             <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>sha512sum</name>
-            <data-type>VARCHAR(128)</data-type>
             <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}">
-      <position>
-        <x>187</x>
-        <y>130</y>
-      </position>
-      <table>
-        <name>build_slaves</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>ssh_key</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>currently_building</name>
-            <data-type>BIGINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>last_connection</name>
-            <data-type>TIME</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>logged_lines</name>
-            <data-type>BIGINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>last_action</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>trials</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}">
-      <position>
-        <x>247</x>
-        <y>291</y>
-      </position>
-      <table>
-        <name>build_assignments</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>package_source</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>architecture</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>is_blocked</name>
-            <data-type>VARCHAR(128)</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>is_black_listed</name>
-            <data-type>VARCHAR(128)</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>is_broken</name>
-            <data-type>BIT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>priority</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>return_date</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>False</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{a774fcb7-1193-4b57-947c-135212695915}">
-      <position>
-        <x>53</x>
-        <y>346</y>
-      </position>
-      <table>
-        <name>failed_builds</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>build_slave</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>build_assignment</name>
-            <data-type>BIGINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>date</name>
-            <data-type>TIMESTAMP</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>reason</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>log_file</name>
-            <data-type>VARCHAR(512)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{7b159780-7f39-45a7-9557-046874a57e43}">
-      <position>
-        <x>-62</x>
-        <y>370</y>
-      </position>
-      <table>
-        <name>fail_reasons</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>name</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>identifier</name>
-            <data-type>VARCHAR(64)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>severity</name>
-            <data-type>SMALLINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{92f54126-a433-458e-80b7-67235e560334}">
-      <position>
-        <x>754</x>
-        <y>399</y>
-      </position>
-      <table>
-        <name>repository_stability_relations</name>
-        <color>#ffffff</color>
-        <column-list>
-          <column>
-            <name>id</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
-          </column>
-          <column>
-            <name>more_stable</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>less_stable</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
             <primary-key>False</primary-key>
           </column>
         </column-list>
@@ -956,13 +290,127 @@
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{dc01c567-d657-4db7-8a55-d2763ed00cee}">
+    <item type="database-table" id="{92f54126-a433-458e-80b7-67235e560334}">
       <position>
-        <x>945</x>
-        <y>-70</y>
+        <x>754</x>
+        <y>399</y>
       </position>
       <table>
-        <name>todos</name>
+        <name>repository_stability_relations</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>more_stable</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>less_stable</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{7b159780-7f39-45a7-9557-046874a57e43}">
+      <position>
+        <x>-62</x>
+        <y>370</y>
+      </position>
+      <table>
+        <name>fail_reasons</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>identifier</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>severity</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{a774fcb7-1193-4b57-947c-135212695915}">
+      <position>
+        <x>53</x>
+        <y>346</y>
+      </position>
+      <table>
+        <name>failed_builds</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>build_slave</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>build_assignment</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>date</name>
+            <data-type>TIMESTAMP</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>reason</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>log_file</name>
+            <data-type>VARCHAR(512)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}">
+      <position>
+        <x>247</x>
+        <y>291</y>
+      </position>
+      <table>
+        <name>build_assignments</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -972,41 +420,461 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>file</name>
-            <data-type>VARCHAR(64)</data-type>
+            <name>package_source</name>
+            <data-type>BIGINT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>line</name>
-            <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>description</name>
-            <data-type>TEXT</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>importance</name>
+            <name>architecture</name>
             <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_blocked</name>
+            <data-type>VARCHAR(128)</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_black_listed</name>
+            <data-type>VARCHAR(128)</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_broken</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>priority</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>return_date</name>
+            <data-type>TIMESTAMP</data-type>
             <required>False</required>
             <primary-key>False</primary-key>
           </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{36980651-4f03-4748-aee8-1f9211aaafde}">
+    <item type="database-table" id="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}">
       <position>
-        <x>788</x>
+        <x>185</x>
+        <y>122</y>
+      </position>
+      <table>
+        <name>build_slaves</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>ssh_key</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>currently_building</name>
+            <data-type>BIGINT</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>last_connection</name>
+            <data-type>TIME</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>logged_lines</name>
+            <data-type>BIGINT</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>last_action</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>trials</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_sane</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}">
+      <position>
+        <x>360</x>
+        <y>56</y>
+      </position>
+      <table>
+        <name>binary_packages</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>build_assignment</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>epoch</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>pkgver</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>pkgrel</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>sub_pkgrel</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>has_issues</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_tested</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>pkgname</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>architecture</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>sha512sum</name>
+            <data-type>VARCHAR(128)</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{f8caa2d5-11ba-485c-b273-8183713896bf}">
+      <position>
+        <x>549</x>
+        <y>105</y>
+      </position>
+      <table>
+        <name>install_target_providers</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>package</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>install_target</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{844766fc-c5af-4f61-b51b-d3f9393c60ca}">
+      <position>
+        <x>549</x>
+        <y>301</y>
+      </position>
+      <table>
+        <name>repositories</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>stability</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_on_master_mirror</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>architecture</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{b3c86235-971a-4d3e-873c-c4179aa96cbc}">
+      <position>
+        <x>770</x>
+        <y>508</y>
+      </position>
+      <table>
+        <name>git_repositories</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>url</name>
+            <data-type>VARCHAR(128)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>directory</name>
+            <data-type>VARCHAR(128)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>head</name>
+            <data-type>VARCHAR(40)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}">
+      <position>
+        <x>539</x>
+        <y>533</y>
+      </position>
+      <table>
+        <name>upstream_repositories</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>git_repository</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{7c210122-c51d-4724-b7cc-22f143bc47ac}">
+      <position>
+        <x>226</x>
+        <y>473</y>
+      </position>
+      <table>
+        <name>package_sources</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>pkgbase</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>git_revision</name>
+            <data-type>VARCHAR(40)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>mod_git_revision</name>
+            <data-type>VARCHAR(40)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>upsream_package_repository</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>uses_upstream</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>uses_modification</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>commit_time</name>
+            <data-type>TIMESTAMP</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{04f424bf-6465-478b-9529-0038615b51d9}">
+      <position>
+        <x>415</x>
+        <y>321</y>
+      </position>
+      <table>
+        <name>architectures</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(16)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}">
+      <position>
+        <x>557</x>
+        <y>30</y>
+      </position>
+      <table>
+        <name>install_targets</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(64)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{caab4a73-46dc-49dc-ac51-d8ae916827c5}">
+      <position>
+        <x>348</x>
         <y>-60</y>
       </position>
       <table>
-        <name>todo_links</name>
+        <name>dependencies</name>
         <color>#ffffff</color>
         <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
           <column>
             <name>dependent</name>
             <data-type>BIGINT</data-type>
@@ -1019,21 +887,27 @@
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
+          <column>
+            <name>dependency_type</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{75e4ebd8-5915-4aff-8316-0c542d3953da}">
+    <item type="database-table" id="{be821d83-a9b4-4c0c-8e1b-433730200714}">
       <position>
-        <x>258</x>
-        <y>-44</y>
+        <x>540</x>
+        <y>-64</y>
       </position>
       <table>
-        <name>persons</name>
+        <name>dependency_types</name>
         <color>#ffffff</color>
         <column-list>
           <column>
             <name>id</name>
-            <data-type>MEDIUMINT</data-type>
+            <data-type>SMALLINT</data-type>
             <required>True</required>
             <primary-key>True</primary-key>
           </column>
@@ -1043,16 +917,28 @@
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
+          <column>
+            <name>relevant_for_building</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>relevant_for_binary_packages</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{f31249ea-ab19-45a4-9427-1854379ad8e7}">
+    <item type="database-table" id="{04b6fdc5-85ae-4416-8db5-034ad05be93a}">
       <position>
-        <x>106</x>
-        <y>-51</y>
+        <x>53</x>
+        <y>501</y>
       </position>
       <table>
-        <name>gpg_keys</name>
+        <name>build_dependency_loops</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -1062,27 +948,93 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>fingerprint</name>
-            <data-type>VARCHAR(40)</data-type>
-            <required>True</required>
-            <primary-key>False</primary-key>
-          </column>
-          <column>
-            <name>owner</name>
+            <name>loop</name>
             <data-type>MEDIUMINT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
+          <column>
+            <name>build_assignment</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{b5671c08-e24a-4293-b983-3c86b1a6d622}">
+    <item type="database-table" id="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}">
       <position>
-        <x>68</x>
-        <y>49</y>
+        <x>788</x>
+        <y>281</y>
       </position>
       <table>
-        <name>allowed_email_actions</name>
+        <name>repository_stabilities</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>name</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>bugtracker_category</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{d823ab09-1c04-44ee-ad4b-6802208967ff}">
+      <position>
+        <x>494</x>
+        <y>427</y>
+      </position>
+      <table>
+        <name>repository_moves</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>from_repository</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>to_repository</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>upstream_package_repository</name>
+            <data-type>SMALLINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
+    </item>
+    <item type="database-table" id="{5cbe15f1-fea8-48eb-a84f-97f7e22060f6}">
+      <position>
+        <x>-55</x>
+        <y>-72</y>
+      </position>
+      <table>
+        <name>email_log</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -1092,51 +1044,51 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>gpg_key</name>
-            <data-type>BIGINT</data-type>
+            <name>date</name>
+            <data-type>TIMESTAMP</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>success</name>
+            <data-type>BIT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
             <name>action</name>
             <data-type>MEDIUMINT</data-type>
-            <required>True</required>
+            <required>False</required>
             <primary-key>False</primary-key>
           </column>
-        </column-list>
-      </table>
-    </item>
-    <item type="database-table" id="{6180fcbf-5069-4d86-8919-fd39394f1813}">
-      <position>
-        <x>-68</x>
-        <y>71</y>
-      </position>
-      <table>
-        <name>email_actions</name>
-        <color>#ffffff</color>
-        <column-list>
           <column>
-            <name>id</name>
+            <name>count</name>
             <data-type>MEDIUMINT</data-type>
-            <required>True</required>
-            <primary-key>True</primary-key>
+            <required>False</required>
+            <primary-key>False</primary-key>
           </column>
           <column>
-            <name>name</name>
-            <data-type>VARCHAR(32)</data-type>
-            <required>True</required>
+            <name>gpg_key</name>
+            <data-type>BIGINT</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>comment</name>
+            <data-type>TEXT</data-type>
+            <required>False</required>
             <primary-key>False</primary-key>
           </column>
         </column-list>
       </table>
     </item>
-    <item type="database-table" id="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}">
+    <item type="database-table" id="{5f12db03-a8bb-4467-bab6-a57e545b9081}">
       <position>
-        <x>237</x>
-        <y>40</y>
+        <x>42</x>
+        <y>135</y>
       </position>
       <table>
-        <name>ssh_keys</name>
+        <name>ssh_log</name>
         <color>#ffffff</color>
         <column-list>
           <column>
@@ -1146,13 +1098,25 @@
             <primary-key>True</primary-key>
           </column>
           <column>
-            <name>owner</name>
-            <data-type>MEDIUMINT</data-type>
+            <name>date</name>
+            <data-type>TIMESTAMP</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
           </column>
           <column>
-            <name>fingerprint</name>
+            <name>build_slave</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>False</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>action</name>
+            <data-type>VARCHAR(32)</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>parameters</name>
             <data-type>TEXT</data-type>
             <required>True</required>
             <primary-key>False</primary-key>
@@ -1160,551 +1124,65 @@
         </column-list>
       </table>
     </item>
-    <item type="database-relationship" id="{0213a360-5a3b-484f-82c7-320003506c8a}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>647.922</x>
-              <y>273.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>633.703</x>
-              <y>301</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToMany</cardinality>
-        <modality>
-          <child>Optional</child>
-          <parent>Optional</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
+    <item type="database-table" id="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}">
+      <position>
+        <x>543</x>
+        <y>182</y>
+      </position>
+      <table>
+        <name>binary_packages_in_repositories</name>
+        <color>#ffffff</color>
+        <column-list>
+          <column>
+            <name>id</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>True</primary-key>
+          </column>
+          <column>
+            <name>package</name>
+            <data-type>BIGINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>repository</name>
+            <data-type>MEDIUMINT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>is_to_be_deleted</name>
+            <data-type>BIT</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+          <column>
+            <name>last_moved</name>
+            <data-type>TIMESTAMP</data-type>
+            <required>True</required>
+            <primary-key>False</primary-key>
+          </column>
+        </column-list>
+      </table>
     </item>
-    <item type="database-relationship" id="{c672e45e-2bd4-4ff1-9b42-fdd2443cae6a}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>543</x>
-              <y>227.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>511.719</x>
-              <y>173.208</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{9a650bd7-521d-499f-ac79-a0fd9226a656}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>153.531</x>
-              <y>180.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{5f12db03-a8bb-4467-bab6-a57e545b9081}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>187</x>
-              <y>196.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{30efa4b2-f4e7-4c8d-943e-44c699e54853}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>612.133</x>
-              <y>504.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>613.727</x>
-              <y>533</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>3</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{6094d4c4-439f-4e6c-94e1-736ae145362a}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>572.755</x>
-              <y>427</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>605.469</x>
-              <y>392.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{4b0f5386-c5f6-4fa4-9c78-f0d85410c366}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>651.51</x>
-              <y>427</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>661.938</x>
-              <y>392.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{c54c97e3-dd0a-4b21-9eeb-708d5b492e2a}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>461.146</x>
-              <y>231.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>462.273</x>
-              <y>321</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>9</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{d3ded37c-70d5-4388-8e27-2329f59a1d9c}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>499.672</x>
-              <y>-34.0625</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>540</x>
-              <y>-25.0938</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{be821d83-a9b4-4c0c-8e1b-433730200714}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>3</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{67f0b7bd-a201-45d1-b18c-db46a8de0480}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>718.406</x>
-              <y>346.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>788</x>
-              <y>312.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{ab992baa-6a2c-441b-a290-da42a791eb95}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>499.672</x>
-              <y>-8.125</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>557</x>
-              <y>54.9062</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{9a1b5925-a86a-470b-9c2b-3132fdcfc87e}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>627.109</x>
-              <y>105</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>607.016</x>
-              <y>79.8125</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{f26515ec-f37f-4eb3-a07f-6d5077208806}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>423.836</x>
-              <y>17.8125</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>435.859</x>
-              <y>56</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{89cacf0f-5195-48db-aace-02a13aa29eee}">
+    <item type="database-relationship" id="{25ec7ee3-9041-4ef4-a5b8-c41a06385813}">
       <line>
         <connector-list>
           <connector>
             <position>
               <x>549</x>
-              <y>136.906</y>
+              <y>346.906</y>
             </position>
             <angle>180</angle>
-            <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
           </connector>
           <connector>
             <position>
-              <x>511.719</x>
-              <y>114.604</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{48ec4e54-ceb5-48f1-b773-9ab92f6c1c5a}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>456.531</x>
-              <y>539.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{7c210122-c51d-4724-b7cc-22f143bc47ac}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>539</x>
-              <y>564.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>4</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{fb5f9b76-6f5d-4c06-b7dd-f89583096ba7}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>688.453</x>
-              <y>564.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>770</x>
-              <y>553.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{b3c86235-971a-4d3e-873c-c4179aa96cbc}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{1702ddc7-99c5-4af4-8731-eb8f4b6306d3}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>340.948</x>
-              <y>424.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>341.266</x>
-              <y>473</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{7c210122-c51d-4724-b7cc-22f143bc47ac}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{2e8b92fe-d2c0-47e0-91b6-d1667772d162}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>387.922</x>
-              <y>357.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>415</x>
+              <x>509.547</x>
               <y>345.906</y>
             </position>
-            <angle>180</angle>
+            <angle>0</angle>
             <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
           </connector>
         </connector-list>
@@ -1716,358 +1194,28 @@
           <parent>Mandatory</parent>
         </modality>
         <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{883853fb-bda9-450c-bde3-77422973b925}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>410.573</x>
-              <y>231.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>340.948</x>
-              <y>291</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{41ee8002-8436-4c74-9f79-75b7a8b9d0bf}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>281.302</x>
-              <y>263.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>293.974</x>
-              <y>291</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>3</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{40654aec-f5e1-4d82-a528-102a76a971d3}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>134.195</x>
-              <y>501</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{04b6fdc5-85ae-4416-8db5-034ad05be93a}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>293.974</x>
-              <y>424.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{307a930b-cbe8-4000-b89d-b6cc99479b19}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>128.859</x>
-              <y>346</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>234.151</x>
-              <y>263.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{35556854-c6c3-45e8-9e10-bd5150680fd2}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>204.719</x>
-              <y>398.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>247</x>
-              <y>357.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{65ace480-001e-4e4e-912d-2a975ff995c8}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>53</x>
-              <y>398.906</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>33.4375</x>
-              <y>408.906</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{7b159780-7f39-45a7-9557-046874a57e43}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
           <child>4</child>
           <parent>0</parent>
         </columns>
       </relationship>
     </item>
-    <item type="database-relationship" id="{8f5f94cd-2919-43f6-ae67-6b783850a2e7}">
+    <item type="database-relationship" id="{3539786a-db3b-4c5c-ba35-e89fb027cda8}">
       <line>
         <connector-list>
           <connector>
             <position>
-              <x>816.656</x>
-              <y>399</y>
+              <x>290.109</x>
+              <y>40</y>
             </position>
             <angle>90</angle>
-            <hub owner="{92f54126-a433-458e-80b7-67235e560334}"/>
+            <hub owner="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}"/>
           </connector>
           <connector>
             <position>
-              <x>840.635</x>
-              <y>344.812</y>
+              <x>293.289</x>
+              <y>5.8125</y>
             </position>
             <angle>270</angle>
-            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{fa899065-104a-466d-bc8c-16589a774a45}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>879.312</x>
-              <y>399</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{92f54126-a433-458e-80b7-67235e560334}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>893.271</x>
-              <y>344.812</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{bb03129e-aba8-4449-88c1-6c352745aeda}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>915.234</x>
-              <y>-43.3958</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{36980651-4f03-4748-aee8-1f9211aaafde}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>945</x>
-              <y>-39.3958</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{dc01c567-d657-4db7-8a55-d2763ed00cee}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>1</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{172204a1-76e9-45fc-826f-b3d174112734}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>915.234</x>
-              <y>-26.7917</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{36980651-4f03-4748-aee8-1f9211aaafde}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>945</x>
-              <y>-8.79167</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{dc01c567-d657-4db7-8a55-d2763ed00cee}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>0</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{abba2005-f23b-445f-aea6-ff9365bc1569}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>212.219</x>
-              <y>-19.0938</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>258</x>
-              <y>-19.0938</y>
-            </position>
-            <angle>180</angle>
             <hub owner="{75e4ebd8-5915-4aff-8316-0c542d3953da}"/>
           </connector>
         </connector-list>
@@ -2079,95 +1227,29 @@
           <parent>Mandatory</parent>
         </modality>
         <columns>
-          <child>2</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{803ce991-1984-4cab-9bb8-48acabb347af}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>35.2969</x>
-              <y>-12.0938</y>
-            </position>
-            <angle>0</angle>
-            <hub owner="{5cbe15f1-fea8-48eb-a84f-97f7e22060f6}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>106</x>
-              <y>-19.0938</y>
-            </position>
-            <angle>180</angle>
-            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
-          <child>5</child>
-          <parent>0</parent>
-        </columns>
-      </relationship>
-    </item>
-    <item type="database-relationship" id="{80755775-c938-4545-b4eb-1f08cfb1f0cc}">
-      <line>
-        <connector-list>
-          <connector>
-            <position>
-              <x>142.789</x>
-              <y>49</y>
-            </position>
-            <angle>90</angle>
-            <hub owner="{b5671c08-e24a-4293-b983-3c86b1a6d622}"/>
-          </connector>
-          <connector>
-            <position>
-              <x>159.109</x>
-              <y>12.8125</y>
-            </position>
-            <angle>270</angle>
-            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
-          </connector>
-        </connector-list>
-      </line>
-      <relationship>
-        <cardinality>OneToOne</cardinality>
-        <modality>
-          <child>Mandatory</child>
-          <parent>Mandatory</parent>
-        </modality>
-        <columns>
           <child>1</child>
           <parent>0</parent>
         </columns>
       </relationship>
     </item>
-    <item type="database-relationship" id="{af592aac-17cd-415f-99e8-9cf164311215}">
+    <item type="database-relationship" id="{326ba5fe-513e-48e9-b924-51305ffa2aeb}">
       <line>
         <connector-list>
           <connector>
             <position>
-              <x>68</x>
-              <y>80.9062</y>
+              <x>255.727</x>
+              <y>122</y>
             </position>
-            <angle>180</angle>
-            <hub owner="{b5671c08-e24a-4293-b983-3c86b1a6d622}"/>
+            <angle>90</angle>
+            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
           </connector>
           <connector>
             <position>
-              <x>29.4531</x>
-              <y>95.9062</y>
+              <x>290.109</x>
+              <y>103.812</y>
             </position>
-            <angle>0</angle>
-            <hub owner="{6180fcbf-5069-4d86-8919-fd39394f1813}"/>
+            <angle>270</angle>
+            <hub owner="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}"/>
           </connector>
         </connector-list>
       </line>
@@ -2216,24 +1298,24 @@
         </columns>
       </relationship>
     </item>
-    <item type="database-relationship" id="{326ba5fe-513e-48e9-b924-51305ffa2aeb}">
+    <item type="database-relationship" id="{af592aac-17cd-415f-99e8-9cf164311215}">
       <line>
         <connector-list>
           <connector>
             <position>
-              <x>257.727</x>
-              <y>130</y>
+              <x>68</x>
+              <y>80.9062</y>
             </position>
-            <angle>90</angle>
-            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
+            <angle>180</angle>
+            <hub owner="{b5671c08-e24a-4293-b983-3c86b1a6d622}"/>
           </connector>
           <connector>
             <position>
-              <x>290.109</x>
-              <y>103.812</y>
+              <x>29.4531</x>
+              <y>95.9062</y>
             </position>
-            <angle>270</angle>
-            <hub owner="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}"/>
+            <angle>0</angle>
+            <hub owner="{6180fcbf-5069-4d86-8919-fd39394f1813}"/>
           </connector>
         </connector-list>
       </line>
@@ -2249,24 +1331,24 @@
         </columns>
       </relationship>
     </item>
-    <item type="database-relationship" id="{3539786a-db3b-4c5c-ba35-e89fb027cda8}">
+    <item type="database-relationship" id="{80755775-c938-4545-b4eb-1f08cfb1f0cc}">
       <line>
         <connector-list>
           <connector>
             <position>
-              <x>290.109</x>
-              <y>40</y>
+              <x>142.789</x>
+              <y>49</y>
             </position>
             <angle>90</angle>
-            <hub owner="{33867a1e-ef36-4cc2-a08e-7366f56fbf5f}"/>
+            <hub owner="{b5671c08-e24a-4293-b983-3c86b1a6d622}"/>
           </connector>
           <connector>
             <position>
-              <x>293.289</x>
-              <y>5.8125</y>
+              <x>159.109</x>
+              <y>12.8125</y>
             </position>
             <angle>270</angle>
-            <hub owner="{75e4ebd8-5915-4aff-8316-0c542d3953da}"/>
+            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
           </connector>
         </connector-list>
       </line>
@@ -2282,24 +1364,222 @@
         </columns>
       </relationship>
     </item>
-    <item type="database-relationship" id="{25ec7ee3-9041-4ef4-a5b8-c41a06385813}">
+    <item type="database-relationship" id="{803ce991-1984-4cab-9bb8-48acabb347af}">
       <line>
         <connector-list>
           <connector>
             <position>
-              <x>549</x>
-              <y>346.906</y>
+              <x>35.2969</x>
+              <y>-12.0938</y>
             </position>
-            <angle>180</angle>
-            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+            <angle>0</angle>
+            <hub owner="{5cbe15f1-fea8-48eb-a84f-97f7e22060f6}"/>
           </connector>
           <connector>
             <position>
-              <x>509.547</x>
-              <y>345.906</y>
+              <x>106</x>
+              <y>-19.0938</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>5</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{abba2005-f23b-445f-aea6-ff9365bc1569}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>212.219</x>
+              <y>-19.0938</y>
             </position>
             <angle>0</angle>
-            <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
+            <hub owner="{f31249ea-ab19-45a4-9427-1854379ad8e7}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>258</x>
+              <y>-19.0938</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{75e4ebd8-5915-4aff-8316-0c542d3953da}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{172204a1-76e9-45fc-826f-b3d174112734}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>915.234</x>
+              <y>-43.3958</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{36980651-4f03-4748-aee8-1f9211aaafde}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>945</x>
+              <y>-39.3958</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{dc01c567-d657-4db7-8a55-d2763ed00cee}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>0</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{bb03129e-aba8-4449-88c1-6c352745aeda}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>915.234</x>
+              <y>-26.7917</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{36980651-4f03-4748-aee8-1f9211aaafde}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>945</x>
+              <y>-8.79167</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{dc01c567-d657-4db7-8a55-d2763ed00cee}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{fa899065-104a-466d-bc8c-16589a774a45}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>816.656</x>
+              <y>399</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{92f54126-a433-458e-80b7-67235e560334}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>840.635</x>
+              <y>344.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{8f5f94cd-2919-43f6-ae67-6b783850a2e7}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>879.312</x>
+              <y>399</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{92f54126-a433-458e-80b7-67235e560334}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>893.271</x>
+              <y>344.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{65ace480-001e-4e4e-912d-2a975ff995c8}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>53</x>
+              <y>398.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>33.4375</x>
+              <y>408.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{7b159780-7f39-45a7-9557-046874a57e43}"/>
           </connector>
         </connector-list>
       </line>
@@ -2311,6 +1591,732 @@
         </modality>
         <columns>
           <child>4</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{35556854-c6c3-45e8-9e10-bd5150680fd2}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>204.719</x>
+              <y>398.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>247</x>
+              <y>357.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{307a930b-cbe8-4000-b89d-b6cc99479b19}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>128.859</x>
+              <y>346</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{a774fcb7-1193-4b57-947c-135212695915}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>232.151</x>
+              <y>269.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{40654aec-f5e1-4d82-a528-102a76a971d3}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>134.195</x>
+              <y>501</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{04b6fdc5-85ae-4416-8db5-034ad05be93a}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>293.974</x>
+              <y>424.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{41ee8002-8436-4c74-9f79-75b7a8b9d0bf}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>279.302</x>
+              <y>269.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>293.974</x>
+              <y>291</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>3</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{883853fb-bda9-450c-bde3-77422973b925}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>410.573</x>
+              <y>231.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>340.948</x>
+              <y>291</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{2e8b92fe-d2c0-47e0-91b6-d1667772d162}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>387.922</x>
+              <y>357.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>415</x>
+              <y>345.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{1702ddc7-99c5-4af4-8731-eb8f4b6306d3}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>340.948</x>
+              <y>424.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{6ea5c997-98b5-4ec8-b63e-3f2acdcaf627}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>341.266</x>
+              <y>473</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{7c210122-c51d-4724-b7cc-22f143bc47ac}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{fb5f9b76-6f5d-4c06-b7dd-f89583096ba7}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>688.453</x>
+              <y>564.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>770</x>
+              <y>553.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{b3c86235-971a-4d3e-873c-c4179aa96cbc}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{48ec4e54-ceb5-48f1-b773-9ab92f6c1c5a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>456.531</x>
+              <y>539.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{7c210122-c51d-4724-b7cc-22f143bc47ac}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>539</x>
+              <y>564.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>4</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{89cacf0f-5195-48db-aace-02a13aa29eee}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>549</x>
+              <y>136.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>511.719</x>
+              <y>114.604</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{f26515ec-f37f-4eb3-a07f-6d5077208806}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>423.836</x>
+              <y>17.8125</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>435.859</x>
+              <y>56</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{9a1b5925-a86a-470b-9c2b-3132fdcfc87e}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>627.109</x>
+              <y>105</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{f8caa2d5-11ba-485c-b273-8183713896bf}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>607.016</x>
+              <y>79.8125</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{ab992baa-6a2c-441b-a290-da42a791eb95}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>499.672</x>
+              <y>-8.125</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>557</x>
+              <y>54.9062</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{e84f8e5f-28e0-4d8b-a7e5-0f80a896f74e}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{67f0b7bd-a201-45d1-b18c-db46a8de0480}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>718.406</x>
+              <y>346.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>788</x>
+              <y>312.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{fee50b4d-969b-4b5f-8545-90ea8f8f7aec}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{d3ded37c-70d5-4388-8e27-2329f59a1d9c}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>499.672</x>
+              <y>-34.0625</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{caab4a73-46dc-49dc-ac51-d8ae916827c5}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>540</x>
+              <y>-25.0938</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{be821d83-a9b4-4c0c-8e1b-433730200714}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>3</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{c54c97e3-dd0a-4b21-9eeb-708d5b492e2a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>461.146</x>
+              <y>231.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>462.273</x>
+              <y>321</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{04f424bf-6465-478b-9529-0038615b51d9}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>9</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{4b0f5386-c5f6-4fa4-9c78-f0d85410c366}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>572.755</x>
+              <y>427</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>605.469</x>
+              <y>392.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{6094d4c4-439f-4e6c-94e1-736ae145362a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>651.51</x>
+              <y>427</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>661.938</x>
+              <y>392.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{30efa4b2-f4e7-4c8d-943e-44c699e54853}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>612.133</x>
+              <y>504.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{d823ab09-1c04-44ee-ad4b-6802208967ff}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>613.727</x>
+              <y>533</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{d01e6205-a6dc-4724-a1fd-d4b2f73637ea}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>3</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{9a650bd7-521d-499f-ac79-a0fd9226a656}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>153.531</x>
+              <y>180.906</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{5f12db03-a8bb-4467-bab6-a57e545b9081}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>185</x>
+              <y>195.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{a945e439-8796-49e8-aa9b-7ce0a58a2c26}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>2</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{c672e45e-2bd4-4ff1-9b42-fdd2443cae6a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>543</x>
+              <y>227.906</y>
+            </position>
+            <angle>180</angle>
+            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>511.719</x>
+              <y>173.208</y>
+            </position>
+            <angle>0</angle>
+            <hub owner="{2e6c3b80-fef6-4d2b-8945-7ea6be1b646c}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToOne</cardinality>
+        <modality>
+          <child>Mandatory</child>
+          <parent>Mandatory</parent>
+        </modality>
+        <columns>
+          <child>1</child>
+          <parent>0</parent>
+        </columns>
+      </relationship>
+    </item>
+    <item type="database-relationship" id="{0213a360-5a3b-484f-82c7-320003506c8a}">
+      <line>
+        <connector-list>
+          <connector>
+            <position>
+              <x>647.922</x>
+              <y>273.812</y>
+            </position>
+            <angle>270</angle>
+            <hub owner="{b33d4844-b4e4-4ef6-944b-36b4113c2b82}"/>
+          </connector>
+          <connector>
+            <position>
+              <x>633.703</x>
+              <y>301</y>
+            </position>
+            <angle>90</angle>
+            <hub owner="{844766fc-c5af-4f61-b51b-d3f9393c60ca}"/>
+          </connector>
+        </connector-list>
+      </line>
+      <relationship>
+        <cardinality>OneToMany</cardinality>
+        <modality>
+          <child>Optional</child>
+          <parent>Optional</parent>
+        </modality>
+        <columns>
+          <child>2</child>
           <parent>0</parent>
         </columns>
       </relationship>

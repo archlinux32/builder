@@ -406,6 +406,7 @@ build_slaves	CREATE TABLE `build_slaves` (
 	 `last_action` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 	 `ssh_key` bigint(20) NOT NULL,
 	 `trials` mediumint(9) DEFAULT NULL,
+	 `is_sane` bit(1) NOT NULL,
 	 PRIMARY KEY (`id`),
 	 UNIQUE KEY `name` (`name`),
 	 KEY `currently_building` (`currently_building`),
