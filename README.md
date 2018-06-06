@@ -1,6 +1,7 @@
 # builder
 tools for building 32-bit archlinux packages from archlinux.org's official, 64-bit tested PKGBUILDs et al.
 This includes scripts to be run on the build master as well as scripts to be run on the build slaves (both residing in `bin`).
+The sources are currently hosted on https://git.archlinux32.org/archlinux32/builder.
 
 ## requirements
 * `moreutils`
