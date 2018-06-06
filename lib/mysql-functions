@@ -787,9 +787,9 @@ mysql_find_build_assignment_loops() {
       mysql_join_dependencies_binary_packages '' 'packages_dependent'
       mysql_join_binary_packages_binary_packages_in_repositories 'packages_dependency' 'packages_in_repository_dependency'
       mysql_join_binary_packages_binary_packages_in_repositories 'packages_dependent' 'packages_in_repository_dependent'
-      printf ' WHERE `packages_in_repositories_dependent`.`repository`=%s' \
+      printf ' WHERE `packages_in_repository_dependent`.`repository`=%s' \
         "${repository_ids__any_build_list}"
-      printf ' AND `packages_in_repositories_dependency`.`repository`=%s;\n' \
+      printf ' AND `packages_in_repository_dependency`.`repository`=%s;\n' \
         "${repository_ids__any_build_list}"
     } | \
       mysql_run_query | \
@@ -876,7 +876,7 @@ mysql_cleanup() {
     if [ "${operator}" = 'DELETE' ]; then
       printf 'UPDATE `repositories`'
     else
-      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `repositories`'
+      printf 'SELECT COUNT(DISTINCT `build_slaves`.`id`) FROM `binary_packages_in_repositories`'
     fi
     mysql_join_binary_packages_in_repositories_binary_packages
     printf ' AND `binary_packages_in_repositories`.`repository`=%s' \
